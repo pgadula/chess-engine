@@ -1,60 +1,6 @@
-use crate::types::{Color, Piece};
-use phf::phf_map;
-use std::slice::Iter;
-use self::FileRank::*;
+use crate::types::{Color, FileRank, Piece, PIECE_CHAR_MAP};
 
-static PIECE_CHAR_MAP: phf::Map<char, (Piece, Color)> = phf_map! {
-   'p'=> (Piece::Pawn, Color::Black),
-   'b'=> (Piece::Bishop, Color::Black),
-   'n'=> (Piece::Knight, Color::Black),
-   'r'=> (Piece::Rook, Color::Black),
-   'q'=> (Piece::Queen, Color::Black),
-   'k'=> (Piece::King, Color::Black),
-   'P'=> (Piece::Pawn, Color::White),
-   'B'=> (Piece::Bishop, Color::White),
-   'N'=> (Piece::Knight, Color::White),
-   'R'=> (Piece::Rook, Color::White),
-   'Q'=> (Piece::Queen, Color::White),
-   'K'=> (Piece::King, Color::White),
-};
-
-#[repr(u8)]
-#[derive(Clone, Copy, Debug)]
-pub enum FileRank {
-    A8, B8, C8, D8, E8, F8, G8, H8,
-    A7, B7, C7, D7, E7, F7, G7, H7,
-    A6, B6, C6, D6, E6, F6, G6, H6,
-    A5, B5, C5, D5, E5, F5, G5, H5,
-    A4, B4, C4, D4, E4, F4, G4, H4,
-    A3, B3, C3, D3, E3, F3, G3, H3,
-    A2, B2, C2, D2, E2, F2, G2, H2,
-    A1, B1, C1, D1, E1, F1, G1, H1
- }
-
-impl FileRank {
-    pub fn iterator() -> Iter<'static, FileRank> {
-    static FILE_RANK: [FileRank; 64] = [   
-        A8, B8, C8, D8, E8, F8, G8, H8,
-        A7, B7, C7, D7, E7, F7, G7, H7,
-        A6, B6, C6, D6, E6, F6, G6, H6,
-        A5, B5, C5, D5, E5, F5, G5, H5,
-        A4, B4, C4, D4, E4, F4, G4, H4,
-        A3, B3, C3, D3, E3, F3, G3, H3,
-        A2, B2, C2, D2, E2, F2, G2, H2,
-        A1, B1, C1, D1, E1, F1, G1, H1
-    ];
-    FILE_RANK.iter()
-    }
-}
-fn get_file_rank(value: u8) -> Option<FileRank> {
-    if value >= FileRank::A8 as u8 && value <= FileRank::H1 as u8 {
-        Some(unsafe { std::mem::transmute(value) })
-    } else {
-        println!("value none {}",value);
-        None
-    }
-}
-
+#[derive(Debug, Clone, Copy)]
 pub struct Game {
     pub w_pawn: u64,
     pub w_bishop: u64,
@@ -70,6 +16,8 @@ pub struct Game {
     pub b_king: u64,
     pub w_turn: bool,
     pub castling: Castling,
+    pub halfmove_clock:u8,
+    pub fullmove_number:u8
 }
 
 impl Game {
@@ -94,6 +42,9 @@ impl Game {
                 w_king_side: false,
                 w_queen_side: false,
             },
+            halfmove_clock:0,
+            fullmove_number:0
+   
         }
     }
     pub fn from_fen(fen: &str) -> Game {
@@ -112,7 +63,7 @@ impl Game {
         for char in piece_placement.chars() {
             if let Some(piece) = PIECE_CHAR_MAP.get(&char) {
                 let index = (row * 8) + col;
-                if let Some(rank_file) = get_file_rank(index) {
+                if let Some(rank_file) = FileRank::get_file_rank(index) {
                     game.set_piece(piece, rank_file);
                     // println!("Placed piece {:?} {:?} at {:?}", piece.0, piece.1, rank_file);
 
@@ -154,8 +105,8 @@ impl Game {
         // Handle en passant, halfmove clock, and fullmove number if necessary
         // Example:
         // game.en_passant = parse_en_passant(en_passant);
-        // game.halfmove_clock = halfmove_clock.parse().unwrap_or(0);
-        // game.fullmove_number = fullmove_number.parse().unwrap_or(1);
+        game.halfmove_clock = halfmove_clock.parse().unwrap_or(0);
+        game.fullmove_number = fullmove_number.parse().unwrap_or(1);
     
         game.castling = castling;
     
@@ -258,7 +209,7 @@ impl Game {
     }
 }
 
-
+#[derive(Debug, Clone, Copy)]
 pub struct Castling {
     w_king_side: bool,
     w_queen_side: bool,

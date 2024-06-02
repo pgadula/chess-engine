@@ -1,7 +1,7 @@
 mod types;
 mod game;
-use game::{FileRank, Game};
-use types::{Color, Piece};
+use game::Game;
+use types::{Color, FileRank, Piece};
 
 
 fn main() {
@@ -17,14 +17,17 @@ fn main() {
     positions.into_iter().map(|fen| Game::from_fen(fen))
     .for_each(|game| {
         game.print();
+        println!()
     });
-        let mut game = Game::empty();
+        let mut game = Game::new_game();
         game.set_piece(&(Piece::Pawn, Color::White), FileRank::H1);
         game.set_piece(&(Piece::Rook, Color::Black), FileRank::A8);
         game.set_piece(&(Piece::Pawn, Color::Black), FileRank::A7);
 
 
         game.print();
+
+        println!("{:?}", game)
     
 }
 
