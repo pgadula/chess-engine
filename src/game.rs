@@ -4,52 +4,53 @@ use std::slice::Iter;
 use self::FileRank::*;
 
 static PIECE_CHAR_MAP: phf::Map<char, (Piece, Color)> = phf_map! {
-   'p'=> (Piece::Pawn, Color::White),
-   'b'=> (Piece::Bishop, Color::White),
-   'n'=> (Piece::Knight, Color::White),
-   'r'=> (Piece::Rook, Color::White),
-   'q'=> (Piece::Queen, Color::White),
-   'k'=> (Piece::King, Color::White),
-   'P'=> (Piece::Pawn, Color::Black),
-   'B'=> (Piece::Bishop, Color::Black),
-   'N'=> (Piece::Knight, Color::Black),
-   'R'=> (Piece::Rook, Color::Black),
-   'Q'=> (Piece::Queen, Color::Black),
-   'K'=> (Piece::King, Color::Black),
+   'p'=> (Piece::Pawn, Color::Black),
+   'b'=> (Piece::Bishop, Color::Black),
+   'n'=> (Piece::Knight, Color::Black),
+   'r'=> (Piece::Rook, Color::Black),
+   'q'=> (Piece::Queen, Color::Black),
+   'k'=> (Piece::King, Color::Black),
+   'P'=> (Piece::Pawn, Color::White),
+   'B'=> (Piece::Bishop, Color::White),
+   'N'=> (Piece::Knight, Color::White),
+   'R'=> (Piece::Rook, Color::White),
+   'Q'=> (Piece::Queen, Color::White),
+   'K'=> (Piece::King, Color::White),
 };
 
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum FileRank {
-   A1,B1,C1,D1,E1,F1,G1,H1,
-   A2,B2,C2,D2,E2,F2,G2,H2,
-   A3,B3,C3,D3,E3,F3,G3,H3,
-   A4,B4,C4,D4,E4,F4,G4,H4,
-   A5,B5,C5,D5,E5,F5,G5,H5,
-   A6,B6,C6,D6,E6,F6,G6,H6,
-   A7,B7,C7,D7,E7,F7,G7,H7,
-   A8,B8,C8,D8,E8,F8,G8,H8
-}
+    A8, B8, C8, D8, E8, F8, G8, H8,
+    A7, B7, C7, D7, E7, F7, G7, H7,
+    A6, B6, C6, D6, E6, F6, G6, H6,
+    A5, B5, C5, D5, E5, F5, G5, H5,
+    A4, B4, C4, D4, E4, F4, G4, H4,
+    A3, B3, C3, D3, E3, F3, G3, H3,
+    A2, B2, C2, D2, E2, F2, G2, H2,
+    A1, B1, C1, D1, E1, F1, G1, H1
+ }
 
 impl FileRank {
     pub fn iterator() -> Iter<'static, FileRank> {
     static FILE_RANK: [FileRank; 64] = [   
-       A1, B1, C1, D1, E1, F1, G1, H1,
-       A2, B2, C2, D2, E2, F2, G2, H2,
-       A3, B3, C3, D3, E3, F3, G3, H3,
-       A4, B4, C4, D4, E4, F4, G4, H4,
-       A5, B5, C5, D5, E5, F5, G5, H5,
-       A6, B6, C6, D6, E6, F6, G6, H6,
-       A7, B7, C7, D7, E7, F7, G7, H7,
-       A8, B8, C8, D8, E8, F8, G8, H8
+        A8, B8, C8, D8, E8, F8, G8, H8,
+        A7, B7, C7, D7, E7, F7, G7, H7,
+        A6, B6, C6, D6, E6, F6, G6, H6,
+        A5, B5, C5, D5, E5, F5, G5, H5,
+        A4, B4, C4, D4, E4, F4, G4, H4,
+        A3, B3, C3, D3, E3, F3, G3, H3,
+        A2, B2, C2, D2, E2, F2, G2, H2,
+        A1, B1, C1, D1, E1, F1, G1, H1
     ];
     FILE_RANK.iter()
     }
 }
 fn get_file_rank(value: u8) -> Option<FileRank> {
-    if value >= FileRank::A1 as u8 && value <= FileRank::H8 as u8 {
+    if value >= FileRank::A8 as u8 && value <= FileRank::H1 as u8 {
         Some(unsafe { std::mem::transmute(value) })
     } else {
+        println!("value none {}",value);
         None
     }
 }
@@ -96,15 +97,26 @@ impl Game {
         }
     }
     pub fn from_fen(fen: &str) -> Game {
-        let mut iter = fen.chars();
+        let mut parts = fen.split_whitespace();
+        let piece_placement = parts.next().unwrap_or("");
+        let active_color = parts.next().unwrap_or("");
+        let castling_rights = parts.next().unwrap_or("");
+        let en_passant = parts.next().unwrap_or("");
+        let halfmove_clock = parts.next().unwrap_or("");
+        let fullmove_number = parts.next().unwrap_or("");
+    
         let mut game = Game::empty();
-
         let mut row: u8 = 0;
         let mut col: u8 = 0;
-        while let Some(char) = iter.next() {
+    
+        for char in piece_placement.chars() {
             if let Some(piece) = PIECE_CHAR_MAP.get(&char) {
-                let rank_file: FileRank = get_file_rank((row * 8) + col).unwrap();
-                game.set_piece(piece, rank_file);
+                let index = (row * 8) + col;
+                if let Some(rank_file) = get_file_rank(index) {
+                    game.set_piece(piece, rank_file);
+                    // println!("Placed piece {:?} {:?} at {:?}", piece.0, piece.1, rank_file);
+
+                }
                 col += 1;
             } else {
                 match char {
@@ -112,57 +124,55 @@ impl Game {
                         row += 1;
                         col = 0;
                     }
-                    '1'..='9' => {
-                        let offset = char.to_digit(10).unwrap() as u8;
-                        col += offset;
-                    }
-                    ' ' => {
-                        break;
+                    '1'..='8' => {
+                        if let Some(offset) = char.to_digit(10) {
+                            col += offset as u8;
+                        }
                     }
                     _ => {}
                 }
             }
         }
+    
+        game.w_turn = match active_color {
+            "w" => true,
+            "b" => false,
+            _ => game.w_turn, // default value
+        };
+    
         let mut castling = Castling::new();
-        while let Some(char) = iter.next() {
+        for char in castling_rights.chars() {
             match char {
-                'b' => {
-                    game.w_turn = false;
-                }
-                'w' => {
-                    game.w_turn = true;
-                }
-                'k' => {
-                    castling.w_king_side = true;
-                }
-                'q' => {
-                    castling.w_queen_side = true;
-                }
-                'K' => {
-                    castling.b_king_side = true;
-                }
-
-                'Q' => {
-                    castling.b_queen_side = true;
-                }
-
+                'K' => castling.w_king_side = true,
+                'Q' => castling.w_queen_side = true,
+                'k' => castling.b_king_side = true,
+                'q' => castling.b_queen_side = true,
                 _ => {}
             }
         }
+    
+        // Handle en passant, halfmove clock, and fullmove number if necessary
+        // Example:
+        // game.en_passant = parse_en_passant(en_passant);
+        // game.halfmove_clock = halfmove_clock.parse().unwrap_or(0);
+        // game.fullmove_number = fullmove_number.parse().unwrap_or(1);
+    
         game.castling = castling;
-
+    
         game
     }
 
     pub fn new_game() -> Game {
         Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
+
     pub fn set_bit(bit_board: &mut u64, file_rank: FileRank) {
         let file_rank_num = file_rank as u8;
 
         let mask: u64 = 0x1 << file_rank_num;
         *bit_board |= mask;
     }
+
     pub fn clear_bit(bit_board: &mut u64, file_rank: FileRank) {
         let file_rank_num = file_rank as u8;
 
@@ -198,7 +208,7 @@ impl Game {
 
     pub fn print(self) {
         println!("  a b c d e f g h");
-        println!(" +----------------");
+        println!(" +----------------+");
 
         FileRank::iterator().enumerate().for_each(|(index, file_rank)| {
             let f_r = file_rank.clone();
@@ -243,7 +253,7 @@ impl Game {
         });
 
         println!("|1");
-        println!(" +----------------");
+        println!(" +----------------+");
         println!("  a b c d e f g h");
     }
 }
