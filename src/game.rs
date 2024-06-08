@@ -19,6 +19,13 @@ pub struct Game {
     pub halfmove_clock:u8,
     pub fullmove_number:u8
 }
+pub trait FenParser {
+    fn deserialize(fen: &str) -> Game;
+    fn serialize(self, output: &mut str) -> &str;
+}
+pub trait MoveGeneration {
+    fn get(fr:FileRank) ->Vec<String>;
+}
 
 impl Game {
     pub fn empty() -> Game {
@@ -46,75 +53,12 @@ impl Game {
             fullmove_number:0
    
         }
-    }
-    pub fn from_fen(fen: &str) -> Game {
-        let mut parts = fen.split_whitespace();
-        let piece_placement = parts.next().unwrap_or("");
-        let active_color = parts.next().unwrap_or("");
-        let castling_rights = parts.next().unwrap_or("");
-        let en_passant = parts.next().unwrap_or("");
-        let halfmove_clock = parts.next().unwrap_or("");
-        let fullmove_number = parts.next().unwrap_or("");
-    
-        let mut game = Game::empty();
-        let mut row: u8 = 0;
-        let mut col: u8 = 0;
-    
-        for char in piece_placement.chars() {
-            if let Some(piece) = PIECE_CHAR_MAP.get(&char) {
-                let index = (row * 8) + col;
-                if let Some(rank_file) = FileRank::get_file_rank(index) {
-                    game.set_piece(piece, rank_file);
-                    // println!("Placed piece {:?} {:?} at {:?}", piece.0, piece.1, rank_file);
 
-                }
-                col += 1;
-            } else {
-                match char {
-                    '/' => {
-                        row += 1;
-                        col = 0;
-                    }
-                    '1'..='8' => {
-                        if let Some(offset) = char.to_digit(10) {
-                            col += offset as u8;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    
-        game.w_turn = match active_color {
-            "w" => true,
-            "b" => false,
-            _ => game.w_turn, // default value
-        };
-    
-        let mut castling = Castling::new();
-        for char in castling_rights.chars() {
-            match char {
-                'K' => castling.w_king_side = true,
-                'Q' => castling.w_queen_side = true,
-                'k' => castling.b_king_side = true,
-                'q' => castling.b_queen_side = true,
-                _ => {}
-            }
-        }
-    
-        // Handle en passant, halfmove clock, and fullmove number if necessary
-        // Example:
-        // game.en_passant = parse_en_passant(en_passant);
-        game.halfmove_clock = halfmove_clock.parse().unwrap_or(0);
-        game.fullmove_number = fullmove_number.parse().unwrap_or(1);
-    
-        game.castling = castling;
-    
-        game
+ 
     }
-
+   
     pub fn new_game() -> Game {
-        Game::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+        Game::deserialize("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
 
     pub fn set_bit(bit_board: &mut u64, file_rank: FileRank) {
@@ -128,6 +72,10 @@ impl Game {
         let file_rank_num = file_rank as u8;
 
         let mask: u64 = 0x1 << file_rank_num;
+        *bit_board ^= mask;
+    }
+    pub fn clear_bit_by_index(bit_board: &mut u64, index:u8) {
+        let mask: u64 = 0x1 << index;
         *bit_board ^= mask;
     }
 
@@ -151,6 +99,25 @@ impl Game {
             (Piece::King, Color::Black) => Game::set_bit(&mut self.b_king, file_rank),
         }
     }
+    pub fn get_all_pieces(self)->u64{        
+        return 
+        self.w_pawn   |
+        self.w_bishop |
+        self.w_knight | 
+        self.w_rook   |
+        self.w_queen  |
+        self.w_king   |
+        self.b_pawn   |
+        self.b_bishop |
+        self.b_knight | 
+        self.b_rook   |
+        self.b_queen  |
+        self.b_king   
+    }
+    pub fn empty_square(self)->u64{
+        return !self.get_all_pieces()
+    }
+
     pub fn get(bit_board: u64, file_rank: FileRank) -> bool {
         let file_rank_num = file_rank as u8;
         let mask: u64 = 0x1 << file_rank_num;
@@ -211,13 +178,13 @@ impl Game {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Castling {
-    w_king_side: bool,
-    w_queen_side: bool,
-    b_king_side: bool,
-    b_queen_side: bool,
+    pub w_king_side: bool,
+    pub w_queen_side: bool,
+    pub b_king_side: bool,
+    pub b_queen_side: bool,
 }
 impl Castling {
-    fn new() -> Castling {
+    pub fn new() -> Castling {
         Castling {
             b_king_side: false,
             b_queen_side: false,
@@ -226,3 +193,80 @@ impl Castling {
         }
     }
 }
+
+
+
+
+impl FenParser for Game {
+    fn deserialize(fen: &str) -> Game {
+       let mut parts = fen.split_whitespace();
+       let piece_placement = parts.next().unwrap_or("");
+       let active_color = parts.next().unwrap_or("");
+       let castling_rights = parts.next().unwrap_or("");
+       let _en_passant = parts.next().unwrap_or("");
+       let halfmove_clock = parts.next().unwrap_or("");
+       let fullmove_number = parts.next().unwrap_or("");
+   
+       let mut game = Game::empty();
+       let mut row: u8 = 0;
+       let mut col: u8 = 0;
+   
+       for char in piece_placement.chars() {
+           if let Some(piece) = PIECE_CHAR_MAP.get(&char) {
+               let index = (row * 8) + col;
+               if let Some(rank_file) = FileRank::get_file_rank(index) {
+                   game.set_piece(piece, rank_file);
+                   // println!("Placed piece {:?} {:?} at {:?}", piece.0, piece.1, rank_file);
+
+               }
+               col += 1;
+           } else {
+               match char {
+                   '/' => {
+                       row += 1;
+                       col = 0;
+                   }
+                   '1'..='8' => {
+                       if let Some(offset) = char.to_digit(10) {
+                           col += offset as u8;
+                       }
+                   }
+                   _ => {}
+               }
+           }
+       }
+   
+       game.w_turn = match active_color {
+           "w" => true,
+           "b" => false,
+           _ => game.w_turn, // default value
+       };
+   
+       let mut castling = Castling::new();
+       for char in castling_rights.chars() {
+           match char {
+               'K' => castling.w_king_side = true,
+               'Q' => castling.w_queen_side = true,
+               'k' => castling.b_king_side = true,
+               'q' => castling.b_queen_side = true,
+               _ => {}
+           }
+       }
+   
+       game.halfmove_clock = halfmove_clock.parse().unwrap_or(0);
+       game.fullmove_number = fullmove_number.parse().unwrap_or(1);
+   
+       game.castling = castling;
+   
+       game
+   }
+   
+    fn serialize(self, _output: &mut str) -> &str {
+        todo!()
+    }
+
+}
+
+
+
+
