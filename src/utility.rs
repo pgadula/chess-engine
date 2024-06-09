@@ -1,4 +1,4 @@
-use crate::{game::Game, types::{Move, RANK_2}};
+use crate::{game::Game, types::{Move, RANK_2, RANK_3}};
 
 pub fn print_chessboard_from_u64(number: u64) {
     // Convert the number to a 64-bit binary string, padded with zeros if necessary
@@ -22,12 +22,12 @@ pub fn get_pawn_moves(game: &Game)->Vec<Move>{
     while pawns > 0{
         let index = pawns.trailing_zeros() as u8;
         let isolated_pawn:u64 = 1 << index as u64;   
-        let push_pawn:u64 = (isolated_pawn >> 8) & blockers;
-        let double_push = (isolated_pawn & RANK_2) >> (8 * 2) & blockers;
-        if push_pawn > 0{
+        let single_push:u64 = (isolated_pawn >> 8) & blockers;
+        let double_push = (single_push & RANK_3)  >> 8 & blockers;
+        if single_push > 0{
             let mv = Move{
                 from: index,
-                to: push_pawn.trailing_zeros() as u8
+                to: single_push.trailing_zeros() as u8
             };
             println!("{}", mv);
             moves.push( mv );
