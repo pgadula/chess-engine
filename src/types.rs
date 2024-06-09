@@ -1,5 +1,5 @@
 use phf::phf_map;
-use std::{path::Display, slice::Iter};
+use std::slice::Iter;
 use self::FileRank::*;
 #[derive(Debug)]
 pub enum Piece {
@@ -45,7 +45,7 @@ pub static PIECE_CHAR_MAP: phf::Map<char, (Piece, Color)> = phf_map! {
      A1, B1, C1, D1, E1, F1, G1, H1
   }
 
-static _FILE_RANK_CHAR: [&'static str; 64] = [
+static FILE_RANK_CHAR: [&'static str; 64] = [
     "A8", "B8", "C8", "D8", "E8", "F8", "G8", "H8",
     "A7", "B7", "C7", "D7", "E7", "F7", "G7", "H7",
     "A6", "B6", "C6", "D6", "E6", "F6", "G6", "H6",
@@ -55,6 +55,7 @@ static _FILE_RANK_CHAR: [&'static str; 64] = [
     "A2", "B2", "C2", "D2", "E2", "F2", "G2", "H2",
     "A1", "B1", "C1", "D1", "E1", "F1", "G1", "H1"
 ];
+
 static FILE_RANK: [FileRank; 64] = [   
     A8, B8, C8, D8, E8, F8, G8, H8,
     A7, B7, C7, D7, E7, F7, G7, H7,
@@ -90,10 +91,10 @@ static FILE_RANK: [FileRank; 64] = [
 
  impl std::fmt::Display for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let fr = _FILE_RANK_CHAR[self.from as usize];
-        let to = _FILE_RANK_CHAR[self.to as usize];
+        let from = FILE_RANK_CHAR[self.from as usize];
+        let to: &str = FILE_RANK_CHAR[self.to as usize];
 
-        write!(f, "(from: {}, to: {})", fr,to)
+        write!(f, "from: {}, to: {}", from, to)
     }
 }
 
@@ -108,3 +109,12 @@ impl std::fmt::Display for Moves {
         Ok(())
     }
 }
+
+pub static RANK_8: u64 =  0xFF << (8 * 0);
+pub static RANK_7: u64 =  0xFF << (8 * 1);
+pub static RANK_6: u64 =  0xFF << (8 * 2);
+pub static RANK_5: u64 =  0xFF << (8 * 3);
+pub static RANK_4: u64 =  0xFF << (8 * 4);
+pub static RANK_3: u64 =  0xFF << (8 * 5);
+pub static RANK_2: u64 =  0xFF << (8 * 6);
+pub static RANK_1: u64 =  0xFF << (8 * 7);

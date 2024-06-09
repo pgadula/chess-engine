@@ -79,7 +79,7 @@ impl Game {
         *bit_board ^= mask;
     }
 
-    fn generate_move() {
+    fn _generate_move() {
         todo!()
     }
 
