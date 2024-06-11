@@ -19,12 +19,18 @@ pub struct Game {
     pub halfmove_clock:u8,
     pub fullmove_number:u8
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct Castling {
+    pub w_king_side: bool,
+    pub w_queen_side: bool,
+    pub b_king_side: bool,
+    pub b_queen_side: bool,
+}
+
 pub trait FenParser {
     fn deserialize(fen: &str) -> Game;
     fn serialize(self, output: &mut str) -> &str;
-}
-pub trait MoveGeneration {
-    fn get(fr:FileRank) ->Vec<String>;
 }
 
 impl Game {
@@ -51,10 +57,7 @@ impl Game {
             },
             halfmove_clock:0,
             fullmove_number:0
-   
         }
-
- 
     }
    
     pub fn new_game() -> Game {
@@ -63,24 +66,19 @@ impl Game {
 
     pub fn set_bit(bit_board: &mut u64, file_rank: FileRank) {
         let file_rank_num = file_rank as u8;
-
         let mask: u64 = 0x1 << file_rank_num;
         *bit_board |= mask;
     }
 
     pub fn clear_bit(bit_board: &mut u64, file_rank: FileRank) {
         let file_rank_num = file_rank as u8;
-
         let mask: u64 = 0x1 << file_rank_num;
         *bit_board ^= mask;
     }
+    
     pub fn clear_bit_by_index(bit_board: &mut u64, index:u8) {
         let mask: u64 = 0x1 << index;
         *bit_board ^= mask;
-    }
-
-    fn _generate_move() {
-        todo!()
     }
 
     pub fn set_piece(&mut self, mv: &(Piece, Color), file_rank: FileRank) {
@@ -176,13 +174,7 @@ impl Game {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Castling {
-    pub w_king_side: bool,
-    pub w_queen_side: bool,
-    pub b_king_side: bool,
-    pub b_queen_side: bool,
-}
+
 impl Castling {
     pub fn new() -> Castling {
         Castling {
@@ -193,9 +185,6 @@ impl Castling {
         }
     }
 }
-
-
-
 
 impl FenParser for Game {
     fn deserialize(fen: &str) -> Game {
@@ -255,7 +244,6 @@ impl FenParser for Game {
    
        game.halfmove_clock = halfmove_clock.parse().unwrap_or(0);
        game.fullmove_number = fullmove_number.parse().unwrap_or(1);
-   
        game.castling = castling;
    
        game
@@ -264,9 +252,4 @@ impl FenParser for Game {
     fn serialize(self, _output: &mut str) -> &str {
         todo!()
     }
-
 }
-
-
-
-
