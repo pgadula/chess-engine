@@ -80,6 +80,17 @@ impl Game {
         let mask: u64 = 0x1 << index;
         *bit_board ^= mask;
     }
+    
+    //Kernighan’s algorithm
+    pub fn bit_count(bit_board: u64) -> usize {
+        let mut b = bit_board;
+        let mut count = 0;
+        while b != 0 {
+            b &= b - 1; // Clears the lowest set bit
+            count += 1;
+        }
+        count
+    }
 
     pub fn set_piece(&mut self, mv: &(Piece, Color), file_rank: FileRank) {
         match mv {

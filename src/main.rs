@@ -21,18 +21,19 @@ fn main() {
     println!();
     game.print();
 
+    let cb = Game::bit_count(game.w_pawn);
+    print!("bit count {}", cb);
+    // FileRank::iterator().for_each(|fr|{
+    //   println!("for rank {:?}", fr);
+    //   let board = _gen_rook_mask(*fr);
 
-    FileRank::iterator().for_each(|fr|{
-      println!("for rank {:?}", fr);
-      let board = _gen_rook_mask(*fr);
+    //   print_chessboard_from_u64(board);
+    //   println!();
+    //   println!("mask {}", board);
+    //   let pre = ROOK_ATTACK_MASK[(*fr) as usize];
+    //   assert_eq!(pre, board)
 
-      print_chessboard_from_u64(board);
-      println!();
-      println!("mask {}", board);
-      let pre = ROOK_ATTACK_MASK[(*fr) as usize];
-      assert_eq!(pre, board)
-
-    });
+    // });
 
 }
 
