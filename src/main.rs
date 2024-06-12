@@ -5,35 +5,28 @@ mod moves;
 mod precalculated;
 
 use game::Game;
-use moves::{_gen_rook_mask, get_pawn_moves};
-use precalculated::ROOK_ATTACK_MASK;
-use types::{Color, FileRank::{self, *}, Moves, Piece, FILE_RANK, RANK_1, RANK_8};
-use utility::{ print_chessboard_from_u64};
+
+
+use types::{Color, FileRank::{self, *}, Piece};
+use utility::print_as_board;
+
 
 
 fn main() {
 
-   let mut game = Game::new_game();
-   game.set_piece(&(Piece::Pawn, Color::White), E4);
-   // Game::clear_bit(&mut game.w_pawn, E7);
+    let mut board:u64 = 0;
 
-   game.w_turn = false;
-    println!();
-    game.print();
-
-    let cb = Game::bit_count(game.w_pawn);
-    print!("bit count {}", cb);
-    // FileRank::iterator().for_each(|fr|{
-    //   println!("for rank {:?}", fr);
-    //   let board = _gen_rook_mask(*fr);
-
-    //   print_chessboard_from_u64(board);
-    //   println!();
-    //   println!("mask {}", board);
-    //   let pre = ROOK_ATTACK_MASK[(*fr) as usize];
-    //   assert_eq!(pre, board)
-
-    // });
-
+    for r in 0..8{
+        for f in 0..8{
+            if f != 7{
+                let index:u8 = r * 8 + f;
+                if(f > 1){
+                    Game::set_bit_by_index(&mut board, index)
+                }
+            }
+        }
+    }
+    print_as_board(board);
+    print!("{board}");
 }
 

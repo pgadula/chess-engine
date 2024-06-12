@@ -69,6 +69,10 @@ impl Game {
         let mask: u64 = 0x1 << file_rank_num;
         *bit_board |= mask;
     }
+    pub fn set_bit_by_index(bit_board: &mut u64, index:u8) {
+        let mask: u64 = 0x1 << index;
+        *bit_board |= mask;
+    }
 
     pub fn clear_bit(bit_board: &mut u64, file_rank: FileRank) {
         let file_rank_num = file_rank as u8;
