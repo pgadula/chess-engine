@@ -2,7 +2,7 @@ use std::iter::zip;
 
 use crate::{
     game::Game,
-    types::{FileRank, Move, RANK_3, RANK_6},
+    types::{Color, FileRank, Move, NOT_A, NOT_AB, NOT_GH, NOT_H, RANK_3, RANK_6}, utility::print_as_board,
 };
 
 pub fn get_pawn_moves(game: &Game) -> Vec<Move> {
@@ -54,31 +54,10 @@ pub fn get_pawn_moves(game: &Game) -> Vec<Move> {
     return moves;
 }
 
-// pub fn _gen_rook_mask(file_rank: FileRank)->u64{
-//     let mut attacks:u64 = 0;
-//     let file_rank_num = file_rank as u64;
-//     let tr:u64 = file_rank_num / 8;
-//     let tf:u64 = file_rank_num % 8;
-//     for f in 1..7 {
-//         if f != tf {
-//             attacks |= 1 << (tr * 8 + f);
-//         }
-//     }
-
-//     // Vertical attacks
-//     for r in 1..7 {
-//         if r != tr {
-//             attacks |= 1 << (r * 8 + tf);
-//         }
-//     }
-//     attacks
-// }
-
-pub fn _gen_rook_mask(file_rank: FileRank) -> u64 {
+pub fn _gen_rook_attacks_mask(file_rank: FileRank) -> u64 {
     let mut attacks: u64 = 0;
-    let file_rank_num = file_rank as u64;
-    let tr: u64 = file_rank_num / 8;
-    let tf: u64 = file_rank_num % 8;
+    let tr: u8 = file_rank.rank();
+    let tf: u8 = file_rank.file();
     for f in (tf + 1)..7 {
         attacks |= 1 << (tr * 8 + f);
     }
@@ -94,11 +73,10 @@ pub fn _gen_rook_mask(file_rank: FileRank) -> u64 {
     attacks
 }
 
-pub fn _gen_bishop_mask(file_rank: FileRank) -> u64 {
+pub fn _gen_bishop_attacks_mask(file_rank: FileRank) -> u64 {
     let mut attacks: u64 = 0;
-    let file_rank_num = file_rank as u64;
-    let tr: u64 = file_rank_num / 8;
-    let tf: u64 = file_rank_num % 8;
+    let tr: u8 = file_rank.rank();
+    let tf: u8 = file_rank.file();
     for (r, f) in zip((tr + 1)..7, (tf + 1)..7) {
         attacks |= 1 << (r * 8 + f);
     }
@@ -114,4 +92,28 @@ pub fn _gen_bishop_mask(file_rank: FileRank) -> u64 {
         attacks |= 1 << (r * 8 + f);
     }
     attacks
+}
+
+
+pub fn _get_pawn_attacks(side:Color, file_rank: FileRank)->u64{
+    let tr: u8 = file_rank.rank();
+    let tf: u8 = file_rank.file();
+    let start = 1u64 << tr * 8 + tf;
+
+    // if side == Color::White{
+    //     //capture
+    //     attacks |= (start & NOT_H) >> 7;
+    //     attacks |= (start & NOT_A) >> 9;
+
+    // }else{
+    //     //capture
+    //     attacks |= (start & NOT_A) << 7;
+    //     attacks |= (start &  NOT_H) << 9;
+    // 
+    //attacks
+    //}
+    match side {
+        Color::White => (start & NOT_H) >> 7 | (start & NOT_A) >> 9,
+        Color::Black => (start & NOT_A) << 7 | (start & NOT_H) << 9,
+    }
 }

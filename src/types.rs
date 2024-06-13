@@ -10,8 +10,7 @@ pub enum Piece {
     Queen,
     King,
 }
-#[derive(Debug)]
-
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Color {
     White,
     Black,
@@ -44,6 +43,16 @@ pub const  PIECE_CHAR_MAP: phf::Map<char, (Piece, Color)> = phf_map! {
      A2, B2, C2, D2, E2, F2, G2, H2,
      A1, B1, C1, D1, E1, F1, G1, H1
   }
+
+ impl FileRank {
+     pub fn rank(self)->u8{
+        ((self as u64) / 8) as u8
+     }
+
+     pub fn file(self)->u8{
+       ((self as u64) % 8) as u8
+     }
+ } 
 
 const FILE_RANK_CHAR: [&'static str; 64] = [
     "A8", "B8", "C8", "D8", "E8", "F8", "G8", "H8",
@@ -121,7 +130,8 @@ pub const RANK_1: u64 =  0xFF << (8 * 7);
 
 
 /*   
-Example of not A 
+example of not A file 
+
    a b c d e f g h
 8| 0 1 1 1 1 1 1 0 
 7| 0 1 1 1 1 1 1 0
@@ -133,6 +143,6 @@ Example of not A
 1| 0 1 1 1 1 1 1 0*/
 
 pub const NOT_A:u64 = 18374403900871474942;
-pub const NOT_AB:u64 = 8970181431921507452;
+pub const NOT_AB:u64 = 18229723555195321596;
 pub const NOT_H:u64 = 9187201950435737471;
 pub const NOT_GH:u64 = 4557430888798830399;
