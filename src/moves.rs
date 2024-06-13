@@ -1,7 +1,7 @@
 use std::iter::zip;
 
 use crate::{
-    base_types::{Color, FileRank, Move}, constants::{NOT_A, NOT_H, RANK_3, RANK_6}, game::Game
+    base_types::{Color, FileRank, Move}, constants::{NOT_A, NOT_AB, NOT_B, NOT_G, NOT_H, RANK_3, RANK_6}, game::Game
 };
 
 pub fn get_pawn_moves(game: &Game) -> Vec<Move> {
@@ -54,7 +54,7 @@ pub fn get_pawn_moves(game: &Game) -> Vec<Move> {
 }
 
 pub fn _gen_rook_attacks_mask(file_rank: FileRank) -> u64 {
-    let mut attacks: u64 = 0;
+    let mut attacks = 0u64;
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     for f in (tf + 1)..7 {
@@ -73,7 +73,7 @@ pub fn _gen_rook_attacks_mask(file_rank: FileRank) -> u64 {
 }
 
 pub fn _gen_bishop_attacks_mask(file_rank: FileRank) -> u64 {
-    let mut attacks: u64 = 0;
+    let mut attacks = 0u64;
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     for (r, f) in zip((tr + 1)..7, (tf + 1)..7) {
@@ -102,4 +102,17 @@ pub fn _get_pawn_attacks(side:Color, file_rank: FileRank)->u64{
         Color::White => (start & NOT_H) >> 7 | (start & NOT_A) >> 9,
         Color::Black => (start & NOT_A) << 7 | (start & NOT_H) << 9,
     }
+}
+
+pub fn _get_knight_attacks(file_rank: FileRank)->u64{
+    let mut attacks = 0u64;
+    let tr: u8 = file_rank.rank();
+    let tf: u8 = file_rank.file();
+    let start = 1u64 << tr * 8 + tf;
+    attacks |= (start & (NOT_AB)) >> 15 | (start & (NOT_A ^ NOT_H)) >> 17 ;
+    // attacks |= (start) >> 6 | (start) >> 10 ;
+    // attacks |= (start) << 6 | (start) << 10 ;
+    // attacks |= (start) << 15 | (start) << 17 ;
+
+    attacks
 }
