@@ -1,8 +1,7 @@
 use std::iter::zip;
 
 use crate::{
-    game::Game,
-    types::{Color, FileRank, Move, NOT_A, NOT_AB, NOT_GH, NOT_H, RANK_3, RANK_6}, utility::print_as_board,
+    base_types::{Color, FileRank, Move}, constants::{NOT_A, NOT_H, RANK_3, RANK_6}, game::Game
 };
 
 pub fn get_pawn_moves(game: &Game) -> Vec<Move> {
@@ -18,7 +17,7 @@ pub fn get_pawn_moves(game: &Game) -> Vec<Move> {
 
     while pawns > 0 {
         let index = pawns.trailing_zeros() as u8;
-        let isolated_pawn: u64 = 1 << index as u64;
+        let isolated_pawn = 1u64 << index as u64;
         let single_push: u64 = if game.w_turn {
             (isolated_pawn >> 8) & blockers
         } else {
@@ -59,16 +58,16 @@ pub fn _gen_rook_attacks_mask(file_rank: FileRank) -> u64 {
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     for f in (tf + 1)..7 {
-        attacks |= 1 << (tr * 8 + f);
+        attacks |= 1u64 << (tr * 8 + f);
     }
     for f in (1..tf).rev() {
-        attacks |= 1 << (tr * 8 + f);
+        attacks |= 1u64 << (tr * 8 + f);
     }
     for r in (tr + 1)..7 {
-        attacks |= 1 << (r * 8 + tf);
+        attacks |= 1u64 << (r * 8 + tf);
     }
     for r in (1..(tr)).rev() {
-        attacks |= 1 << (r * 8 + tf);
+        attacks |= 1u64 << (r * 8 + tf);
     }
     attacks
 }
@@ -78,18 +77,18 @@ pub fn _gen_bishop_attacks_mask(file_rank: FileRank) -> u64 {
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     for (r, f) in zip((tr + 1)..7, (tf + 1)..7) {
-        attacks |= 1 << (r * 8 + f);
+        attacks |= 1u64 << (r * 8 + f);
     }
     for (r, f) in zip((1..tr).rev(), (1..(tf)).rev()) {
-        attacks |= 1 << (r * 8 + f);
+        attacks |= 1u64 << (r * 8 + f);
     }
 
     for (r, f) in zip((1..tr).rev(), (tf + 1)..7) {
-        attacks |= 1 << (r * 8 + f);
+        attacks |= 1u64 << (r * 8 + f);
     }
 
     for (r, f) in zip((tr + 1)..7, (1..(tf)).rev()) {
-        attacks |= 1 << (r * 8 + f);
+        attacks |= 1u64 << (r * 8 + f);
     }
     attacks
 }
@@ -99,19 +98,6 @@ pub fn _get_pawn_attacks(side:Color, file_rank: FileRank)->u64{
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     let start = 1u64 << tr * 8 + tf;
-
-    // if side == Color::White{
-    //     //capture
-    //     attacks |= (start & NOT_H) >> 7;
-    //     attacks |= (start & NOT_A) >> 9;
-
-    // }else{
-    //     //capture
-    //     attacks |= (start & NOT_A) << 7;
-    //     attacks |= (start &  NOT_H) << 9;
-    // 
-    //attacks
-    //}
     match side {
         Color::White => (start & NOT_H) >> 7 | (start & NOT_A) >> 9,
         Color::Black => (start & NOT_A) << 7 | (start & NOT_H) << 9,

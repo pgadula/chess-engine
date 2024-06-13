@@ -1,7 +1,4 @@
-use crate::{
-    types::{Color, FileRank, Piece, PIECE_CHAR_MAP},
-    utility::print_as_board,
-};
+use crate::base_types::{Color, FileRank, Piece, PIECE_CHAR_MAP};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Game {
@@ -69,22 +66,22 @@ impl Game {
 
     pub fn set_bit(bit_board: &mut u64, file_rank: FileRank) {
         let file_rank_num = file_rank as u8;
-        let mask: u64 = 0x1 << file_rank_num;
+        let mask = 1u64 << file_rank_num;
         *bit_board |= mask;
     }
     pub fn set_bit_by_index(bit_board: &mut u64, index: u8) {
-        let mask: u64 = 0x1 << index;
+        let mask = 1u64 << index;
         *bit_board |= mask;
     }
 
     pub fn clear_bit(bit_board: &mut u64, file_rank: FileRank) {
         let file_rank_num = file_rank as u8;
-        let mask: u64 = 0x1 << file_rank_num;
+        let mask = 1u64 << file_rank_num;
         *bit_board &= !(mask);
     }
 
     pub fn clear_bit_by_index(bit_board: &mut u64, index: u8) {
-        let mask: u64 = 0x1 << index;
+        let mask = 1u64 << index;
         *bit_board ^= mask;
     }
 
@@ -132,29 +129,15 @@ impl Game {
         }
     }
     pub fn get_all_pieces(self) -> u64 {
-        return 
-            self.get_white_pieces() |
-            self.get_black_pieces()
+        return self.get_white_pieces() | self.get_black_pieces();
     }
 
-
-    pub fn get_black_pieces(self)->u64{
-          self.w_pawn
-        | self.w_bishop
-        | self.w_knight
-        | self.w_rook
-        | self.w_queen
-        | self.w_king
-
+    pub fn get_black_pieces(self) -> u64 {
+        self.w_pawn | self.w_bishop | self.w_knight | self.w_rook | self.w_queen | self.w_king
     }
 
-    pub fn get_white_pieces(self)->u64{
-          self.b_pawn
-        | self.b_bishop
-        | self.b_knight
-        | self.b_rook
-        | self.b_queen
-        | self.b_king
+    pub fn get_white_pieces(self) -> u64 {
+        self.b_pawn | self.b_bishop | self.b_knight | self.b_rook | self.b_queen | self.b_king
     }
 
     pub fn empty_square(self) -> u64 {
@@ -163,7 +146,7 @@ impl Game {
 
     pub fn get(bit_board: u64, file_rank: FileRank) -> bool {
         let file_rank_num = file_rank as u8;
-        let mask: u64 = 0x1 << file_rank_num;
+        let mask = 1u64 << file_rank_num;
         return (bit_board & mask) != 0;
     }
 
@@ -171,7 +154,7 @@ impl Game {
         println!("  a b c d e f g h");
         println!(" +----------------+");
 
-        FileRank::iterator().for_each(|(file_rank)| {
+        FileRank::iter().for_each(|(file_rank)| {
             let f_r = file_rank.clone();
             let row = 7 - file_rank.rank(); // Calculate the row in reverse
             let col = file_rank.file();
@@ -250,7 +233,6 @@ impl FenParser for Game {
                 let index = (row * 8) + col;
                 if let Some(rank_file) = FileRank::get_file_rank(index) {
                     game.set_piece(piece, rank_file);
-                    // println!("Placed piece {:?} {:?} at {:?}", piece.0, piece.1, rank_file);
                 }
                 col += 1;
             } else {

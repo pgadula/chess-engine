@@ -1,6 +1,7 @@
 use phf::phf_map;
 use std::slice::Iter;
 use self::FileRank::*;
+
 #[derive(Debug)]
 pub enum Piece {
     Pawn,
@@ -55,14 +56,14 @@ pub const  PIECE_CHAR_MAP: phf::Map<char, (Piece, Color)> = phf_map! {
  } 
 
 const FILE_RANK_CHAR: [&'static str; 64] = [
-    "A8", "B8", "C8", "D8", "E8", "F8", "G8", "H8",
-    "A7", "B7", "C7", "D7", "E7", "F7", "G7", "H7",
-    "A6", "B6", "C6", "D6", "E6", "F6", "G6", "H6",
-    "A5", "B5", "C5", "D5", "E5", "F5", "G5", "H5",
-    "A4", "B4", "C4", "D4", "E4", "F4", "G4", "H4",
-    "A3", "B3", "C3", "D3", "E3", "F3", "G3", "H3",
-    "A2", "B2", "C2", "D2", "E2", "F2", "G2", "H2",
-    "A1", "B1", "C1", "D1", "E1", "F1", "G1", "H1"
+    "a8", "b8", "c8", "d8", "e8", "f8", "r8", "h8",
+    "a7", "b7", "c7", "d7", "e7", "f7", "r7", "h7",
+    "a6", "b6", "c6", "d6", "e6", "f6", "r6", "h6",
+    "a5", "b5", "c5", "d5", "e5", "f5", "r5", "h5",
+    "a4", "b4", "c4", "d4", "e4", "f4", "r4", "h4",
+    "a3", "b3", "c3", "d3", "e3", "f3", "r3", "h3",
+    "a2", "b2", "c2", "d2", "e2", "f2", "r2", "h2",
+    "a1", "b1", "c1", "d1", "e1", "f1", "r1", "h1"
 ];
 
 pub const FILE_RANK: [FileRank; 64] = [   
@@ -77,8 +78,9 @@ pub const FILE_RANK: [FileRank; 64] = [
 ];
 
  impl FileRank {
-     pub fn iterator() -> Iter<'static, FileRank> {
 
+    /// get iterator with order starting from A8 to H1
+     pub fn iter() -> Iter<'static, FileRank> {
      FILE_RANK.iter()
      }
 
@@ -91,6 +93,7 @@ pub const FILE_RANK: [FileRank; 64] = [
         }
     }
  }
+
 
  #[derive(Clone, Copy, Debug)]
  pub struct Move {
@@ -107,8 +110,6 @@ pub const FILE_RANK: [FileRank; 64] = [
     }
 }
 
-pub struct Moves(pub Vec<Move>);
-
 impl std::fmt::Display for Moves {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Moves:\n")?;
@@ -119,30 +120,4 @@ impl std::fmt::Display for Moves {
     }
 }
 
-pub const RANK_8: u64 =  0xFF << (8 * 0);
-pub const RANK_7: u64 =  0xFF << (8 * 1);
-pub const RANK_6: u64 =  0xFF << (8 * 2);
-pub const RANK_5: u64 =  0xFF << (8 * 3);
-pub const RANK_4: u64 =  0xFF << (8 * 4);
-pub const RANK_3: u64 =  0xFF << (8 * 5);
-pub const RANK_2: u64 =  0xFF << (8 * 6);
-pub const RANK_1: u64 =  0xFF << (8 * 7);
-
-
-/*   
-example of not A file 
-
-   a b c d e f g h
-8| 0 1 1 1 1 1 1 0 
-7| 0 1 1 1 1 1 1 0
-6| 0 1 1 1 1 1 1 0
-5| 0 1 1 1 1 1 1 0
-4| 0 1 1 1 1 1 1 0
-3| 0 1 1 1 1 1 1 0
-2| 0 1 1 1 1 1 1 0
-1| 0 1 1 1 1 1 1 0*/
-
-pub const NOT_A:u64 = 18374403900871474942;
-pub const NOT_AB:u64 = 18229723555195321596;
-pub const NOT_H:u64 = 9187201950435737471;
-pub const NOT_GH:u64 = 4557430888798830399;
+pub struct Moves(pub Vec<Move>);
