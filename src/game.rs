@@ -14,7 +14,8 @@ pub struct Game {
     pub b_rook: u64,
     pub b_queen: u64,
     pub b_king: u64,
-    pub w_turn: bool,
+    //state
+    pub turn: Color,
     pub castling: Castling,
     pub halfmove_clock: u8,
     pub fullmove_number: u8,
@@ -48,7 +49,7 @@ impl Game {
             b_rook: 0,
             b_queen: 0,
             b_king: 0,
-            w_turn: false,
+            turn: Color::White,
             castling: Castling {
                 b_king_side: false,
                 b_queen_side: false,
@@ -199,7 +200,8 @@ impl Game {
 
         println!("|1");
         println!(" +----------------+");
-        println!("  a b c d e f g h");
+        println!("  a b c d e f g h")
+
     }
 }
 
@@ -251,10 +253,10 @@ impl FenParser for Game {
             }
         }
 
-        game.w_turn = match active_color {
-            "w" => true,
-            "b" => false,
-            _ => game.w_turn, // default value
+        game.turn = match active_color {
+            "w" => Color::White,
+            "b" => Color::Black,
+            _ => game.turn, // default value
         };
 
         let mut castling = Castling::new();

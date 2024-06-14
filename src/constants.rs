@@ -8,6 +8,15 @@ pub const RANK_3: u64 =  0xFF << (8 * 5);
 pub const RANK_2: u64 =  0xFF << (8 * 6);
 pub const RANK_1: u64 =  0xFF << (8 * 7);
 
+pub const RANK_1_2:u64 = RANK_1 | RANK_2;
+pub const RANK_7_8:u64 = RANK_7 | RANK_8;
+
+pub const NOT_RANK_1:u64 = !RANK_1;
+pub const NOT_RANK_1_2:u64 = !RANK_1_2;
+
+pub const NOT_RANK_8:u64 = !RANK_8;
+pub const NOT_RANK_7_8:u64 = !RANK_7_8;
+
 /*   
 Example of not A file
    a b c d e f g h

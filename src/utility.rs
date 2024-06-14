@@ -12,6 +12,7 @@ pub fn print_as_board(number: u64) {
         println!();
     }
     println!("   a b c d e f g h");
+    println!("Bitboard: {}", number);
 
 }
 
