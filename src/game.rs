@@ -81,7 +81,7 @@ impl Game {
         *bit_board &= !(mask);
     }
 
-    pub fn clear_bit_by_index(bit_board: &mut u64, index: u8) {
+    pub fn pop_bit(bit_board: &mut u64, index: u8) {
         let mask = 1u64 << index;
         *bit_board ^= mask;
     }
@@ -95,6 +95,10 @@ impl Game {
             count += 1;
         }
         count
+    }
+    
+    pub fn get_lsb_index(bit_board: u64) -> u32 {
+        bit_board.trailing_zeros()
     }
 
     pub fn set_piece(&mut self, mv: &(Piece, Color), file_rank: FileRank) {

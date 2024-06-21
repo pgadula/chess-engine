@@ -47,7 +47,7 @@ pub fn get_pawn_moves(game: &Game) -> Vec<Move> {
         }
         println!();
 
-        Game::clear_bit_by_index(&mut pawns, index)
+        Game::pop_bit(&mut pawns, index)
     }
 
     return moves;

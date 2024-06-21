@@ -53,6 +53,10 @@ pub const  PIECE_CHAR_MAP: phf::Map<char, (Piece, Color)> = phf_map! {
      pub fn file(self)->u8{
        ((self as u64) % 8) as u8
      }
+
+     pub fn index(self)->u8{
+        self.rank() * 8 + self.file()
+      }
  } 
 
 const FILE_RANK_CHAR: [&'static str; 64] = [
@@ -94,7 +98,6 @@ pub const FILE_RANK: [FileRank; 64] = [
     }
  }
 
-
  #[derive(Clone, Copy, Debug)]
  pub struct Move {
     pub from: u8,
@@ -119,5 +122,4 @@ impl std::fmt::Display for Moves {
         Ok(())
     }
 }
-
 pub struct Moves(pub Vec<Move>);
