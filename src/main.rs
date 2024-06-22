@@ -4,18 +4,19 @@ mod game;
 mod moves_gen;
 mod precalculated;
 mod utility;
+mod magic_gen;
 
 use base_types::FileRank;
-use game::{FenParser, Game};
-use precalculated::{BISHOP_ATTACK_MASK, KING_ATTACK_MASK, KNIGHT_ATTACK_MASK, ROOK_ATTACK_MASK};
-use rand::Rng;
-use utility::print_as_board;
+use game::Game;
+use magic_gen::{get_random_number, magic_index};
+use precalculated::{BISHOP_ATTACK_MASK, ROOK_ATTACK_MASK};
+
 
 fn main() {
     use std::time::Instant;
     let now = Instant::now();
 
-    generate_magics(KING_ATTACK_MASK);
+    generate_magics(ROOK_ATTACK_MASK);
     let elapsed = now.elapsed();
     println!("Elapsed: {:.2?}", elapsed);
 }
@@ -30,35 +31,33 @@ fn generate_magics(mask_attacks: [u64; 64]) {
 
         let bit_count = Game::bit_count(attack_mask);
         let count: usize = 1 << bit_count;
-        let subsets = get_subsets(count, attack_mask);
-
-
-        let mut is_valid_magic_number: bool = false;
+        let subsets = generate_attack_subsets(attack_mask, count);
 
         let mut magic_number: u64;
         let relevant_bit = 64 - bit_count;
-
         magic_offsets[file_rank_index] = relevant_bit;
 
-        while !is_valid_magic_number {
-            is_valid_magic_number = true;
-            let mut attacks: Vec<u64> = vec![1; count]; //
-            magic_number = get_random_number();
+        let mut found_magic: bool = false;
 
-            for subset in subsets.clone().into_iter() {
-                let magic_index = ((subset.wrapping_mul(magic_number)) >> (relevant_bit)) as usize;
+        let mut attacks: Vec<u64> = vec![1; count];
+        while !found_magic {
+            attacks.fill(1);
+            magic_number = get_random_number();
+            found_magic = true;
+
+            for &subset in &subsets {
+                let magic_index = magic_index(subset, magic_number, relevant_bit);
 
                 if attacks[magic_index] == 1 {
                     attacks[magic_index] = subset;
-                    // println!("fit, {} {}",attacks[magic_index], subset  )
                 } else {
-                    is_valid_magic_number = false;
+                    found_magic = false;
                     break;
                 }
             }
 
-            if is_valid_magic_number {
-                is_valid_magic_number = true;
+            if found_magic {
+                found_magic = true;
                 magic_numbers[file_rank_index] = magic_number;
             }
         }
@@ -67,17 +66,19 @@ fn generate_magics(mask_attacks: [u64; 64]) {
     println!("magic offset {:?}", magic_offsets);
 }
 
-fn get_subsets(count: usize, mask: u64) -> Vec<u64> {
+
+
+fn generate_attack_subsets(mask:u64, count: usize) -> Vec<u64> {
     let mut subsets: Vec<u64> = Vec::with_capacity(count);
 
     for index in 0..count {
-        let result = get_occupancy(index, mask);
+        let result = calculate_occupancy(index, mask);
         subsets.push(result)
     }
     subsets
 }
 
-fn get_occupancy(index: usize, attack_mask: u64) -> u64 {
+fn calculate_occupancy(index: usize, attack_mask: u64) -> u64 {
     let mut mask = attack_mask;
     let mut occupancy = 0u64;
     let bit_count = Game::bit_count(attack_mask);
@@ -93,23 +94,4 @@ fn get_occupancy(index: usize, attack_mask: u64) -> u64 {
     occupancy
 }
 
-pub fn get_rook_moves(square: FileRank, blockers: u64) {
-    let index = square.index() as usize;
-    let and_mask = ROOK_ATTACK_MASK[index];
-    let and_result = and_mask & blockers;
-    let bit_count = Game::bit_count(and_mask);
-    print_as_board(and_mask);
-    println!();
-    print_as_board(and_result);
-    print!("{bit_count}");
-}
 
-pub fn get_random_number() -> u64 {
-    let mut rng: rand::prelude::ThreadRng = rand::thread_rng();
-
-    let n: u64 = rng.gen();
-    let n1: u64 = rng.gen();
-    let n2: u64 = rng.gen();
-
-    n & n1 & n2
-}
