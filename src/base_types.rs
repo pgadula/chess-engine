@@ -33,7 +33,7 @@ pub const  PIECE_CHAR_MAP: phf::Map<char, (Piece, Color)> = phf_map! {
  };
  
  #[repr(u8)]
- #[derive(Clone, Copy, Debug)]
+ #[derive(Clone, Copy, Debug, PartialEq)]
  pub enum FileRank {
      A8, B8, C8, D8, E8, F8, G8, H8,
      A7, B7, C7, D7, E7, F7, G7, H7,
@@ -92,7 +92,6 @@ pub const FILE_RANK: [FileRank; 64] = [
         if value >= FileRank::A8 as u8 && value <= FileRank::H1 as u8 {
             Some(unsafe { std::mem::transmute(value) })
         } else {
-            println!("value none {}",value);
             None
         }
     }

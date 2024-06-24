@@ -1,7 +1,7 @@
 use crate::base_types::{Color, FileRank, Piece, PIECE_CHAR_MAP};
 
 #[derive(Debug, Clone, Copy)]
-pub struct Game {
+pub struct BitBoard {
     pub w_pawn: u64,
     pub w_bishop: u64,
     pub w_knight: u64,
@@ -30,13 +30,13 @@ pub struct Castling {
 }
 
 pub trait FenParser {
-    fn deserialize(fen: &str) -> Game;
+    fn deserialize(fen: &str) -> BitBoard;
     fn serialize(self, output: &mut str) -> &str;
 }
 
-impl Game {
-    pub fn empty() -> Game {
-        Game {
+impl BitBoard {
+    pub fn empty() -> BitBoard {
+        BitBoard {
             w_pawn: 0,
             w_bishop: 0,
             w_knight: 0,
@@ -61,8 +61,8 @@ impl Game {
         }
     }
 
-    pub fn new_game() -> Game {
-        Game::deserialize("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    pub fn new_game() -> BitBoard {
+        BitBoard::deserialize("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
 
     pub fn set_bit(bit_board: &mut u64, file_rank: FileRank) {
@@ -103,45 +103,45 @@ impl Game {
 
     pub fn set_piece(&mut self, mv: &(Piece, Color), file_rank: FileRank) {
         match mv {
-            (Piece::Pawn, Color::White) => Game::set_bit(&mut self.w_pawn, file_rank),
-            (Piece::Bishop, Color::White) => Game::set_bit(&mut self.w_bishop, file_rank),
-            (Piece::Knight, Color::White) => Game::set_bit(&mut self.w_knight, file_rank),
-            (Piece::Rook, Color::White) => Game::set_bit(&mut self.w_rook, file_rank),
-            (Piece::Queen, Color::White) => Game::set_bit(&mut self.w_queen, file_rank),
-            (Piece::King, Color::White) => Game::set_bit(&mut self.w_king, file_rank),
-            (Piece::Pawn, Color::Black) => Game::set_bit(&mut self.b_pawn, file_rank),
-            (Piece::Bishop, Color::Black) => Game::set_bit(&mut self.b_bishop, file_rank),
-            (Piece::Knight, Color::Black) => Game::set_bit(&mut self.b_knight, file_rank),
-            (Piece::Rook, Color::Black) => Game::set_bit(&mut self.b_rook, file_rank),
-            (Piece::Queen, Color::Black) => Game::set_bit(&mut self.b_queen, file_rank),
-            (Piece::King, Color::Black) => Game::set_bit(&mut self.b_king, file_rank),
+            (Piece::Pawn, Color::White) => BitBoard::set_bit(&mut self.w_pawn, file_rank),
+            (Piece::Bishop, Color::White) => BitBoard::set_bit(&mut self.w_bishop, file_rank),
+            (Piece::Knight, Color::White) => BitBoard::set_bit(&mut self.w_knight, file_rank),
+            (Piece::Rook, Color::White) => BitBoard::set_bit(&mut self.w_rook, file_rank),
+            (Piece::Queen, Color::White) => BitBoard::set_bit(&mut self.w_queen, file_rank),
+            (Piece::King, Color::White) => BitBoard::set_bit(&mut self.w_king, file_rank),
+            (Piece::Pawn, Color::Black) => BitBoard::set_bit(&mut self.b_pawn, file_rank),
+            (Piece::Bishop, Color::Black) => BitBoard::set_bit(&mut self.b_bishop, file_rank),
+            (Piece::Knight, Color::Black) => BitBoard::set_bit(&mut self.b_knight, file_rank),
+            (Piece::Rook, Color::Black) => BitBoard::set_bit(&mut self.b_rook, file_rank),
+            (Piece::Queen, Color::Black) => BitBoard::set_bit(&mut self.b_queen, file_rank),
+            (Piece::King, Color::Black) => BitBoard::set_bit(&mut self.b_king, file_rank),
         }
     }
     pub fn clear_piece(&mut self, mv: &(Piece, Color), file_rank: FileRank) {
         match mv {
-            (Piece::Pawn, Color::White) => Game::clear_bit(&mut self.w_pawn, file_rank),
-            (Piece::Bishop, Color::White) => Game::clear_bit(&mut self.w_bishop, file_rank),
-            (Piece::Knight, Color::White) => Game::clear_bit(&mut self.w_knight, file_rank),
-            (Piece::Rook, Color::White) => Game::clear_bit(&mut self.w_rook, file_rank),
-            (Piece::Queen, Color::White) => Game::clear_bit(&mut self.w_queen, file_rank),
-            (Piece::King, Color::White) => Game::clear_bit(&mut self.w_king, file_rank),
-            (Piece::Pawn, Color::Black) => Game::clear_bit(&mut self.b_pawn, file_rank),
-            (Piece::Bishop, Color::Black) => Game::clear_bit(&mut self.b_bishop, file_rank),
-            (Piece::Knight, Color::Black) => Game::clear_bit(&mut self.b_knight, file_rank),
-            (Piece::Rook, Color::Black) => Game::clear_bit(&mut self.b_rook, file_rank),
-            (Piece::Queen, Color::Black) => Game::clear_bit(&mut self.b_queen, file_rank),
-            (Piece::King, Color::Black) => Game::clear_bit(&mut self.b_king, file_rank),
+            (Piece::Pawn, Color::White) => BitBoard::clear_bit(&mut self.w_pawn, file_rank),
+            (Piece::Bishop, Color::White) => BitBoard::clear_bit(&mut self.w_bishop, file_rank),
+            (Piece::Knight, Color::White) => BitBoard::clear_bit(&mut self.w_knight, file_rank),
+            (Piece::Rook, Color::White) => BitBoard::clear_bit(&mut self.w_rook, file_rank),
+            (Piece::Queen, Color::White) => BitBoard::clear_bit(&mut self.w_queen, file_rank),
+            (Piece::King, Color::White) => BitBoard::clear_bit(&mut self.w_king, file_rank),
+            (Piece::Pawn, Color::Black) => BitBoard::clear_bit(&mut self.b_pawn, file_rank),
+            (Piece::Bishop, Color::Black) => BitBoard::clear_bit(&mut self.b_bishop, file_rank),
+            (Piece::Knight, Color::Black) => BitBoard::clear_bit(&mut self.b_knight, file_rank),
+            (Piece::Rook, Color::Black) => BitBoard::clear_bit(&mut self.b_rook, file_rank),
+            (Piece::Queen, Color::Black) => BitBoard::clear_bit(&mut self.b_queen, file_rank),
+            (Piece::King, Color::Black) => BitBoard::clear_bit(&mut self.b_king, file_rank),
         }
     }
     pub fn get_all_pieces(self) -> u64 {
         return self.get_white_pieces() | self.get_black_pieces();
     }
 
-    pub fn get_black_pieces(self) -> u64 {
+    pub fn get_white_pieces(self) -> u64 {
         self.w_pawn | self.w_bishop | self.w_knight | self.w_rook | self.w_queen | self.w_king
     }
 
-    pub fn get_white_pieces(self) -> u64 {
+    pub fn get_black_pieces(self) -> u64 {
         self.b_pawn | self.b_bishop | self.b_knight | self.b_rook | self.b_queen | self.b_king
     }
 
@@ -152,6 +152,10 @@ impl Game {
     pub fn get(bit_board: u64, file_rank: FileRank) -> bool {
         let file_rank_num = file_rank as u8;
         let mask = 1u64 << file_rank_num;
+        return (bit_board & mask) != 0;
+    }
+    pub fn get_by_index(bit_board: u64, index:u8) -> bool {
+        let mask: u64 = 1u64 << index;
         return (bit_board & mask) != 0;
     }
 
@@ -173,29 +177,29 @@ impl Game {
                 print!("{}|", row + 1);
             }
 
-            if Game::get(self.w_pawn, f_r) {
+            if BitBoard::get(self.w_pawn, f_r) {
                 print!("♟︎ ");
-            } else if Game::get(self.w_bishop, f_r) {
+            } else if BitBoard::get(self.w_bishop, f_r) {
                 print!("♝ ");
-            } else if Game::get(self.w_knight, f_r) {
+            } else if BitBoard::get(self.w_knight, f_r) {
                 print!("♞ ");
-            } else if Game::get(self.w_rook, f_r) {
+            } else if BitBoard::get(self.w_rook, f_r) {
                 print!("♜ ");
-            } else if Game::get(self.w_queen, f_r) {
+            } else if BitBoard::get(self.w_queen, f_r) {
                 print!("♛ ");
-            } else if Game::get(self.w_king, f_r) {
+            } else if BitBoard::get(self.w_king, f_r) {
                 print!("♚ ");
-            } else if Game::get(self.b_pawn, f_r) {
+            } else if BitBoard::get(self.b_pawn, f_r) {
                 print!("♙ ");
-            } else if Game::get(self.b_bishop, f_r) {
+            } else if BitBoard::get(self.b_bishop, f_r) {
                 print!("♗ ");
-            } else if Game::get(self.b_knight, f_r) {
+            } else if BitBoard::get(self.b_knight, f_r) {
                 print!("♘ ");
-            } else if Game::get(self.b_rook, f_r) {
+            } else if BitBoard::get(self.b_rook, f_r) {
                 print!("♖ ");
-            } else if Game::get(self.b_queen, f_r) {
+            } else if BitBoard::get(self.b_queen, f_r) {
                 print!("♕ ");
-            } else if Game::get(self.b_king, f_r) {
+            } else if BitBoard::get(self.b_king, f_r) {
                 print!("♔ ");
             } else {
                 print!(". ");
@@ -220,8 +224,8 @@ impl Castling {
     }
 }
 
-impl FenParser for Game {
-    fn deserialize(fen: &str) -> Game {
+impl FenParser for BitBoard {
+    fn deserialize(fen: &str) -> BitBoard {
         let mut parts = fen.split_whitespace();
         let piece_placement = parts.next().unwrap_or("");
         let active_color = parts.next().unwrap_or("");
@@ -230,7 +234,7 @@ impl FenParser for Game {
         let halfmove_clock = parts.next().unwrap_or("");
         let fullmove_number = parts.next().unwrap_or("");
 
-        let mut game = Game::empty();
+        let mut game = BitBoard::empty();
         let mut row: u8 = 0;
         let mut col: u8 = 0;
 

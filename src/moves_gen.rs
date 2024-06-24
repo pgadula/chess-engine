@@ -1,17 +1,26 @@
 use std::iter::zip;
 
 use crate::{
-    base_types::{Color, FileRank, Move}, constants::{NOT_A, NOT_AB, NOT_B, NOT_G, NOT_GH, NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_3, RANK_6}, game::Game
+    base_types::{Color, FileRank, Move},
+    constants::{
+        NOT_A, NOT_AB, NOT_B, NOT_G, NOT_GH, NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
+        NOT_RANK_8, RANK_3, RANK_6,
+    },
+    game::BitBoard,
 };
 
-pub fn get_pawn_moves(game: &Game) -> Vec<Move> {
+pub fn get_pawn_moves(game: &BitBoard) -> Vec<Move> {
     let mut moves: Vec<Move> = Vec::new();
     let mut pawns = if game.turn == Color::White {
         game.w_pawn
     } else {
         game.b_pawn
     };
-    let rank_3_or_6 = if game.turn == Color::White { RANK_3 } else { RANK_6 };
+    let rank_3_or_6 = if game.turn == Color::White {
+        RANK_3
+    } else {
+        RANK_6
+    };
 
     let blockers = game.empty_square();
 
@@ -47,7 +56,7 @@ pub fn get_pawn_moves(game: &Game) -> Vec<Move> {
         }
         println!();
 
-        Game::pop_bit(&mut pawns, index)
+        BitBoard::pop_bit(&mut pawns, index)
     }
 
     return moves;
@@ -68,6 +77,45 @@ pub fn _gen_rook_attacks_mask(file_rank: FileRank) -> u64 {
     }
     for r in (1..(tr)).rev() {
         attacks |= 1u64 << (r * 8 + tf);
+    }
+    attacks
+}
+
+pub fn _gen_rook_move_fly(file_rank: FileRank, bit_board: u64) -> u64 {
+    let mut attacks = 0u64;
+    let tr: u8 = file_rank.rank();
+    let tf: u8 = file_rank.file();
+    for f in (tf + 1)..7 {
+        let index: u64 = 1u64 << (tr * 8 + f);
+        let is_occupied: bool = BitBoard::get_by_index(bit_board, (tr * 8 + f) as u8);
+        attacks |= index;
+        if is_occupied {
+            break;
+        }
+    }
+    for f in (1..tf).rev() {
+        let index: u64 = 1u64 << (tr * 8 + f);
+        let is_occupied = BitBoard::get_by_index(bit_board, (tr * 8 + f) as u8);
+        attacks |= index;
+        if is_occupied {
+            break;
+        }
+    }
+    for r in (tr + 1)..7 {
+        let index = 1u64 << (r * 8 + tf);
+        let is_occupied: bool = BitBoard::get_by_index(bit_board, (r * 8 + tf) as u8);
+        attacks |= index;
+        if is_occupied {
+            break;
+        }
+    }
+    for r in (1..(tr)).rev() {
+        let index = 1u64 << (r * 8 + tf);
+        let is_occupied: bool = BitBoard::get_by_index(bit_board, (r * 8 + tf) as u8);
+        attacks |= index;
+        if is_occupied {
+            break;
+        }
     }
     attacks
 }
@@ -93,8 +141,7 @@ pub fn _gen_bishop_attacks_mask(file_rank: FileRank) -> u64 {
     attacks
 }
 
-
-pub fn _get_pawn_attacks(side:Color, file_rank: FileRank)->u64{
+pub fn _get_pawn_attacks(side: Color, file_rank: FileRank) -> u64 {
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     let start = 1u64 << tr * 8 + tf;
@@ -104,7 +151,7 @@ pub fn _get_pawn_attacks(side:Color, file_rank: FileRank)->u64{
     }
 }
 
-pub fn _get_knight_attacks(file_rank: FileRank)->u64{
+pub fn _get_knight_attacks(file_rank: FileRank) -> u64 {
     let mut attacks = 0u64;
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
@@ -124,7 +171,7 @@ pub fn _get_knight_attacks(file_rank: FileRank)->u64{
     attacks
 }
 
-pub fn _get_king_attacks(file_rank: FileRank)->u64{
+pub fn _get_king_attacks(file_rank: FileRank) -> u64 {
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     let start = 1u64 << tr * 8 + tf;
