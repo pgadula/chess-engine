@@ -86,32 +86,36 @@ pub fn _gen_rook_move_fly(file_rank: FileRank, bit_board: u64) -> u64 {
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     for f in (tf + 1)..7 {
-        let index: u64 = 1u64 << (tr * 8 + f);
-        let is_occupied: bool = BitBoard::get_by_index(bit_board, (tr * 8 + f) as u8);
+        let shift =  tr * 8 + f;
+        let index: u64 = 1u64 << shift;
+        let is_occupied: bool = BitBoard::get_by_index(bit_board, shift as u8);
         attacks |= index;
         if is_occupied {
             break;
         }
     }
     for f in (1..tf).rev() {
-        let index: u64 = 1u64 << (tr * 8 + f);
-        let is_occupied = BitBoard::get_by_index(bit_board, (tr * 8 + f) as u8);
+        let shift =  tr * 8 + f;
+        let index: u64 = 1u64 << shift;
+        let is_occupied = BitBoard::get_by_index(bit_board, shift as u8);
         attacks |= index;
         if is_occupied {
             break;
         }
     }
     for r in (tr + 1)..7 {
-        let index = 1u64 << (r * 8 + tf);
-        let is_occupied: bool = BitBoard::get_by_index(bit_board, (r * 8 + tf) as u8);
+        let shift = r * 8 + tf;
+        let index = 1u64 << shift;
+        let is_occupied: bool = BitBoard::get_by_index(bit_board, shift as u8);
         attacks |= index;
         if is_occupied {
             break;
         }
     }
     for r in (1..(tr)).rev() {
-        let index = 1u64 << (r * 8 + tf);
-        let is_occupied: bool = BitBoard::get_by_index(bit_board, (r * 8 + tf) as u8);
+        let shift = r * 8 + tf;
+        let index = 1u64 << shift;
+        let is_occupied: bool = BitBoard::get_by_index(bit_board, shift as u8);
         attacks |= index;
         if is_occupied {
             break;
@@ -140,6 +144,48 @@ pub fn _gen_bishop_attacks_mask(file_rank: FileRank) -> u64 {
     }
     attacks
 }
+
+pub fn _gen_bishop_attacks_on_the_fly(file_rank: FileRank, bit_board: u64) -> u64 {
+    let mut attacks = 0u64;
+    let tr: u8 = file_rank.rank();
+    let tf: u8 = file_rank.file();
+    for (r, f) in zip((tr + 1)..7, (tf + 1)..7) {
+        let shift = r * 8 + f;
+        attacks |= 1u64 << shift;
+        let oc = BitBoard::get_by_index(bit_board, shift);
+        if oc {
+            break
+        }
+    }
+    for (r, f) in zip((1..tr).rev(), (1..(tf)).rev()) {
+        let shift = r * 8 + f;
+        attacks |= 1u64 << shift;
+        let oc = BitBoard::get_by_index(bit_board, shift);
+        if oc {
+            break
+        }
+    }
+
+    for (r, f) in zip((1..tr).rev(), (tf + 1)..7) {
+        let shift = r * 8 + f;
+        attacks |= 1u64 << shift;
+        let oc = BitBoard::get_by_index(bit_board, shift);
+        if oc {
+            break
+        }
+    }
+
+    for (r, f) in zip((tr + 1)..7, (1..(tf)).rev()) {
+        let shift = r * 8 + f;
+        attacks |= 1u64 << shift;
+        let oc = BitBoard::get_by_index(bit_board, shift);
+        if oc {
+            break
+        }
+    }
+    attacks
+}
+
 
 pub fn _get_pawn_attacks(side: Color, file_rank: FileRank) -> u64 {
     let tr: u8 = file_rank.rank();
