@@ -9,8 +9,8 @@ use crate::{
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MagicQuery {
-    rook_attacks: [Vec<u64>; 64],
-    bishop_attacks: [Vec<u64>; 64],
+    pub rook_attacks: [Vec<u64>; 64],
+    pub bishop_attacks: [Vec<u64>; 64],
 }
 
 impl MagicQuery {
@@ -53,7 +53,6 @@ impl MagicQuery {
                 b_table[magic_index] = attack;
             }
             bishop[fr_index] = b_table;
-            rook[fr_index] = r_table;
         }
 
         MagicQuery {
@@ -61,6 +60,7 @@ impl MagicQuery {
             rook_attacks: rook,
         }
     }
+
     pub fn get_rook_attack(self, file_rank: FileRank, bit_board: BitBoard) -> u64 {
         let fr_index = file_rank.index() as usize;
 
@@ -101,6 +101,7 @@ impl MagicHelper {
 
         n & n1 & n2
     }
+
     fn generate_magics(mask_attacks: [u64; 64]) -> MagicHelper {
         let mut magic_numbers: [u64; 64] = [0; 64];
         let mut shifts = [0; 64];
@@ -178,6 +179,7 @@ impl MagicHelper {
         }
         occupancy
     }
+
     fn get_magic_index(blockers: u64, magic_number: u64, shift: usize) -> usize {
         ((blockers.wrapping_mul(magic_number)) >> (shift)) as usize
     }

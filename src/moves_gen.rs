@@ -3,7 +3,7 @@ use std::iter::zip;
 use crate::{
     base_types::{Color, FileRank, Move},
     constants::{
-        NOT_A, NOT_AB, NOT_B, NOT_G, NOT_GH, NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
+        FILE_NOT_A, FILE_NOT_AB, FILE_NOT_B, FILE_NOT_G, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
         NOT_RANK_8, RANK_3, RANK_6,
     },
     game::BitBoard,
@@ -192,8 +192,8 @@ pub fn _get_pawn_attacks(side: Color, file_rank: FileRank) -> u64 {
     let tf: u8 = file_rank.file();
     let start = 1u64 << tr * 8 + tf;
     match side {
-        Color::White => (start & NOT_H) >> 7 | (start & NOT_A) >> 9,
-        Color::Black => (start & NOT_A) << 7 | (start & NOT_H) << 9,
+        Color::White => (start & FILE_NOT_H) >> 7 | (start & FILE_NOT_A) >> 9,
+        Color::Black => (start & FILE_NOT_A) << 7 | (start & FILE_NOT_H) << 9,
     }
 }
 
@@ -202,17 +202,14 @@ pub fn _get_knight_attacks(file_rank: FileRank) -> u64 {
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     let start = 1u64 << tr * 8 + tf;
-    attacks |= (start & (NOT_H & NOT_RANK_7_8)) >> 15;
-    attacks |= (start & (NOT_A & NOT_RANK_7_8)) >> 17;
-
-    attacks |= (start & (NOT_A & NOT_RANK_1_2)) << 15;
-    attacks |= (start & (NOT_H & NOT_RANK_1_2)) << 17;
-
-    attacks |= (start & (NOT_GH & NOT_RANK_8)) >> 6;
-    attacks |= (start & (NOT_AB & NOT_RANK_8)) >> 10;
-
-    attacks |= (start & (NOT_AB & NOT_RANK_1)) << 6;
-    attacks |= (start & (NOT_GH & NOT_RANK_1)) << 10;
+    attacks |= (start & (FILE_NOT_H & NOT_RANK_7_8)) >> 15;
+    attacks |= (start & (FILE_NOT_A & NOT_RANK_7_8)) >> 17;
+    attacks |= (start & (FILE_NOT_A & NOT_RANK_1_2)) << 15;
+    attacks |= (start & (FILE_NOT_H & NOT_RANK_1_2)) << 17;
+    attacks |= (start & (FILE_NOT_GH & NOT_RANK_8)) >> 6;
+    attacks |= (start & (FILE_NOT_AB & NOT_RANK_8)) >> 10;
+    attacks |= (start & (FILE_NOT_AB & NOT_RANK_1)) << 6;
+    attacks |= (start & (FILE_NOT_GH & NOT_RANK_1)) << 10;
 
     attacks
 }
@@ -224,15 +221,15 @@ pub fn _get_king_attacks(file_rank: FileRank) -> u64 {
     let mut attacks = 0u64;
 
     attacks |= (start & (NOT_RANK_8)) >> 8;
-    attacks |= (start & (NOT_RANK_8 & NOT_H)) >> 7;
-    attacks |= (start & (NOT_RANK_8 & NOT_A)) >> 9;
+    attacks |= (start & (NOT_RANK_8 & FILE_NOT_H)) >> 7;
+    attacks |= (start & (NOT_RANK_8 & FILE_NOT_A)) >> 9;
 
     attacks |= (start & (NOT_RANK_1)) << 8;
-    attacks |= (start & (NOT_RANK_1 & NOT_A)) << 7;
-    attacks |= (start & (NOT_RANK_1 & NOT_H)) << 9;
+    attacks |= (start & (NOT_RANK_1 & FILE_NOT_A)) << 7;
+    attacks |= (start & (NOT_RANK_1 & FILE_NOT_H)) << 9;
 
-    attacks |= (start & (NOT_H)) << 1;
-    attacks |= (start & (NOT_A)) >> 1;
+    attacks |= (start & (FILE_NOT_H)) << 1;
+    attacks |= (start & (FILE_NOT_A)) >> 1;
 
     attacks
 }
