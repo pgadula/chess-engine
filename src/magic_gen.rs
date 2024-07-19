@@ -14,7 +14,7 @@ pub struct MagicQuery {
 }
 
 impl MagicQuery {
-    pub fn init_leaper() -> MagicQuery {
+    pub fn init_sliding() -> MagicQuery {
         let mut rook: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
         let mut bishop: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
 
@@ -25,9 +25,9 @@ impl MagicQuery {
             let r_magic_number = ROOK_MAGIC_NUMBERS[fr_index];
             let r_shift = ROOK_SHIFTS[fr_index] as usize;
 
-            let b_attack_mask = ROOK_ATTACK_MASK[fr_index];
-            let b_magic_number = ROOK_MAGIC_NUMBERS[fr_index];
-            let b_shift = ROOK_SHIFTS[fr_index] as usize;
+            let b_attack_mask = BISHOP_ATTACK_MASK[fr_index];
+            let b_magic_number = BISHOP_MAGIC_NUMBERS[fr_index];
+            let b_shift = BISHOP_SHIFTS[fr_index] as usize;
 
             let r_num_bits: usize = 64 - r_shift;
             let b_num_bits: usize = 64 - b_shift;
@@ -63,7 +63,7 @@ impl MagicQuery {
         }
     }
 
-    pub fn get_rook_attack(self, file_rank: FileRank, bit_board: BitBoard) -> u64 {
+    pub fn get_rook_attack(&self, file_rank: FileRank, bit_board: BitBoard) -> u64 {
         let fr_index = file_rank.index() as usize;
 
         let attack_mask = ROOK_ATTACK_MASK[fr_index];
@@ -75,7 +75,7 @@ impl MagicQuery {
         attacks
     }
 
-    pub fn get_bishop_attack(self, file_rank: FileRank, bit_board: BitBoard) -> u64 {
+    pub fn get_bishop_attack(&self, file_rank: FileRank, bit_board: BitBoard) -> u64 {
         let fr_index = file_rank.index() as usize;
 
         let attack_mask = BISHOP_ATTACK_MASK[fr_index];
