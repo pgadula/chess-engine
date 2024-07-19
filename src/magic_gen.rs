@@ -14,7 +14,7 @@ pub struct MagicQuery {
 }
 
 impl MagicQuery {
-    pub fn init_rook() -> MagicQuery {
+    pub fn init_leaper() -> MagicQuery {
         let mut rook: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
         let mut bishop: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
 
@@ -53,6 +53,8 @@ impl MagicQuery {
                 b_table[magic_index] = attack;
             }
             bishop[fr_index] = b_table;
+            rook[fr_index] = r_table;
+
         }
 
         MagicQuery {

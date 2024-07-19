@@ -86,6 +86,14 @@ impl BitBoard {
         *bit_board ^= mask;
     }
 
+    pub fn pop_lsb(b:& mut u64)->u32
+    {
+        let i = b.trailing_zeros();
+        *b &= (*b) - 1;
+        return i;
+    }
+
+
     //Kernighan’s algorithm
     pub fn bit_count(bit_board: u64) -> usize {
         let mut b = bit_board;

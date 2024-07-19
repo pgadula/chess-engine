@@ -2,7 +2,7 @@ use std::iter::zip;
 
 use crate::{
     base_types::{Color, FileRank, Move},
-    constants::{
+    file_rank::{
         FILE_NOT_A, FILE_NOT_AB, FILE_NOT_B, FILE_NOT_G, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
         NOT_RANK_8, RANK_3, RANK_6,
     },
