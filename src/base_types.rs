@@ -54,8 +54,8 @@ pub const  PIECE_CHAR_MAP: phf::Map<char, (Piece, Color)> = phf_map! {
        ((self as u64) % 8) as u8
      }
 
-     pub fn index(self)->u8{
-        self.rank() * 8 + self.file()
+     pub fn index(self)->usize{
+        (self.rank() * 8 + self.file()) as usize
       }
  } 
 
@@ -122,3 +122,13 @@ impl std::fmt::Display for Moves {
     }
 }
 pub struct Moves(pub Vec<Move>);
+
+pub struct Attacks {
+    pub rooks: u64,
+    pub bishops: u64,
+    pub queens: u64,
+    pub king: u64,
+    pub knights: u64,
+    pub pawns: u64,
+    pub friendly_blockers: u64,
+}

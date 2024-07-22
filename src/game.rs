@@ -1,4 +1,6 @@
-use crate::base_types::{Color, FileRank, Piece, PIECE_CHAR_MAP};
+use std::{array, sync::Arc};
+
+use crate::{base_types::{Attacks, Color, FileRank, Piece, PIECE_CHAR_MAP}, magic_gen::MagicQuery, moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves}, utility::bits::{clear_bit, pop_lsb, set_bit}};
 
 #[derive(Debug, Clone, Copy)]
 pub struct BitBoard {
@@ -61,84 +63,124 @@ impl BitBoard {
         }
     }
 
+    pub fn generate_moves(&self, db: Arc<MagicQuery>) -> [Vec<u8>; 64] {
+        let mut move_counter: u32 = 0;
+    
+        let Attacks {
+            mut bishops,
+            mut friendly_blockers,
+            mut king,
+            mut queens,
+            mut rooks,
+            mut pawns,
+            mut knights,
+        } = if self.turn == Color::White {
+            Attacks {
+                rooks: self.w_rook,
+                bishops: self.w_bishop,
+                queens: self.w_queen,
+                king: self.w_king,
+                pawns: self.w_pawn,
+                knights: self.w_knight,
+                friendly_blockers: self.get_white_pieces(),
+            }
+        } else {
+            Attacks {
+                rooks: self.b_rook,
+                bishops: self.b_bishop,
+                queens: self.b_queen,
+                king: self.b_king,
+                pawns: self.b_pawn,
+                knights: self.b_knight,
+                friendly_blockers: self.get_black_pieces(),
+            }
+        };
+        let rev_friendly_blockers = !friendly_blockers;
+    
+        let mut moves: [Vec<u8>; 64] = array::from_fn(|_| Vec::with_capacity(4096));
+    
+        while rooks > 0 {
+            let i = pop_lsb(&mut rooks) as usize;
+            let position: &mut Vec<u8> = &mut moves[i];
+            let file_rank = FileRank::get_file_rank(i as u8).unwrap();
+            let mut rook_move: u64 = db.clone().get_rook_attack(file_rank, self) & rev_friendly_blockers;
+    
+            fill_moves(rook_move, position, &mut move_counter);
+        }
+        while bishops > 0 {
+            let index = pop_lsb(&mut bishops) as usize;
+            let file_rank = FileRank::get_file_rank(index as u8).unwrap();
+            let position: &mut Vec<u8> = &mut moves[index];
+            let mut bishop_moves: u64 =
+                db.clone().get_bishop_attack(file_rank, self) & rev_friendly_blockers;
+            fill_moves(bishop_moves, position, &mut move_counter);
+        }
+    
+        while queens > 0 {
+            let index = pop_lsb(&mut queens) as usize;
+            let file_rank = FileRank::get_file_rank(index as u8).unwrap();
+            let position: &mut Vec<u8> = &mut moves[index];
+            let mut bishop_moves: u64 = db.clone().get_bishop_attack(file_rank, self);
+            let mut rook_moves: u64 = db.clone().get_rook_attack(file_rank, self);
+            let mut sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
+            fill_moves(sliding_moves, position, &mut move_counter);
+        }
+        
+        while knights > 0 {
+            let index = pop_lsb(&mut knights) as usize;
+            let file_rank = FileRank::get_file_rank(index as u8).unwrap();
+            let position: &mut Vec<u8> = &mut moves[index];
+            let mut attacks = get_knight_attacks(file_rank) & rev_friendly_blockers;
+            fill_moves(attacks, position, &mut move_counter);
+        }
+        
+        get_pawn_moves(&self, &mut moves);
+        
+        while king > 0 {
+            let index = pop_lsb(&mut king) as usize;
+            let file_rank = FileRank::get_file_rank(index as u8).unwrap();
+            let position: &mut Vec<u8> = &mut moves[index];
+            let mut attacks = get_king_attacks(file_rank) & rev_friendly_blockers;
+            fill_moves(attacks, position, &mut move_counter);
+        }
+        println!("number of attacks: {move_counter}");
+        moves
+    }
+
     pub fn new_game() -> BitBoard {
         BitBoard::deserialize("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
 
-    pub fn set_bit(bit_board: &mut u64, file_rank: FileRank) {
-        let file_rank_num = file_rank as u8;
-        let mask = 1u64 << file_rank_num;
-        *bit_board |= mask;
-    }
-    pub fn set_bit_by_index(bit_board: &mut u64, index: u8) {
-        let mask = 1u64 << index;
-        *bit_board |= mask;
-    }
-
-    pub fn clear_bit(bit_board: &mut u64, file_rank: FileRank) {
-        let file_rank_num = file_rank as u8;
-        let mask = 1u64 << file_rank_num;
-        *bit_board &= !(mask);
-    }
-
-    pub fn pop_bit(bit_board: &mut u64, index: u8) {
-        let mask = 1u64 << index;
-        *bit_board ^= mask;
-    }
-
-    pub fn pop_lsb(b:& mut u64)->u32
-    {
-        let i = b.trailing_zeros();
-        *b &= (*b) - 1;
-        return i;
-    }
-
-
-    //Kernighan’s algorithm
-    pub fn bit_count(bit_board: u64) -> usize {
-        let mut b = bit_board;
-        let mut count = 0;
-        while b != 0 {
-            b &= b - 1; // Clears the lowest set bit
-            count += 1;
-        }
-        count
-    }
-    
-    pub fn get_lsb_index(bit_board: u64) -> u32 {
-        bit_board.trailing_zeros()
-    }
-
     pub fn set_piece(&mut self, mv: &(Piece, Color), file_rank: FileRank) {
         match mv {
-            (Piece::Pawn, Color::White) => BitBoard::set_bit(&mut self.w_pawn, file_rank),
-            (Piece::Bishop, Color::White) => BitBoard::set_bit(&mut self.w_bishop, file_rank),
-            (Piece::Knight, Color::White) => BitBoard::set_bit(&mut self.w_knight, file_rank),
-            (Piece::Rook, Color::White) => BitBoard::set_bit(&mut self.w_rook, file_rank),
-            (Piece::Queen, Color::White) => BitBoard::set_bit(&mut self.w_queen, file_rank),
-            (Piece::King, Color::White) => BitBoard::set_bit(&mut self.w_king, file_rank),
-            (Piece::Pawn, Color::Black) => BitBoard::set_bit(&mut self.b_pawn, file_rank),
-            (Piece::Bishop, Color::Black) => BitBoard::set_bit(&mut self.b_bishop, file_rank),
-            (Piece::Knight, Color::Black) => BitBoard::set_bit(&mut self.b_knight, file_rank),
-            (Piece::Rook, Color::Black) => BitBoard::set_bit(&mut self.b_rook, file_rank),
-            (Piece::Queen, Color::Black) => BitBoard::set_bit(&mut self.b_queen, file_rank),
-            (Piece::King, Color::Black) => BitBoard::set_bit(&mut self.b_king, file_rank),
+            (Piece::Pawn, Color::White) => set_bit(&mut self.w_pawn, file_rank),
+            (Piece::Bishop, Color::White) => set_bit(&mut self.w_bishop, file_rank),
+            (Piece::Knight, Color::White) => set_bit(&mut self.w_knight, file_rank),
+            (Piece::Rook, Color::White) => set_bit(&mut self.w_rook, file_rank),
+            (Piece::Queen, Color::White) => set_bit(&mut self.w_queen, file_rank),
+            (Piece::King, Color::White) => set_bit(&mut self.w_king, file_rank),
+            (Piece::Pawn, Color::Black) => set_bit(&mut self.b_pawn, file_rank),
+            (Piece::Bishop, Color::Black) => set_bit(&mut self.b_bishop, file_rank),
+            (Piece::Knight, Color::Black) => set_bit(&mut self.b_knight, file_rank),
+            (Piece::Rook, Color::Black) => set_bit(&mut self.b_rook, file_rank),
+            (Piece::Queen, Color::Black) => set_bit(&mut self.b_queen, file_rank),
+            (Piece::King, Color::Black) => set_bit(&mut self.b_king, file_rank),
         }
     }
     pub fn clear_piece(&mut self, mv: &(Piece, Color), file_rank: FileRank) {
         match mv {
-            (Piece::Pawn, Color::White) => BitBoard::clear_bit(&mut self.w_pawn, file_rank),
-            (Piece::Bishop, Color::White) => BitBoard::clear_bit(&mut self.w_bishop, file_rank),
-            (Piece::Knight, Color::White) => BitBoard::clear_bit(&mut self.w_knight, file_rank),
-            (Piece::Rook, Color::White) => BitBoard::clear_bit(&mut self.w_rook, file_rank),
-            (Piece::Queen, Color::White) => BitBoard::clear_bit(&mut self.w_queen, file_rank),
-            (Piece::King, Color::White) => BitBoard::clear_bit(&mut self.w_king, file_rank),
-            (Piece::Pawn, Color::Black) => BitBoard::clear_bit(&mut self.b_pawn, file_rank),
-            (Piece::Bishop, Color::Black) => BitBoard::clear_bit(&mut self.b_bishop, file_rank),
-            (Piece::Knight, Color::Black) => BitBoard::clear_bit(&mut self.b_knight, file_rank),
-            (Piece::Rook, Color::Black) => BitBoard::clear_bit(&mut self.b_rook, file_rank),
-            (Piece::Queen, Color::Black) => BitBoard::clear_bit(&mut self.b_queen, file_rank),
-            (Piece::King, Color::Black) => BitBoard::clear_bit(&mut self.b_king, file_rank),
+            (Piece::Pawn, Color::White) => clear_bit(&mut self.w_pawn, file_rank),
+            (Piece::Bishop, Color::White) => clear_bit(&mut self.w_bishop, file_rank),
+            (Piece::Knight, Color::White) => clear_bit(&mut self.w_knight, file_rank),
+            (Piece::Rook, Color::White) => clear_bit(&mut self.w_rook, file_rank),
+            (Piece::Queen, Color::White) => clear_bit(&mut self.w_queen, file_rank),
+            (Piece::King, Color::White) => clear_bit(&mut self.w_king, file_rank),
+            (Piece::Pawn, Color::Black) => clear_bit(&mut self.b_pawn, file_rank),
+            (Piece::Bishop, Color::Black) => clear_bit(&mut self.b_bishop, file_rank),
+            (Piece::Knight, Color::Black) => clear_bit(&mut self.b_knight, file_rank),
+            (Piece::Rook, Color::Black) => clear_bit(&mut self.b_rook, file_rank),
+            (Piece::Queen, Color::Black) => clear_bit(&mut self.b_queen, file_rank),
+            (Piece::King, Color::Black) => clear_bit(&mut self.b_king, file_rank),
         }
     }
     pub fn get_all_pieces(self) -> u64 {
@@ -171,15 +213,13 @@ impl BitBoard {
         println!("  a b c d e f g h");
         println!(" +----------------+");
 
-        FileRank::iter().for_each(|(file_rank)| {
+        FileRank::iter().for_each(| file_rank| {
             let f_r = file_rank.clone();
-            let row = 7 - file_rank.rank(); // Calculate the row in reverse
+            let row = 7 - file_rank.rank();
             let col = file_rank.file();
 
-            // Print the row number at the start of each row
             if col == 0 {
                 if row != 7 {
-                    // To avoid an extra newline before the first row
                     println!("|{}", row + 2);
                 }
                 print!("{}|", row + 1);

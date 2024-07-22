@@ -4,7 +4,7 @@ use crate::{
     base_types::FileRank,
     game::BitBoard,
     moves_gen::{_gen_bishop_attacks_on_the_fly, _gen_rook_move_fly},
-    precalculated::{BISHOP_ATTACK_MASK, BISHOP_MAGIC_NUMBERS, BISHOP_SHIFTS, ROOK_ATTACK_MASK, ROOK_MAGIC_NUMBERS, ROOK_SHIFTS},
+    precalculated::{BISHOP_ATTACK_MASK, BISHOP_MAGIC_NUMBERS, BISHOP_SHIFTS, ROOK_ATTACK_MASK, ROOK_MAGIC_NUMBERS, ROOK_SHIFTS}, utility::bits::{bit_count, get_lsb_index, pop_bit},
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -19,7 +19,7 @@ impl MagicQuery {
         let mut bishop: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
 
         for fr in FileRank::iter() {
-            let fr_index = fr.index() as usize;
+            let fr_index = fr.index();
 
             let r_attack_mask = ROOK_ATTACK_MASK[fr_index];
             let r_magic_number = ROOK_MAGIC_NUMBERS[fr_index];
@@ -63,8 +63,8 @@ impl MagicQuery {
         }
     }
 
-    pub fn get_rook_attack(&self, file_rank: FileRank, bit_board: BitBoard) -> u64 {
-        let fr_index = file_rank.index() as usize;
+    pub fn get_rook_attack(&self, file_rank: FileRank, bit_board: &BitBoard) -> u64 {
+        let fr_index = file_rank.index();
 
         let attack_mask = ROOK_ATTACK_MASK[fr_index];
         let magic_number = ROOK_MAGIC_NUMBERS[fr_index];
@@ -75,8 +75,8 @@ impl MagicQuery {
         attacks
     }
 
-    pub fn get_bishop_attack(&self, file_rank: FileRank, bit_board: BitBoard) -> u64 {
-        let fr_index = file_rank.index() as usize;
+    pub fn get_bishop_attack(&self, file_rank: FileRank, bit_board: &BitBoard) -> u64 {
+        let fr_index = file_rank.index();
 
         let attack_mask = BISHOP_ATTACK_MASK[fr_index];
         let magic_number = BISHOP_MAGIC_NUMBERS[fr_index];
@@ -109,10 +109,10 @@ impl MagicHelper {
         let mut shifts = [0; 64];
 
         for file_rank in FileRank::iter() {
-            let file_rank_index = file_rank.index() as usize;
+            let file_rank_index = file_rank.index();
             let attack_mask = mask_attacks[file_rank_index];
 
-            let bit_count = BitBoard::bit_count(attack_mask);
+            let bit_count = bit_count(attack_mask);
             let count: usize = 1 << bit_count;
             let subsets = Self::generate_attack_subsets(attack_mask);
 
@@ -155,7 +155,7 @@ impl MagicHelper {
     }
 
     pub fn generate_attack_subsets(attack_mask: u64) -> Vec<u64> {
-        let bit_count = BitBoard::bit_count(attack_mask);
+        let bit_count = bit_count(attack_mask);
         let count: usize = 1 << bit_count;
         let mut subsets: Vec<u64> = Vec::with_capacity(count);
 
@@ -169,12 +169,12 @@ impl MagicHelper {
     fn calculate_occupancy(index: usize, attack_mask: u64) -> u64 {
         let mut mask = attack_mask;
         let mut occupancy = 0u64;
-        let bit_count = BitBoard::bit_count(attack_mask);
+        let bit_count = bit_count(attack_mask);
         for count in 0..bit_count {
-            let square = BitBoard::get_lsb_index(mask);
+            let square = get_lsb_index(mask);
             let c: u64 = count as u64;
             let i = index as u64;
-            BitBoard::pop_bit(&mut mask, square as u8);
+            pop_bit(&mut mask, square as u8);
             if i & (1u64 << c) > 0 {
                 occupancy |= 1u64 << square;
             }
