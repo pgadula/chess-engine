@@ -1,4 +1,3 @@
-
 pub const RANK_8: u64 =  0xFF << (8 * 0);
 pub const RANK_7: u64 =  0xFF << (8 * 1);
 pub const RANK_6: u64 =  0xFF << (8 * 2);

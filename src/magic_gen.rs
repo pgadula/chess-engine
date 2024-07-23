@@ -8,13 +8,13 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct MagicQuery {
+pub struct DB {
     pub rook_attacks: [Vec<u64>; 64],
     pub bishop_attacks: [Vec<u64>; 64],
 }
 
-impl MagicQuery {
-    pub fn init_sliding() -> MagicQuery {
+impl DB {
+    pub fn sliding_pieces() -> DB {
         let mut rook: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
         let mut bishop: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
 
@@ -57,7 +57,7 @@ impl MagicQuery {
 
         }
 
-        MagicQuery {
+        DB {
             bishop_attacks: bishop,
             rook_attacks: rook,
         }
@@ -110,11 +110,11 @@ impl MagicHelper {
 
         for file_rank in FileRank::iter() {
             let file_rank_index = file_rank.index();
-            let attack_mask = mask_attacks[file_rank_index];
+            let attack_pattern_mask = mask_attacks[file_rank_index];
 
-            let bit_count = bit_count(attack_mask);
+            let bit_count = bit_count(attack_pattern_mask);
             let count: usize = 1 << bit_count;
-            let subsets = Self::generate_attack_subsets(attack_mask);
+            let subsets = Self::generate_attack_subsets(attack_pattern_mask);
 
             let mut magic_number: u64;
             let relevant_bit = 64 - bit_count;
@@ -122,10 +122,10 @@ impl MagicHelper {
 
             let mut found_magic: bool = false;
 
-            let mut attacks: Vec<u64> = vec![1; count];
+            let mut attacks: Vec<bool> = vec![false; count];
             while !found_magic {
                 //TODO its weird to fill with 1
-                attacks.fill(1);
+                attacks.fill(false);
                 magic_number = MagicHelper::get_random_number();
                 found_magic = true;
 
@@ -133,8 +133,8 @@ impl MagicHelper {
                     let magic_index =
                         MagicHelper::get_magic_index(subset, magic_number, relevant_bit);
 
-                    if attacks[magic_index] == 1 {
-                        attacks[magic_index] = subset;
+                    if attacks[magic_index] == false {
+                        attacks[magic_index] = true;
                     } else {
                         found_magic = false;
                         break;

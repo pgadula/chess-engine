@@ -38,18 +38,9 @@ pub fn get_pawn_moves(game: &BitBoard, moves: &mut [Vec<u8>; 64]) {
             (single_push & rank_3_or_6) << 8 & blockers
         };
         if single_push > 0 {
-            let mv = Move {
-                from: index,
-                to: single_push.trailing_zeros() as u8,
-            };
             position.push(single_push.trailing_zeros() as u8)
         }
         if double_push > 0 {
-            let mv = Move {
-                from: index,
-                to: double_push.trailing_zeros() as u8,
-            };
-
             position.push(double_push.trailing_zeros() as u8)
         }
 
@@ -229,7 +220,7 @@ pub fn get_king_attacks(file_rank: FileRank) -> u64 {
 }
 
 
-pub fn fill_moves(mut bit_moves: u64, position: &mut Vec<u8>, move_counter: &mut u32) {
+pub fn fill_moves(mut bit_moves: u64, position: &mut Vec<u8>, move_counter: &mut u8) {
     while bit_moves > 0 {
         let i: u8 = pop_lsb(&mut bit_moves) as u8;
         position.push(i);

@@ -1,4 +1,3 @@
-use phf::phf_map;
 use std::slice::Iter;
 use self::FileRank::*;
 
@@ -17,21 +16,48 @@ pub enum Color {
     Black,
 }
 
-pub const  PIECE_CHAR_MAP: phf::Map<char, (Piece, Color)> = phf_map! {
-    'p'=> (Piece::Pawn, Color::Black),
-    'b'=> (Piece::Bishop, Color::Black),
-    'n'=> (Piece::Knight, Color::Black),
-    'r'=> (Piece::Rook, Color::Black),
-    'q'=> (Piece::Queen, Color::Black),
-    'k'=> (Piece::King, Color::Black),
-    'P'=> (Piece::Pawn, Color::White),
-    'B'=> (Piece::Bishop, Color::White),
-    'N'=> (Piece::Knight, Color::White),
-    'R'=> (Piece::Rook, Color::White),
-    'Q'=> (Piece::Queen, Color::White),
-    'K'=> (Piece::King, Color::White),
- };
- 
+static PIECE_CHAR_ARRAY: [(Piece, Color); 12] = 
+[
+    (Piece::Pawn, Color::White),   // 'P'
+    (Piece::Bishop, Color::White), // 'B'
+    (Piece::Knight, Color::White), // 'N'
+    (Piece::Rook, Color::White),   // 'R'
+    (Piece::Queen, Color::White),  // 'Q'
+    (Piece::King, Color::White),   // 'K'
+    (Piece::Pawn, Color::Black),   // 'p'
+    (Piece::Bishop, Color::Black), // 'b'
+    (Piece::Knight, Color::Black), // 'n'
+    (Piece::Rook, Color::Black),   // 'r'
+    (Piece::Queen, Color::Black),  // 'q'
+    (Piece::King, Color::Black)    // 'k'
+];
+
+pub fn get_piece_from_char<'a>(piece: char) -> Option<&'a (Piece, Color)> {    
+    let index = get_char_value(piece);
+    if index < 0{
+        return None;
+    }
+    Some(&PIECE_CHAR_ARRAY[index as usize])
+}
+fn get_char_value(c: char) -> i32 {
+    match c {
+        'P' => 0,  // Pawn (White)
+        'B' => 1,  // Bishop (White)
+        'N' => 2,  // Knight (White)
+        'R' => 3,  // Rook (White)
+        'Q' => 4,  // Queen (White)
+        'K' => 5,  // King (White)
+        'p' => 6,  // Pawn (Black)
+        'b' => 7,  // Bishop (Black)
+        'n' => 8,  // Knight (Black)
+        'r' => 9,  // Rook (Black)
+        'q' => 10, // Queen (Black)
+        'k' => 11, // King (Black)
+        _ => -1,   // Character not found
+    }
+}
+
+
  #[repr(u8)]
  #[derive(Clone, Copy, Debug, PartialEq)]
  pub enum FileRank {

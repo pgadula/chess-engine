@@ -1,6 +1,6 @@
 use std::{array, sync::Arc};
 
-use crate::{base_types::{Attacks, Color, FileRank, Piece, PIECE_CHAR_MAP}, magic_gen::MagicQuery, moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves}, utility::bits::{clear_bit, pop_lsb, set_bit}};
+use crate::{base_types::{get_piece_from_char, Attacks, Color, FileRank, Piece}, magic_gen::DB, moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves}, utility::bits::{clear_bit, pop_lsb, set_bit}};
 
 #[derive(Debug, Clone, Copy)]
 pub struct BitBoard {
@@ -38,33 +38,11 @@ pub trait FenParser {
 
 impl BitBoard {
     pub fn empty() -> BitBoard {
-        BitBoard {
-            w_pawn: 0,
-            w_bishop: 0,
-            w_knight: 0,
-            w_rook: 0,
-            w_queen: 0,
-            w_king: 0,
-            b_pawn: 0,
-            b_bishop: 0,
-            b_knight: 0,
-            b_rook: 0,
-            b_queen: 0,
-            b_king: 0,
-            turn: Color::White,
-            castling: Castling {
-                b_king_side: false,
-                b_queen_side: false,
-                w_king_side: false,
-                w_queen_side: false,
-            },
-            halfmove_clock: 0,
-            fullmove_number: 0,
-        }
+        Default::default()
     }
 
-    pub fn generate_moves(&self, db: Arc<MagicQuery>) -> [Vec<u8>; 64] {
-        let mut move_counter: u32 = 0;
+    pub fn generate_moves(&self, db: Arc<DB>) -> [Vec<u8>; 64] {
+        let mut move_counter: u8 = 0;
     
         let Attacks {
             mut bishops,
@@ -97,7 +75,7 @@ impl BitBoard {
         };
         let rev_friendly_blockers = !friendly_blockers;
     
-        let mut moves: [Vec<u8>; 64] = array::from_fn(|_| Vec::with_capacity(4096));
+        let mut moves: [Vec<u8>; 64] = array::from_fn(|_| Vec::with_capacity(64));
     
         while rooks > 0 {
             let i = pop_lsb(&mut rooks) as usize;
@@ -107,6 +85,7 @@ impl BitBoard {
     
             fill_moves(rook_move, position, &mut move_counter);
         }
+        
         while bishops > 0 {
             let index = pop_lsb(&mut bishops) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
@@ -143,7 +122,6 @@ impl BitBoard {
             let mut attacks = get_king_attacks(file_rank) & rev_friendly_blockers;
             fill_moves(attacks, position, &mut move_counter);
         }
-        println!("number of attacks: {move_counter}");
         moves
     }
 
@@ -287,7 +265,7 @@ impl FenParser for BitBoard {
         let mut col: u8 = 0;
 
         for char in piece_placement.chars() {
-            if let Some(piece) = PIECE_CHAR_MAP.get(&char) {
+            if let Some(piece) = get_piece_from_char(char) {
                 let index = (row * 8) + col;
                 if let Some(rank_file) = FileRank::get_file_rank(index) {
                     game.set_piece(piece, rank_file);
@@ -335,5 +313,11 @@ impl FenParser for BitBoard {
 
     fn serialize(self, _output: &mut str) -> &str {
         todo!()
+    }
+}
+
+impl Default for BitBoard {
+    fn default() -> Self {
+        Self { w_pawn: 0u64, w_bishop: 0u64, w_knight: 0u64, w_rook: 0u64, w_queen: 0u64, w_king: 0u64, b_pawn: 0u64, b_bishop: 0u64, b_knight: 0u64, b_rook: 0u64, b_queen: 0u64, b_king: 0u64, turn: Color::White, castling: Castling{b_king_side:false,b_queen_side:false,w_king_side:false,w_queen_side:false}, halfmove_clock: 0u8, fullmove_number: 0u8 }
     }
 }
