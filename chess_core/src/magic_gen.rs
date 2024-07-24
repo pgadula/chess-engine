@@ -2,9 +2,9 @@ use rand::Rng;
 
 use crate::{
     base_types::FileRank,
-    game::BitBoard,
     moves_gen::{_gen_bishop_attacks_on_the_fly, _gen_rook_move_fly},
-    precalculated::{BISHOP_ATTACK_MASK, BISHOP_MAGIC_NUMBERS, BISHOP_SHIFTS, ROOK_ATTACK_MASK, ROOK_MAGIC_NUMBERS, ROOK_SHIFTS}, utility::bits::{bit_count, get_lsb_index, pop_bit},
+    precalculated::{BISHOP_ATTACK_MASK, BISHOP_MAGIC_NUMBERS, BISHOP_SHIFTS, ROOK_ATTACK_MASK, ROOK_MAGIC_NUMBERS, ROOK_SHIFTS},
+    utility::bits::{bit_count, get_lsb_index, pop_bit}, BitBoard,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -14,7 +14,7 @@ pub struct DB {
 }
 
 impl DB {
-    pub fn sliding_pieces() -> DB {
+    pub fn init() -> DB {
         let mut rook: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
         let mut bishop: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
 

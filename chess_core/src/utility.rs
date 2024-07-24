@@ -2,13 +2,12 @@ use bits::pop_lsb;
 
 use crate::base_types::FileRank;
 
-
 pub fn print_as_board(number: u64) {
     // Convert the number to a 64-bit binary string, padded with zeros if necessary
     let binary_string = format!("{:064b}", number);
     println!("   a b c d e f g h");
     for row in (0..8).rev() {
-        print!("{}| ", row+1);
+        print!("{}| ", row + 1);
         for col in (0..8).rev() {
             let index = row * 8 + col;
             print!("{} ", &binary_string[index..index + 1]);
@@ -17,10 +16,9 @@ pub fn print_as_board(number: u64) {
     }
     println!("   a b c d e f g h");
     println!("Bitboard: {}", number);
-
 }
 
-pub mod bits{
+pub mod bits {
     use crate::base_types::FileRank;
 
     pub fn set_bit(bit_board: &mut u64, file_rank: FileRank) {
@@ -32,26 +30,24 @@ pub mod bits{
         let mask = 1u64 << index;
         *bit_board |= mask;
     }
-    
+
     pub fn clear_bit(bit_board: &mut u64, file_rank: FileRank) {
         let file_rank_num = file_rank as u8;
         let mask = 1u64 << file_rank_num;
         *bit_board &= !(mask);
     }
-    
+
     pub fn pop_bit(bit_board: &mut u64, index: u8) {
         let mask = 1u64 << index;
         *bit_board ^= mask;
     }
-    
-    pub fn pop_lsb(b:& mut u64)->u32
-    {
+
+    pub fn pop_lsb(b: &mut u64) -> u32 {
         let i = b.trailing_zeros();
         *b &= (*b) - 1;
         return i;
     }
-    
-    
+
     //Kernighan’s algorithm
     pub fn bit_count(bit_board: u64) -> usize {
         let mut b = bit_board;
@@ -62,10 +58,8 @@ pub mod bits{
         }
         count
     }
-    
+
     pub fn get_lsb_index(bit_board: u64) -> u32 {
         bit_board.trailing_zeros()
     }
 }
-
-

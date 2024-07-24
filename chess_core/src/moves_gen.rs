@@ -6,7 +6,8 @@ use crate::{
         FILE_NOT_A, FILE_NOT_AB, FILE_NOT_B, FILE_NOT_G, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1,
         NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_3, RANK_6,
     },
-    game::BitBoard, utility::bits::{pop_bit, pop_lsb},
+    utility::bits::{pop_bit, pop_lsb},
+    BitBoard,
 };
 
 pub fn get_pawn_moves(game: &BitBoard, moves: &mut [Vec<u8>; 64]) {
@@ -218,7 +219,6 @@ pub fn get_king_attacks(file_rank: FileRank) -> u64 {
 
     attacks
 }
-
 
 pub fn fill_moves(mut bit_moves: u64, position: &mut Vec<u8>, move_counter: &mut u8) {
     while bit_moves > 0 {

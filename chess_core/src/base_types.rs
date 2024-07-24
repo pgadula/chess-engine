@@ -1,3 +1,5 @@
+
+
 use std::slice::Iter;
 use self::FileRank::*;
 
@@ -10,6 +12,7 @@ pub enum Piece {
     Queen,
     King,
 }
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Color {
     White,

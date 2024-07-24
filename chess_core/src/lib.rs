@@ -1,8 +1,17 @@
 use std::{array, sync::Arc};
 
-use crate::{base_types::{get_piece_from_char, Attacks, Color, FileRank, Piece}, magic_gen::DB, moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves}, utility::bits::{clear_bit, pop_lsb, set_bit}};
+use base_types::{get_piece_from_char, Attacks, Color, FileRank, Piece};
+use magic_gen::DB;
+use moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves};
+use utility::bits::{clear_bit, pop_lsb, set_bit};
+pub mod base_types;
+pub mod file_rank;
+pub mod magic_gen;
+pub mod moves_gen;
+mod precalculated;
+pub mod utility;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct BitBoard {
     pub w_pawn: u64,
     pub w_bishop: u64,
@@ -16,11 +25,13 @@ pub struct BitBoard {
     pub b_rook: u64,
     pub b_queen: u64,
     pub b_king: u64,
+
     //state
     pub turn: Color,
     pub castling: Castling,
     pub halfmove_clock: u8,
     pub fullmove_number: u8,
+    pub db: Arc<DB>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -41,9 +52,9 @@ impl BitBoard {
         Default::default()
     }
 
-    pub fn generate_moves(&self, db: Arc<DB>) -> [Vec<u8>; 64] {
+    pub fn generate_moves(&self) -> [Vec<u8>; 64] {
         let mut move_counter: u8 = 0;
-    
+        let db = &self.db;
         let Attacks {
             mut bishops,
             mut friendly_blockers,
@@ -74,18 +85,19 @@ impl BitBoard {
             }
         };
         let rev_friendly_blockers = !friendly_blockers;
-    
+
         let mut moves: [Vec<u8>; 64] = array::from_fn(|_| Vec::with_capacity(64));
-    
+
         while rooks > 0 {
             let i = pop_lsb(&mut rooks) as usize;
             let position: &mut Vec<u8> = &mut moves[i];
             let file_rank = FileRank::get_file_rank(i as u8).unwrap();
-            let mut rook_move: u64 = db.clone().get_rook_attack(file_rank, self) & rev_friendly_blockers;
-    
+            let mut rook_move: u64 =
+                db.clone().get_rook_attack(file_rank, self) & rev_friendly_blockers;
+
             fill_moves(rook_move, position, &mut move_counter);
         }
-        
+
         while bishops > 0 {
             let index = pop_lsb(&mut bishops) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
@@ -94,7 +106,7 @@ impl BitBoard {
                 db.clone().get_bishop_attack(file_rank, self) & rev_friendly_blockers;
             fill_moves(bishop_moves, position, &mut move_counter);
         }
-    
+
         while queens > 0 {
             let index = pop_lsb(&mut queens) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
@@ -104,7 +116,7 @@ impl BitBoard {
             let mut sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
             fill_moves(sliding_moves, position, &mut move_counter);
         }
-        
+
         while knights > 0 {
             let index = pop_lsb(&mut knights) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
@@ -112,9 +124,9 @@ impl BitBoard {
             let mut attacks = get_knight_attacks(file_rank) & rev_friendly_blockers;
             fill_moves(attacks, position, &mut move_counter);
         }
-        
+
         get_pawn_moves(&self, &mut moves);
-        
+
         while king > 0 {
             let index = pop_lsb(&mut king) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
@@ -161,19 +173,19 @@ impl BitBoard {
             (Piece::King, Color::Black) => clear_bit(&mut self.b_king, file_rank),
         }
     }
-    pub fn get_all_pieces(self) -> u64 {
-        return self.get_white_pieces() | self.get_black_pieces();
+    pub fn get_all_pieces(&self) -> u64 {
+        return (self.get_white_pieces()) | (self.get_black_pieces());
     }
 
-    pub fn get_white_pieces(self) -> u64 {
+    pub fn get_white_pieces(&self) -> u64 {
         self.w_pawn | self.w_bishop | self.w_knight | self.w_rook | self.w_queen | self.w_king
     }
 
-    pub fn get_black_pieces(self) -> u64 {
+    pub fn get_black_pieces(&self) -> u64 {
         self.b_pawn | self.b_bishop | self.b_knight | self.b_rook | self.b_queen | self.b_king
     }
 
-    pub fn empty_square(self) -> u64 {
+    pub fn empty_square(&self) -> u64 {
         return !self.get_all_pieces();
     }
 
@@ -182,7 +194,7 @@ impl BitBoard {
         let mask = 1u64 << file_rank_num;
         return (bit_board & mask) != 0;
     }
-    pub fn get_by_index(bit_board: u64, index:u8) -> bool {
+    pub fn get_by_index(bit_board: u64, index: u8) -> bool {
         let mask: u64 = 1u64 << index;
         return (bit_board & mask) != 0;
     }
@@ -191,7 +203,7 @@ impl BitBoard {
         println!("  a b c d e f g h");
         println!(" +----------------+");
 
-        FileRank::iter().for_each(| file_rank| {
+        FileRank::iter().for_each(|file_rank| {
             let f_r = file_rank.clone();
             let row = 7 - file_rank.rank();
             let col = file_rank.file();
@@ -235,7 +247,6 @@ impl BitBoard {
         println!("|1");
         println!(" +----------------+");
         println!("  a b c d e f g h")
-
     }
 }
 
@@ -318,6 +329,30 @@ impl FenParser for BitBoard {
 
 impl Default for BitBoard {
     fn default() -> Self {
-        Self { w_pawn: 0u64, w_bishop: 0u64, w_knight: 0u64, w_rook: 0u64, w_queen: 0u64, w_king: 0u64, b_pawn: 0u64, b_bishop: 0u64, b_knight: 0u64, b_rook: 0u64, b_queen: 0u64, b_king: 0u64, turn: Color::White, castling: Castling{b_king_side:false,b_queen_side:false,w_king_side:false,w_queen_side:false}, halfmove_clock: 0u8, fullmove_number: 0u8 }
+        let db = Arc::new(DB::init());
+        Self {
+            db,
+            w_pawn: 0u64,
+            w_bishop: 0u64,
+            w_knight: 0u64,
+            w_rook: 0u64,
+            w_queen: 0u64,
+            w_king: 0u64,
+            b_pawn: 0u64,
+            b_bishop: 0u64,
+            b_knight: 0u64,
+            b_rook: 0u64,
+            b_queen: 0u64,
+            b_king: 0u64,
+            turn: Color::White,
+            castling: Castling {
+                b_king_side: false,
+                b_queen_side: false,
+                w_king_side: false,
+                w_queen_side: false,
+            },
+            halfmove_clock: 0u8,
+            fullmove_number: 0u8,
+        }
     }
 }
