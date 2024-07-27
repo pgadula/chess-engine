@@ -1,6 +1,7 @@
-use std::{array, sync::Arc};
+use std::{array, iter::empty, sync::Arc};
 
-use base_types::{get_piece_from_char, Attacks, Color, FileRank, Piece};
+use base_types::{get_piece_from_char, Side, Color, FileRank, Piece, Token};
+use file_rank::FILES_CHAR;
 use magic_gen::DB;
 use moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves};
 use utility::bits::{clear_bit, pop_lsb, set_bit};
@@ -8,6 +9,7 @@ pub mod base_types;
 pub mod file_rank;
 pub mod magic_gen;
 pub mod moves_gen;
+pub mod algebraic_notation;
 mod precalculated;
 pub mod utility;
 
@@ -32,6 +34,10 @@ pub struct BitBoard {
     pub halfmove_clock: u8,
     pub fullmove_number: u8,
     pub db: Arc<DB>,
+
+    pub white_moves:Vec<Vec<u8>>,
+    pub black_moves:Vec<Vec<u8>>
+
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -52,19 +58,11 @@ impl BitBoard {
         Default::default()
     }
 
-    pub fn generate_moves(&self) -> [Vec<u8>; 64] {
+    pub fn calculate_moves(&mut self) {
         let mut move_counter: u8 = 0;
         let db = &self.db;
-        let Attacks {
-            mut bishops,
-            mut friendly_blockers,
-            mut king,
-            mut queens,
-            mut rooks,
-            mut pawns,
-            mut knights,
-        } = if self.turn == Color::White {
-            Attacks {
+        let white =
+            Side {
                 rooks: self.w_rook,
                 bishops: self.w_bishop,
                 queens: self.w_queen,
@@ -72,9 +70,9 @@ impl BitBoard {
                 pawns: self.w_pawn,
                 knights: self.w_knight,
                 friendly_blockers: self.get_white_pieces(),
-            }
-        } else {
-            Attacks {
+        };
+       let black = 
+            Side {
                 rooks: self.b_rook,
                 bishops: self.b_bishop,
                 queens: self.b_queen,
@@ -82,61 +80,78 @@ impl BitBoard {
                 pawns: self.b_pawn,
                 knights: self.b_knight,
                 friendly_blockers: self.get_black_pieces(),
-            }
-        };
+            };
+    
+        self.white_moves = self.get_moves_for_color(&white);
+        self.black_moves = self.get_moves_for_color(&black);
+
+    }
+
+    fn get_moves_for_color(&self, side:&Side) -> Vec<Vec<u8>> {
+        
+        let Side {
+            mut bishops,
+            mut friendly_blockers,
+            mut king,
+            mut queens,
+            mut rooks,
+            mut pawns,
+            mut knights,
+        } = side;
+        let db = self.db.clone();
         let rev_friendly_blockers = !friendly_blockers;
-
-        let mut moves: [Vec<u8>; 64] = array::from_fn(|_| Vec::with_capacity(64));
-
+        
+        let mut moves: Vec<Vec<u8>> = Vec::with_capacity(64);
+    
         while rooks > 0 {
             let i = pop_lsb(&mut rooks) as usize;
             let position: &mut Vec<u8> = &mut moves[i];
             let file_rank = FileRank::get_file_rank(i as u8).unwrap();
             let mut rook_move: u64 =
-                db.clone().get_rook_attack(file_rank, self) & rev_friendly_blockers;
-
-            fill_moves(rook_move, position, &mut move_counter);
+                db.get_rook_attack(file_rank, self) & rev_friendly_blockers;
+    
+            fill_moves(rook_move, position);
         }
-
+    
         while bishops > 0 {
             let index = pop_lsb(&mut bishops) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
             let position: &mut Vec<u8> = &mut moves[index];
             let mut bishop_moves: u64 =
-                db.clone().get_bishop_attack(file_rank, self) & rev_friendly_blockers;
-            fill_moves(bishop_moves, position, &mut move_counter);
+                db.get_bishop_attack(file_rank, self) & rev_friendly_blockers;
+            fill_moves(bishop_moves, position);
         }
-
+    
         while queens > 0 {
             let index = pop_lsb(&mut queens) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
             let position: &mut Vec<u8> = &mut moves[index];
-            let mut bishop_moves: u64 = db.clone().get_bishop_attack(file_rank, self);
-            let mut rook_moves: u64 = db.clone().get_rook_attack(file_rank, self);
+            let mut bishop_moves: u64 = db.get_bishop_attack(file_rank, self);
+            let mut rook_moves: u64 = db.get_rook_attack(file_rank, self);
             let mut sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
-            fill_moves(sliding_moves, position, &mut move_counter);
+            fill_moves(sliding_moves, position);
         }
-
+    
         while knights > 0 {
             let index = pop_lsb(&mut knights) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
             let position: &mut Vec<u8> = &mut moves[index];
             let mut attacks = get_knight_attacks(file_rank) & rev_friendly_blockers;
-            fill_moves(attacks, position, &mut move_counter);
+            fill_moves(attacks, position);
         }
-
+    
         get_pawn_moves(&self, &mut moves);
-
+    
         while king > 0 {
             let index = pop_lsb(&mut king) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
             let position: &mut Vec<u8> = &mut moves[index];
             let mut attacks = get_king_attacks(file_rank) & rev_friendly_blockers;
-            fill_moves(attacks, position, &mut move_counter);
+            fill_moves(attacks, position);
         }
         moves
     }
-
+    
     pub fn new_game() -> BitBoard {
         BitBoard::deserialize("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
@@ -197,6 +212,28 @@ impl BitBoard {
     pub fn get_by_index(bit_board: u64, index: u8) -> bool {
         let mask: u64 = 1u64 << index;
         return (bit_board & mask) != 0;
+    }
+
+
+
+
+
+    pub fn deserialize_move(&self, input:&str)->Option<Token>{
+
+        let mut iterator =  input.chars();
+        if let Some(c) = iterator.next() {
+            match c {
+                'K' | 'Q' | 'R' | 'B' | 'N' | 'P' | 'k' | 'q' | 'r' | 'b' | 'n' | 'p' =>{
+                    return Some(Token::Piece(c));
+                }
+                'a'..='h' => return Some(Token::File(c)),
+                '1'..='8' => return Some(Token::Rank(c)),
+                'x' => return Some(Token::Capture),
+                 _ => {return None;}
+            }
+         }
+         return None;
+
     }
 
     pub fn print(self) {
@@ -353,6 +390,8 @@ impl Default for BitBoard {
             },
             halfmove_clock: 0u8,
             fullmove_number: 0u8,
+            black_moves:Vec::new(),
+            white_moves:Vec::new()
         }
     }
 }

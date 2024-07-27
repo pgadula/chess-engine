@@ -10,12 +10,10 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let fen = "1nbqkbnr/pppppppp/R7/8/4P3/2rR4/PPPP1PPP/RNBQKBNR w KQkq e3 0 1";
-    let db = Arc::new(DB::init());
-
-    let game = BitBoard::deserialize(fen);
+    let mut game = BitBoard::deserialize(fen);
 
 
-    c.bench_function("move generation", |b| b.iter(|| game.generate_moves()));
+    c.bench_function("move generation", |b| b.iter(|| game.calculate_moves()));
 }
 
 criterion_group!(benches, criterion_benchmark);

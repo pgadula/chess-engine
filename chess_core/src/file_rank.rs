@@ -39,3 +39,4 @@ pub const FILE_A: u64 = !FILE_NOT_A;
 pub const FILE_H: u64 = !FILE_NOT_H;
 
 pub const EDGES: u64 = RANK_1 | RANK_8 | FILE_H | FILE_A;
+pub const FILES_CHAR:[char; 8] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];

@@ -1,5 +1,3 @@
-
-
 use std::slice::Iter;
 use self::FileRank::*;
 
@@ -152,7 +150,7 @@ impl std::fmt::Display for Moves {
 }
 pub struct Moves(pub Vec<Move>);
 
-pub struct Attacks {
+pub struct Side {
     pub rooks: u64,
     pub bishops: u64,
     pub queens: u64,
@@ -160,4 +158,18 @@ pub struct Attacks {
     pub knights: u64,
     pub pawns: u64,
     pub friendly_blockers: u64,
+}
+
+#[derive(Debug)]
+pub enum Token {
+    Piece(char),
+    File(char),
+    Rank(char),
+    Capture,
+    Check,
+    Checkmate,
+    CastleKingSide,
+    CastleQueenSide,
+    Promotion(char),
+    MoveIndicator,
 }

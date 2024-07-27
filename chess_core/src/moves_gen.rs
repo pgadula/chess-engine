@@ -10,7 +10,7 @@ use crate::{
     BitBoard,
 };
 
-pub fn get_pawn_moves(game: &BitBoard, moves: &mut [Vec<u8>; 64]) {
+pub fn get_pawn_moves(game: &BitBoard, moves: &mut Vec<Vec<u8>>) {
     let mut pawns = if game.turn == Color::White {
         game.w_pawn
     } else {
@@ -220,10 +220,9 @@ pub fn get_king_attacks(file_rank: FileRank) -> u64 {
     attacks
 }
 
-pub fn fill_moves(mut bit_moves: u64, position: &mut Vec<u8>, move_counter: &mut u8) {
+pub fn fill_moves(mut bit_moves: u64, position: &mut Vec<u8>) {
     while bit_moves > 0 {
         let i: u8 = pop_lsb(&mut bit_moves) as u8;
         position.push(i);
-        *move_counter += 1;
     }
 }
