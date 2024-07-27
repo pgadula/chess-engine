@@ -1,7 +1,7 @@
 use std::iter::zip;
 
 use crate::{
-    base_types::{Color, FileRank, Move},
+    base_types::{Color, FileRank, PieceType, PieceLocation},
     file_rank::{
         FILE_NOT_A, FILE_NOT_AB, FILE_NOT_B, FILE_NOT_G, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1,
         NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_3, RANK_6,
@@ -10,42 +10,37 @@ use crate::{
     BitBoard,
 };
 
-pub fn get_pawn_moves(game: &BitBoard, moves: &mut Vec<Vec<u8>>) {
-    let mut pawns = if game.turn == Color::White {
-        game.w_pawn
-    } else {
-        game.b_pawn
-    };
-    let rank_3_or_6 = if game.turn == Color::White {
+pub fn get_pawn_moves(color: Color, pawns:u64, blockers: u64, moves: &mut [Vec<usize>; 64]) {
+    let mut pawns = pawns;
+
+    let rank_3_or_6 = if color == Color::White {
         RANK_3
     } else {
         RANK_6
     };
 
-    let blockers = game.empty_square();
-
     while pawns > 0 {
-        let index = pawns.trailing_zeros() as u8;
+        let index = pawns.trailing_zeros();
         let isolated_pawn = 1u64 << index as u64;
-        let mut position: &mut Vec<u8> = &mut moves[index as usize];
-        let single_push: u64 = if game.turn == Color::White {
+        let mut position: &mut Vec<usize> = &mut moves[index as usize];
+        let single_push: u64 = if color == Color::White {
             (isolated_pawn >> 8) & blockers
         } else {
             (isolated_pawn << 8) & blockers
         };
-        let double_push: u64 = if game.turn == Color::White {
+        let double_push: u64 = if color == Color::White {
             (single_push & rank_3_or_6) >> 8 & blockers
         } else {
             (single_push & rank_3_or_6) << 8 & blockers
         };
         if single_push > 0 {
-            position.push(single_push.trailing_zeros() as u8)
+            position.push(single_push.trailing_zeros() as usize)
         }
         if double_push > 0 {
-            position.push(double_push.trailing_zeros() as u8)
+            position.push(double_push.trailing_zeros() as usize)
         }
 
-        pop_bit(&mut pawns, index)
+        pop_bit(&mut pawns, index as u8)
     }
 }
 
@@ -220,9 +215,9 @@ pub fn get_king_attacks(file_rank: FileRank) -> u64 {
     attacks
 }
 
-pub fn fill_moves(mut bit_moves: u64, position: &mut Vec<u8>) {
+pub fn fill_moves(file_rank: FileRank, piece: PieceType, mut bit_moves: u64, position: &mut Vec<usize>) {
     while bit_moves > 0 {
-        let i: u8 = pop_lsb(&mut bit_moves) as u8;
+        let i:usize = pop_lsb(&mut bit_moves) as usize;
         position.push(i);
     }
 }

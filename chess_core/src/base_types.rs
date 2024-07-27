@@ -1,8 +1,8 @@
 use std::slice::Iter;
 use self::FileRank::*;
 
-#[derive(Debug)]
-pub enum Piece {
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum PieceType {
     Pawn,
     Bishop,
     Knight,
@@ -17,29 +17,51 @@ pub enum Color {
     Black,
 }
 
-static PIECE_CHAR_ARRAY: [(Piece, Color); 12] = 
-[
-    (Piece::Pawn, Color::White),   // 'P'
-    (Piece::Bishop, Color::White), // 'B'
-    (Piece::Knight, Color::White), // 'N'
-    (Piece::Rook, Color::White),   // 'R'
-    (Piece::Queen, Color::White),  // 'Q'
-    (Piece::King, Color::White),   // 'K'
-    (Piece::Pawn, Color::Black),   // 'p'
-    (Piece::Bishop, Color::Black), // 'b'
-    (Piece::Knight, Color::Black), // 'n'
-    (Piece::Rook, Color::Black),   // 'r'
-    (Piece::Queen, Color::Black),  // 'q'
-    (Piece::King, Color::Black)    // 'k'
+#[derive(Debug, PartialEq, Clone, Copy)]
+
+pub struct Piece {
+    pub piece_type: PieceType,
+    pub color: Color
+}
+
+// Define constants for each piece
+pub const WHITE_PAWN: Piece = Piece { piece_type: PieceType::Pawn, color: Color::White };
+pub const WHITE_BISHOP: Piece = Piece { piece_type: PieceType::Bishop, color: Color::White };
+pub const WHITE_KNIGHT: Piece = Piece { piece_type: PieceType::Knight, color: Color::White };
+pub const WHITE_ROOK: Piece = Piece { piece_type: PieceType::Rook, color: Color::White };
+pub const WHITE_QUEEN: Piece = Piece { piece_type: PieceType::Queen, color: Color::White };
+pub const WHITE_KING: Piece = Piece { piece_type: PieceType::King, color: Color::White };
+pub const BLACK_PAWN: Piece = Piece { piece_type: PieceType::Pawn, color: Color::Black };
+pub const BLACK_BISHOP: Piece = Piece { piece_type: PieceType::Bishop, color: Color::Black };
+pub const BLACK_KNIGHT: Piece = Piece { piece_type: PieceType::Knight, color: Color::Black };
+pub const BLACK_ROOK: Piece = Piece { piece_type: PieceType::Rook, color: Color::Black };
+pub const BLACK_QUEEN: Piece = Piece { piece_type: PieceType::Queen, color: Color::Black };
+pub const BLACK_KING: Piece = Piece { piece_type: PieceType::King, color: Color::Black };
+
+// Create an array of all pieces
+const PIECE_CHAR_ARRAY: [Piece; 12] = [
+    WHITE_PAWN,    // 'P'
+    WHITE_BISHOP,  // 'B'
+    WHITE_KNIGHT,  // 'N'
+    WHITE_ROOK,    // 'R'
+    WHITE_QUEEN,   // 'Q'
+    WHITE_KING,    // 'K'
+    BLACK_PAWN,    // 'p'
+    BLACK_BISHOP,  // 'b'
+    BLACK_KNIGHT,  // 'n'
+    BLACK_ROOK,    // 'r'
+    BLACK_QUEEN,   // 'q'
+    BLACK_KING,    // 'k'
 ];
 
-pub fn get_piece_from_char<'a>(piece: char) -> Option<&'a (Piece, Color)> {    
+pub fn get_piece_from_char<'a>(piece: char) -> Option<&'a Piece> {    
     let index = get_char_value(piece);
     if index < 0{
         return None;
     }
     Some(&PIECE_CHAR_ARRAY[index as usize])
 }
+
 fn get_char_value(c: char) -> i32 {
     match c {
         'P' => 0,  // Pawn (White)
@@ -124,33 +146,7 @@ pub const FILE_RANK: [FileRank; 64] = [
     }
  }
 
- #[derive(Clone, Copy, Debug)]
- pub struct Move {
-    pub from: u8,
-    pub to: u8,
- }
-
- impl std::fmt::Display for Move {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let from = FILE_RANK_CHAR[self.from as usize];
-        let to: &str = FILE_RANK_CHAR[self.to as usize];
-
-        write!(f, "from: {}, to: {}", from, to)
-    }
-}
-
-impl std::fmt::Display for Moves {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Moves:\n")?;
-        for v in &self.0 {
-            writeln!(f, "{} ", v)?;
-        }
-        Ok(())
-    }
-}
-pub struct Moves(pub Vec<Move>);
-
-pub struct Side {
+pub struct BoardSide {
     pub rooks: u64,
     pub bishops: u64,
     pub queens: u64,
@@ -158,10 +154,11 @@ pub struct Side {
     pub knights: u64,
     pub pawns: u64,
     pub friendly_blockers: u64,
+    pub color:Color
 }
 
 #[derive(Debug)]
-pub enum Token {
+pub enum AlgebraicNotationToken {
     Piece(char),
     File(char),
     Rank(char),
@@ -172,4 +169,11 @@ pub enum Token {
     CastleQueenSide,
     Promotion(char),
     MoveIndicator,
+}
+
+#[derive(Debug)]
+pub struct PieceLocation{
+    pub piece:PieceType,
+    pub file_rank:FileRank,
+    pub color:Color
 }

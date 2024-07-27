@@ -8,13 +8,13 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct DB {
+pub struct MoveLookupTable {
     pub rook_attacks: [Vec<u64>; 64],
     pub bishop_attacks: [Vec<u64>; 64],
 }
 
-impl DB {
-    pub fn init() -> DB {
+impl MoveLookupTable {
+    pub fn init() -> MoveLookupTable {
         let mut rook: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
         let mut bishop: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
 
@@ -57,7 +57,7 @@ impl DB {
 
         }
 
-        DB {
+        MoveLookupTable {
             bishop_attacks: bishop,
             rook_attacks: rook,
         }

@@ -1,15 +1,15 @@
 use std::{array, iter::empty, sync::Arc};
 
-use base_types::{get_piece_from_char, Side, Color, FileRank, Piece, Token};
+use base_types::{get_piece_from_char, AlgebraicNotationToken, Color, FileRank, Piece, PieceLocation, PieceType, BoardSide, BLACK_BISHOP, BLACK_KING, BLACK_KNIGHT, BLACK_PAWN, BLACK_QUEEN, BLACK_ROOK, WHITE_BISHOP, WHITE_KING, WHITE_KNIGHT, WHITE_PAWN, WHITE_QUEEN, WHITE_ROOK};
 use file_rank::FILES_CHAR;
-use magic_gen::DB;
+use magic_gen::MoveLookupTable;
 use moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves};
 use utility::bits::{clear_bit, pop_lsb, set_bit};
+pub mod algebraic_notation;
 pub mod base_types;
 pub mod file_rank;
 pub mod magic_gen;
 pub mod moves_gen;
-pub mod algebraic_notation;
 mod precalculated;
 pub mod utility;
 
@@ -33,11 +33,11 @@ pub struct BitBoard {
     pub castling: Castling,
     pub halfmove_clock: u8,
     pub fullmove_number: u8,
-    pub db: Arc<DB>,
+    pub db: Arc<MoveLookupTable>,
 
-    pub white_moves:Vec<Vec<u8>>,
-    pub black_moves:Vec<Vec<u8>>
-
+    pub white_moves: Vec<Vec<usize>>,
+    pub black_moves: Vec<Vec<usize>>,
+    pub attacked_squared: Vec<Vec<usize>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -61,35 +61,33 @@ impl BitBoard {
     pub fn calculate_moves(&mut self) {
         let mut move_counter: u8 = 0;
         let db = &self.db;
-        let white =
-            Side {
-                rooks: self.w_rook,
-                bishops: self.w_bishop,
-                queens: self.w_queen,
-                king: self.w_king,
-                pawns: self.w_pawn,
-                knights: self.w_knight,
-                friendly_blockers: self.get_white_pieces(),
+        let white = BoardSide {
+            rooks: self.w_rook,
+            bishops: self.w_bishop,
+            queens: self.w_queen,
+            king: self.w_king,
+            pawns: self.w_pawn,
+            knights: self.w_knight,
+            friendly_blockers: self.get_white_pieces(),
+            color: Color::White,
         };
-       let black = 
-            Side {
-                rooks: self.b_rook,
-                bishops: self.b_bishop,
-                queens: self.b_queen,
-                king: self.b_king,
-                pawns: self.b_pawn,
-                knights: self.b_knight,
-                friendly_blockers: self.get_black_pieces(),
-            };
-    
+        let black = BoardSide {
+            rooks: self.b_rook,
+            bishops: self.b_bishop,
+            queens: self.b_queen,
+            king: self.b_king,
+            pawns: self.b_pawn,
+            knights: self.b_knight,
+            friendly_blockers: self.get_black_pieces(),
+            color: Color::Black,
+        };
+
         self.white_moves = self.get_moves_for_color(&white);
         self.black_moves = self.get_moves_for_color(&black);
-
     }
 
-    fn get_moves_for_color(&self, side:&Side) -> Vec<Vec<u8>> {
-        
-        let Side {
+    fn get_moves_for_color(&self, side: &BoardSide) -> Vec<Vec<usize>> {
+        let BoardSide {
             mut bishops,
             mut friendly_blockers,
             mut king,
@@ -97,95 +95,140 @@ impl BitBoard {
             mut rooks,
             mut pawns,
             mut knights,
+            color,
         } = side;
+        let color = color.clone();
         let db = self.db.clone();
         let rev_friendly_blockers = !friendly_blockers;
-        
-        let mut moves: Vec<Vec<u8>> = Vec::with_capacity(64);
-    
+
+        let mut moves: [Vec<usize>; 64] = array::from_fn(|_| Vec::with_capacity(64));
+        let mut attacked_squares: [Vec<PieceLocation>; 64] =
+            array::from_fn(|_| Vec::with_capacity(64));
+
         while rooks > 0 {
             let i = pop_lsb(&mut rooks) as usize;
-            let position: &mut Vec<u8> = &mut moves[i];
+            let position: &mut Vec<usize> = &mut moves[i];
             let file_rank = FileRank::get_file_rank(i as u8).unwrap();
-            let mut rook_move: u64 =
-                db.get_rook_attack(file_rank, self) & rev_friendly_blockers;
-    
-            fill_moves(rook_move, position);
+            let mut rook_move: u64 = db.get_rook_attack(file_rank, self) & rev_friendly_blockers;
+
+            fill_moves(file_rank, PieceType::Rook, rook_move, position);
+            for index in position {
+                attacked_squares[*index as usize].push(PieceLocation {
+                    file_rank,
+                    piece: PieceType::Rook,
+                    color,
+                })
+            }
         }
-    
+
         while bishops > 0 {
             let index = pop_lsb(&mut bishops) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<u8> = &mut moves[index];
+            let position: &mut Vec<usize> = &mut moves[index];
             let mut bishop_moves: u64 =
                 db.get_bishop_attack(file_rank, self) & rev_friendly_blockers;
-            fill_moves(bishop_moves, position);
+            fill_moves(file_rank, PieceType::Bishop, bishop_moves, position);
+            for index in position {
+                attacked_squares[*index as usize].push(PieceLocation {
+                    file_rank,
+                    piece: PieceType::Bishop,
+                    color,
+                })
+            }
         }
-    
+
         while queens > 0 {
             let index = pop_lsb(&mut queens) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<u8> = &mut moves[index];
+            let position: &mut Vec<usize> = &mut moves[index];
             let mut bishop_moves: u64 = db.get_bishop_attack(file_rank, self);
             let mut rook_moves: u64 = db.get_rook_attack(file_rank, self);
             let mut sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
-            fill_moves(sliding_moves, position);
+            fill_moves(file_rank, PieceType::Queen, sliding_moves, position);
+            for index in position {
+                attacked_squares[*index as usize].push(PieceLocation {
+                    file_rank,
+                    piece: PieceType::Queen,
+                    color,
+                })
+            }
         }
-    
+
         while knights > 0 {
             let index = pop_lsb(&mut knights) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<u8> = &mut moves[index];
+            let position: &mut Vec<usize> = &mut moves[index];
             let mut attacks = get_knight_attacks(file_rank) & rev_friendly_blockers;
-            fill_moves(attacks, position);
+            fill_moves(file_rank, PieceType::Knight, attacks, position);
+            for index in position {
+                attacked_squares[*index as usize].push(PieceLocation {
+                    file_rank,
+                    piece: PieceType::Knight,
+                    color,
+                })
+            }
         }
-    
-        get_pawn_moves(&self, &mut moves);
-    
+
+        let pawns = if color == Color::White {
+            self.w_pawn
+        } else {
+            self.b_pawn
+        };
+        get_pawn_moves(color, pawns, self.empty_square(), &mut moves);
+
         while king > 0 {
             let index = pop_lsb(&mut king) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<u8> = &mut moves[index];
+            let position: &mut Vec<usize> = &mut moves[index];
             let mut attacks = get_king_attacks(file_rank) & rev_friendly_blockers;
-            fill_moves(attacks, position);
+            fill_moves(file_rank, PieceType::King, attacks, position);
+            for index in position {
+                attacked_squares[*index as usize].push(PieceLocation {
+                    file_rank,
+                    piece: PieceType::King,
+                    color,
+                })
+            }
         }
-        moves
+
+        moves.to_vec()
     }
-    
+
     pub fn new_game() -> BitBoard {
         BitBoard::deserialize("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
 
-    pub fn set_piece(&mut self, mv: &(Piece, Color), file_rank: FileRank) {
-        match mv {
-            (Piece::Pawn, Color::White) => set_bit(&mut self.w_pawn, file_rank),
-            (Piece::Bishop, Color::White) => set_bit(&mut self.w_bishop, file_rank),
-            (Piece::Knight, Color::White) => set_bit(&mut self.w_knight, file_rank),
-            (Piece::Rook, Color::White) => set_bit(&mut self.w_rook, file_rank),
-            (Piece::Queen, Color::White) => set_bit(&mut self.w_queen, file_rank),
-            (Piece::King, Color::White) => set_bit(&mut self.w_king, file_rank),
-            (Piece::Pawn, Color::Black) => set_bit(&mut self.b_pawn, file_rank),
-            (Piece::Bishop, Color::Black) => set_bit(&mut self.b_bishop, file_rank),
-            (Piece::Knight, Color::Black) => set_bit(&mut self.b_knight, file_rank),
-            (Piece::Rook, Color::Black) => set_bit(&mut self.b_rook, file_rank),
-            (Piece::Queen, Color::Black) => set_bit(&mut self.b_queen, file_rank),
-            (Piece::King, Color::Black) => set_bit(&mut self.b_king, file_rank),
+    pub fn set_piece(&mut self, piece: &Piece, file_rank: FileRank) {
+        match (piece.piece_type, piece.color) {
+            (PieceType::Pawn, Color::White) => set_bit(&mut self.w_pawn, file_rank),
+            (PieceType::Bishop, Color::White) => set_bit(&mut self.w_bishop, file_rank),
+            (PieceType::Knight, Color::White) => set_bit(&mut self.w_knight, file_rank),
+            (PieceType::Rook, Color::White) => set_bit(&mut self.w_rook, file_rank),
+            (PieceType::Queen, Color::White) => set_bit(&mut self.w_queen, file_rank),
+            (PieceType::King, Color::White) => set_bit(&mut self.w_king, file_rank),
+            (PieceType::Pawn, Color::Black) => set_bit(&mut self.b_pawn, file_rank),
+            (PieceType::Bishop, Color::Black) => set_bit(&mut self.b_bishop, file_rank),
+            (PieceType::Knight, Color::Black) => set_bit(&mut self.b_knight, file_rank),
+            (PieceType::Rook, Color::Black) => set_bit(&mut self.b_rook, file_rank),
+            (PieceType::Queen, Color::Black) => set_bit(&mut self.b_queen, file_rank),
+            (PieceType::King, Color::Black) => set_bit(&mut self.b_king, file_rank),
         }
     }
-    pub fn clear_piece(&mut self, mv: &(Piece, Color), file_rank: FileRank) {
-        match mv {
-            (Piece::Pawn, Color::White) => clear_bit(&mut self.w_pawn, file_rank),
-            (Piece::Bishop, Color::White) => clear_bit(&mut self.w_bishop, file_rank),
-            (Piece::Knight, Color::White) => clear_bit(&mut self.w_knight, file_rank),
-            (Piece::Rook, Color::White) => clear_bit(&mut self.w_rook, file_rank),
-            (Piece::Queen, Color::White) => clear_bit(&mut self.w_queen, file_rank),
-            (Piece::King, Color::White) => clear_bit(&mut self.w_king, file_rank),
-            (Piece::Pawn, Color::Black) => clear_bit(&mut self.b_pawn, file_rank),
-            (Piece::Bishop, Color::Black) => clear_bit(&mut self.b_bishop, file_rank),
-            (Piece::Knight, Color::Black) => clear_bit(&mut self.b_knight, file_rank),
-            (Piece::Rook, Color::Black) => clear_bit(&mut self.b_rook, file_rank),
-            (Piece::Queen, Color::Black) => clear_bit(&mut self.b_queen, file_rank),
-            (Piece::King, Color::Black) => clear_bit(&mut self.b_king, file_rank),
+    
+    pub fn clear_piece(&mut self, piece: &Piece, file_rank: FileRank) {
+        match (piece.piece_type, piece.color) {
+            (PieceType::Pawn, Color::White) => clear_bit(&mut self.w_pawn, file_rank),
+            (PieceType::Bishop, Color::White) => clear_bit(&mut self.w_bishop, file_rank),
+            (PieceType::Knight, Color::White) => clear_bit(&mut self.w_knight, file_rank),
+            (PieceType::Rook, Color::White) => clear_bit(&mut self.w_rook, file_rank),
+            (PieceType::Queen, Color::White) => clear_bit(&mut self.w_queen, file_rank),
+            (PieceType::King, Color::White) => clear_bit(&mut self.w_king, file_rank),
+            (PieceType::Pawn, Color::Black) => clear_bit(&mut self.b_pawn, file_rank),
+            (PieceType::Bishop, Color::Black) => clear_bit(&mut self.b_bishop, file_rank),
+            (PieceType::Knight, Color::Black) => clear_bit(&mut self.b_knight, file_rank),
+            (PieceType::Rook, Color::Black) => clear_bit(&mut self.b_rook, file_rank),
+            (PieceType::Queen, Color::Black) => clear_bit(&mut self.b_queen, file_rank),
+            (PieceType::King, Color::Black) => clear_bit(&mut self.b_king, file_rank),
         }
     }
     pub fn get_all_pieces(&self) -> u64 {
@@ -214,34 +257,29 @@ impl BitBoard {
         return (bit_board & mask) != 0;
     }
 
-
-
-
-
-    pub fn deserialize_move(&self, input:&str)->Option<Token>{
-
-        let mut iterator =  input.chars();
+    pub fn deserialize_move(&self, input: &str) -> Option<AlgebraicNotationToken> {
+        let mut iterator = input.chars();
         if let Some(c) = iterator.next() {
             match c {
-                'K' | 'Q' | 'R' | 'B' | 'N' | 'P' | 'k' | 'q' | 'r' | 'b' | 'n' | 'p' =>{
-                    return Some(Token::Piece(c));
+                'K' | 'Q' | 'R' | 'B' | 'N' | 'P' | 'k' | 'q' | 'r' | 'b' | 'n' | 'p' => {
+                    return Some(AlgebraicNotationToken::Piece(c));
                 }
-                'a'..='h' => return Some(Token::File(c)),
-                '1'..='8' => return Some(Token::Rank(c)),
-                'x' => return Some(Token::Capture),
-                 _ => {return None;}
+                'a'..='h' => return Some(AlgebraicNotationToken::File(c)),
+                '1'..='8' => return Some(AlgebraicNotationToken::Rank(c)),
+                'x' => return Some(AlgebraicNotationToken::Capture),
+                _ => {
+                    return None;
+                }
             }
-         }
-         return None;
-
+        }
+        return None;
     }
 
-    pub fn print(self) {
+    pub fn print(&self) {
         println!("  a b c d e f g h");
         println!(" +----------------+");
 
         FileRank::iter().for_each(|file_rank| {
-            let f_r = file_rank.clone();
             let row = 7 - file_rank.rank();
             let col = file_rank.file();
 
@@ -252,38 +290,61 @@ impl BitBoard {
                 print!("{}|", row + 1);
             }
 
-            if BitBoard::get(self.w_pawn, f_r) {
-                print!("♟︎ ");
-            } else if BitBoard::get(self.w_bishop, f_r) {
-                print!("♝ ");
-            } else if BitBoard::get(self.w_knight, f_r) {
-                print!("♞ ");
-            } else if BitBoard::get(self.w_rook, f_r) {
-                print!("♜ ");
-            } else if BitBoard::get(self.w_queen, f_r) {
-                print!("♛ ");
-            } else if BitBoard::get(self.w_king, f_r) {
-                print!("♚ ");
-            } else if BitBoard::get(self.b_pawn, f_r) {
-                print!("♙ ");
-            } else if BitBoard::get(self.b_bishop, f_r) {
-                print!("♗ ");
-            } else if BitBoard::get(self.b_knight, f_r) {
-                print!("♘ ");
-            } else if BitBoard::get(self.b_rook, f_r) {
-                print!("♖ ");
-            } else if BitBoard::get(self.b_queen, f_r) {
-                print!("♕ ");
-            } else if BitBoard::get(self.b_king, f_r) {
-                print!("♔ ");
-            } else {
-                print!(". ");
+            let piece = self.get_piece_at(file_rank.clone());
+
+            if let Some(p) = piece {
+                match (p.piece_type, p.color) {
+                    (PieceType::Pawn, Color::White) => print!("♙ "),
+                    (PieceType::Bishop, Color::White) => print!("♗ "),
+                    (PieceType::Knight, Color::White) => print!("♘ "),
+                    (PieceType::Rook, Color::White) => print!("♖ "),
+                    (PieceType::Queen, Color::White) => print!("♕ "),
+                    (PieceType::King, Color::White) => print!("♔ "),
+                    (PieceType::Pawn, Color::Black) => print!("♟︎ "),
+                    (PieceType::Bishop, Color::Black) => print!("♝ "),
+                    (PieceType::Knight, Color::Black) => print!("♞ "),
+                    (PieceType::Rook, Color::Black) => print!("♜ "),
+                    (PieceType::Queen, Color::Black) => print!("♛ "),
+                    (PieceType::King, Color::Black) => print!("♚ "),
+                }
+            }else{
+              print!(". ");
             }
+
         });
 
         println!("|1");
         println!(" +----------------+");
         println!("  a b c d e f g h")
+    }
+
+    pub fn get_piece_at(&self, file_rank: FileRank) -> Option<Piece> {
+        if BitBoard::get(self.w_pawn, file_rank) {
+            return Some(WHITE_PAWN)
+        } else if BitBoard::get(self.w_bishop, file_rank) {
+            return Some(WHITE_BISHOP)
+        } else if BitBoard::get(self.w_knight, file_rank) {
+            return Some(WHITE_KNIGHT)
+        } else if BitBoard::get(self.w_rook, file_rank) {
+            return Some(WHITE_ROOK)
+        } else if BitBoard::get(self.w_queen, file_rank) {
+            return Some(WHITE_QUEEN)
+        } else if BitBoard::get(self.w_king, file_rank) {
+            return Some(WHITE_KING)
+        } else if BitBoard::get(self.b_pawn, file_rank) {
+            return Some(BLACK_PAWN)
+        } else if BitBoard::get(self.b_bishop, file_rank) {
+            return Some(BLACK_BISHOP)
+        } else if BitBoard::get(self.b_knight, file_rank) {
+            return Some(BLACK_KNIGHT)
+        } else if BitBoard::get(self.b_rook, file_rank) {
+            return Some(BLACK_ROOK)
+        } else if BitBoard::get(self.b_queen, file_rank) {
+            return Some(BLACK_QUEEN)
+        } else if BitBoard::get(self.b_king, file_rank) {
+            return Some(BLACK_KING)
+        }
+        None
     }
 }
 
@@ -366,7 +427,7 @@ impl FenParser for BitBoard {
 
 impl Default for BitBoard {
     fn default() -> Self {
-        let db = Arc::new(DB::init());
+        let db = Arc::new(MoveLookupTable::init());
         Self {
             db,
             w_pawn: 0u64,
@@ -390,8 +451,9 @@ impl Default for BitBoard {
             },
             halfmove_clock: 0u8,
             fullmove_number: 0u8,
-            black_moves:Vec::new(),
-            white_moves:Vec::new()
+            black_moves: Vec::new(),
+            white_moves: Vec::new(),
+            attacked_squared: Vec::new(),
         }
     }
 }

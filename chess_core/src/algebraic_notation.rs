@@ -1,6 +1,6 @@
 use std::str::Chars;
 
-use crate::base_types::Token;
+use crate::base_types::AlgebraicNotationToken;
 
 pub struct AlgebraicNotation<'a> {
     input: Chars<'a>,
@@ -15,32 +15,32 @@ impl<'a> AlgebraicNotation<'a> {
         }
     }
 
-    pub fn next_token(&mut self) -> Option<Token> {
+    pub fn next_token(&mut self) -> Option<AlgebraicNotationToken> {
         let castling_symbol = self.castling_symbol;
         while let Some(c) = self.input.next() {
             match c {
-                'K' | 'Q' | 'R' | 'B' | 'N' | 'P' => return Some(Token::Piece(c)),
-                'a'..='h' => return Some(Token::File(c)),
-                '1'..='8' => return Some(Token::Rank(c)),
-                'x' => return Some(Token::Capture),
-                '+' => return Some(Token::Check),
-                '#' => return Some(Token::Checkmate),
+                'K' | 'Q' | 'R' | 'B' | 'N' | 'P' => return Some(AlgebraicNotationToken::Piece(c)),
+                'a'..='h' => return Some(AlgebraicNotationToken::File(c)),
+                '1'..='8' => return Some(AlgebraicNotationToken::Rank(c)),
+                'x' => return Some(AlgebraicNotationToken::Capture),
+                '+' => return Some(AlgebraicNotationToken::Check),
+                '#' => return Some(AlgebraicNotationToken::Checkmate),
                 castling_symbol => {
                     return self.parse_castling();
                 }
                 '=' => {
                     if let Some(promotion_piece) = self.input.next() {
-                        return Some(Token::Promotion(promotion_piece));
+                        return Some(AlgebraicNotationToken::Promotion(promotion_piece));
                     }
                 }
-                '-' => return Some(Token::MoveIndicator),
+                '-' => return Some(AlgebraicNotationToken::MoveIndicator),
                 _ => {}
             }
         }
         None
     }
 
-    fn parse_castling(&mut self) -> Option<Token> {
+    fn parse_castling(&mut self) -> Option<AlgebraicNotationToken> {
         let symbol = self.castling_symbol;
 
         let king_castling_pattern = format!("-{}", symbol);
@@ -50,12 +50,12 @@ impl<'a> AlgebraicNotation<'a> {
 
         if peek_input.starts_with(&queen_castling_pattern) {
             self.consume_pattern(&queen_castling_pattern);
-            return Some(Token::CastleQueenSide);
+            return Some(AlgebraicNotationToken::CastleQueenSide);
         }
 
         if peek_input.starts_with(&king_castling_pattern) {
             self.consume_pattern(&king_castling_pattern);
-            return Some(Token::CastleKingSide);
+            return Some(AlgebraicNotationToken::CastleKingSide);
         }
 
         None
