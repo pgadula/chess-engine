@@ -171,7 +171,7 @@ pub enum AlgebraicNotationToken {
     MoveIndicator,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct PieceLocation{
     pub piece:PieceType,
     pub file_rank:FileRank,

@@ -1,16 +1,16 @@
 use std::iter::zip;
 
 use crate::{
-    base_types::{Color, FileRank, PieceType, PieceLocation},
+    base_types::{Color, FileRank, PieceLocation, PieceType},
     file_rank::{
-        FILE_NOT_A, FILE_NOT_AB, FILE_NOT_B, FILE_NOT_G, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1,
+        FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1,
         NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_3, RANK_6,
     },
     utility::bits::{pop_bit, pop_lsb},
     BitBoard,
 };
 
-pub fn get_pawn_moves(color: Color, pawns:u64, blockers: u64, moves: &mut [Vec<usize>; 64]) {
+pub fn get_pawn_moves(color: Color, pawns:u64, all_blockers: u64, moves: &mut [Vec<FileRank>; 64], attacked_squared: &mut [Vec<PieceLocation>; 64]) {
     let mut pawns = pawns;
 
     let rank_3_or_6 = if color == Color::White {
@@ -22,22 +22,36 @@ pub fn get_pawn_moves(color: Color, pawns:u64, blockers: u64, moves: &mut [Vec<u
     while pawns > 0 {
         let index = pawns.trailing_zeros();
         let isolated_pawn = 1u64 << index as u64;
-        let mut position: &mut Vec<usize> = &mut moves[index as usize];
+        let mut position: &mut Vec<FileRank> = &mut moves[index as usize];
         let single_push: u64 = if color == Color::White {
-            (isolated_pawn >> 8) & blockers
+            (isolated_pawn >> 8) & all_blockers
         } else {
-            (isolated_pawn << 8) & blockers
+            (isolated_pawn << 8) & all_blockers
         };
         let double_push: u64 = if color == Color::White {
-            (single_push & rank_3_or_6) >> 8 & blockers
+            (single_push & rank_3_or_6) >> 8 & all_blockers
         } else {
-            (single_push & rank_3_or_6) << 8 & blockers
+            (single_push & rank_3_or_6) << 8 & all_blockers
         };
         if single_push > 0 {
-            position.push(single_push.trailing_zeros() as usize)
+            let attack_index = single_push.trailing_zeros() as usize;
+            let fr = FileRank::get_file_rank(attack_index as u8).unwrap();
+            attacked_squared[attack_index].push(PieceLocation{
+                color:color,
+                file_rank:FileRank::get_file_rank(index as u8).unwrap(),
+                piece: PieceType::Pawn
+            });
+            position.push( fr);
         }
         if double_push > 0 {
-            position.push(double_push.trailing_zeros() as usize)
+            let attack_index: usize = double_push.trailing_zeros() as usize;
+            let fr = FileRank::get_file_rank(attack_index as u8).unwrap();
+            position.push(fr);
+            attacked_squared[attack_index].push(PieceLocation{
+                color:color,
+                file_rank:FileRank::get_file_rank(index as u8).unwrap(),
+                piece: PieceType::Pawn
+            });
         }
 
         pop_bit(&mut pawns, index as u8)
@@ -215,9 +229,9 @@ pub fn get_king_attacks(file_rank: FileRank) -> u64 {
     attacks
 }
 
-pub fn fill_moves(file_rank: FileRank, piece: PieceType, mut bit_moves: u64, position: &mut Vec<usize>) {
+pub fn fill_moves(file_rank: FileRank, piece: PieceType, mut bit_moves: u64, position: &mut Vec<FileRank>) {
     while bit_moves > 0 {
         let i:usize = pop_lsb(&mut bit_moves) as usize;
-        position.push(i);
+        position.push(FileRank::get_file_rank(i as u8).unwrap());
     }
 }

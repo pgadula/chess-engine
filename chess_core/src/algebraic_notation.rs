@@ -27,12 +27,12 @@ impl<'a> AlgebraicNotation<'a> {
                 '#' => return Some(AlgebraicNotationToken::Checkmate),
                 castling_symbol => {
                     return self.parse_castling();
-                }
+                },
                 '=' => {
                     if let Some(promotion_piece) = self.input.next() {
                         return Some(AlgebraicNotationToken::Promotion(promotion_piece));
                     }
-                }
+                },
                 '-' => return Some(AlgebraicNotationToken::MoveIndicator),
                 _ => {}
             }

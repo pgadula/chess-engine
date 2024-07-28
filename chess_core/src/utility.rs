@@ -1,4 +1,3 @@
-use bits::pop_lsb;
 
 use crate::base_types::FileRank;
 

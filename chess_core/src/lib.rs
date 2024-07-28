@@ -1,7 +1,10 @@
-use std::{array, iter::empty, sync::Arc};
+use std::{array, sync::Arc};
 
-use base_types::{get_piece_from_char, AlgebraicNotationToken, Color, FileRank, Piece, PieceLocation, PieceType, BoardSide, BLACK_BISHOP, BLACK_KING, BLACK_KNIGHT, BLACK_PAWN, BLACK_QUEEN, BLACK_ROOK, WHITE_BISHOP, WHITE_KING, WHITE_KNIGHT, WHITE_PAWN, WHITE_QUEEN, WHITE_ROOK};
-use file_rank::FILES_CHAR;
+use base_types::{
+    get_piece_from_char, AlgebraicNotationToken, BoardSide, Color, FileRank, Piece, PieceLocation,
+    PieceType, BLACK_BISHOP, BLACK_KING, BLACK_KNIGHT, BLACK_PAWN, BLACK_QUEEN, BLACK_ROOK,
+    WHITE_BISHOP, WHITE_KING, WHITE_KNIGHT, WHITE_PAWN, WHITE_QUEEN, WHITE_ROOK,
+};
 use magic_gen::MoveLookupTable;
 use moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves};
 use utility::bits::{clear_bit, pop_lsb, set_bit};
@@ -33,11 +36,13 @@ pub struct BitBoard {
     pub castling: Castling,
     pub halfmove_clock: u8,
     pub fullmove_number: u8,
-    pub db: Arc<MoveLookupTable>,
+    pub move_lookup_table: Arc<MoveLookupTable>,
 
-    pub white_moves: Vec<Vec<usize>>,
-    pub black_moves: Vec<Vec<usize>>,
-    pub attacked_squared: Vec<Vec<usize>>,
+    pub white_legal_moves: Vec<Vec<FileRank>>,
+    pub white_attacked_squares: Vec<Vec<PieceLocation>>,
+    pub black_legal_moves: Vec<Vec<FileRank>>,
+    pub black_attacked_squares: Vec<Vec<PieceLocation>>,
+
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -60,7 +65,7 @@ impl BitBoard {
 
     pub fn calculate_moves(&mut self) {
         let mut move_counter: u8 = 0;
-        let db = &self.db;
+        let db = &self.move_lookup_table;
         let white = BoardSide {
             rooks: self.w_rook,
             bishops: self.w_bishop,
@@ -82,11 +87,17 @@ impl BitBoard {
             color: Color::Black,
         };
 
-        self.white_moves = self.get_moves_for_color(&white);
-        self.black_moves = self.get_moves_for_color(&black);
+    let (w_for_position,w_attacked) = self.get_moves_for_color(&white);
+    let (b_for_position,b_attacked) = self.get_moves_for_color(&black);
+    self.white_attacked_squares = w_attacked;
+    self.white_legal_moves = w_for_position;
+
+    self.black_attacked_squares = b_attacked;
+    self.black_legal_moves = b_for_position;
+
     }
 
-    fn get_moves_for_color(&self, side: &BoardSide) -> Vec<Vec<usize>> {
+    fn get_moves_for_color(&self, side: &BoardSide)->(Vec<Vec<FileRank>>, Vec<Vec<PieceLocation>>) {
         let BoardSide {
             mut bishops,
             mut friendly_blockers,
@@ -98,18 +109,18 @@ impl BitBoard {
             color,
         } = side;
         let color = color.clone();
-        let db = self.db.clone();
+        let lookup_table = self.move_lookup_table.clone();
         let rev_friendly_blockers = !friendly_blockers;
 
-        let mut moves: [Vec<usize>; 64] = array::from_fn(|_| Vec::with_capacity(64));
+        let mut moves: [Vec<FileRank>; 64] = array::from_fn(|_| Vec::with_capacity(64));
         let mut attacked_squares: [Vec<PieceLocation>; 64] =
             array::from_fn(|_| Vec::with_capacity(64));
 
         while rooks > 0 {
             let i = pop_lsb(&mut rooks) as usize;
-            let position: &mut Vec<usize> = &mut moves[i];
+            let position: &mut Vec<FileRank> = &mut moves[i];
             let file_rank = FileRank::get_file_rank(i as u8).unwrap();
-            let mut rook_move: u64 = db.get_rook_attack(file_rank, self) & rev_friendly_blockers;
+            let mut rook_move: u64 = lookup_table.get_rook_attack(file_rank, self) & rev_friendly_blockers;
 
             fill_moves(file_rank, PieceType::Rook, rook_move, position);
             for index in position {
@@ -124,9 +135,9 @@ impl BitBoard {
         while bishops > 0 {
             let index = pop_lsb(&mut bishops) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<usize> = &mut moves[index];
+            let position: &mut Vec<FileRank> = &mut moves[index];
             let mut bishop_moves: u64 =
-                db.get_bishop_attack(file_rank, self) & rev_friendly_blockers;
+                lookup_table.get_bishop_attack(file_rank, self) & rev_friendly_blockers;
             fill_moves(file_rank, PieceType::Bishop, bishop_moves, position);
             for index in position {
                 attacked_squares[*index as usize].push(PieceLocation {
@@ -140,9 +151,9 @@ impl BitBoard {
         while queens > 0 {
             let index = pop_lsb(&mut queens) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<usize> = &mut moves[index];
-            let mut bishop_moves: u64 = db.get_bishop_attack(file_rank, self);
-            let mut rook_moves: u64 = db.get_rook_attack(file_rank, self);
+            let position: &mut Vec<FileRank> = &mut moves[index];
+            let mut bishop_moves: u64 = lookup_table.get_bishop_attack(file_rank, &self);
+            let mut rook_moves: u64 = lookup_table.get_rook_attack(file_rank, &self);
             let mut sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
             fill_moves(file_rank, PieceType::Queen, sliding_moves, position);
             for index in position {
@@ -157,7 +168,7 @@ impl BitBoard {
         while knights > 0 {
             let index = pop_lsb(&mut knights) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<usize> = &mut moves[index];
+            let position: &mut Vec<FileRank> = &mut moves[index];
             let mut attacks = get_knight_attacks(file_rank) & rev_friendly_blockers;
             fill_moves(file_rank, PieceType::Knight, attacks, position);
             for index in position {
@@ -174,24 +185,25 @@ impl BitBoard {
         } else {
             self.b_pawn
         };
-        get_pawn_moves(color, pawns, self.empty_square(), &mut moves);
+        get_pawn_moves(color, pawns, self.empty_square(), &mut moves, &mut attacked_squares);
 
         while king > 0 {
             let index = pop_lsb(&mut king) as usize;
             let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<usize> = &mut moves[index];
+            let position: &mut Vec<FileRank> = &mut moves[index];
             let mut attacks = get_king_attacks(file_rank) & rev_friendly_blockers;
             fill_moves(file_rank, PieceType::King, attacks, position);
-            for index in position {
-                attacked_squares[*index as usize].push(PieceLocation {
+            for fr in position {
+                attacked_squares[fr.index()].push(PieceLocation {
                     file_rank,
                     piece: PieceType::King,
                     color,
                 })
             }
         }
+        let collection_of_attacked_squares = attacked_squares.to_vec();
+        (moves.to_vec(), attacked_squares.to_vec())
 
-        moves.to_vec()
     }
 
     pub fn new_game() -> BitBoard {
@@ -214,7 +226,7 @@ impl BitBoard {
             (PieceType::King, Color::Black) => set_bit(&mut self.b_king, file_rank),
         }
     }
-    
+
     pub fn clear_piece(&mut self, piece: &Piece, file_rank: FileRank) {
         match (piece.piece_type, piece.color) {
             (PieceType::Pawn, Color::White) => clear_bit(&mut self.w_pawn, file_rank),
@@ -307,10 +319,9 @@ impl BitBoard {
                     (PieceType::Queen, Color::Black) => print!("♛ "),
                     (PieceType::King, Color::Black) => print!("♚ "),
                 }
-            }else{
-              print!(". ");
+            } else {
+                print!(". ");
             }
-
         });
 
         println!("|1");
@@ -319,32 +330,60 @@ impl BitBoard {
     }
 
     pub fn get_piece_at(&self, file_rank: FileRank) -> Option<Piece> {
-        if BitBoard::get(self.w_pawn, file_rank) {
-            return Some(WHITE_PAWN)
-        } else if BitBoard::get(self.w_bishop, file_rank) {
-            return Some(WHITE_BISHOP)
-        } else if BitBoard::get(self.w_knight, file_rank) {
-            return Some(WHITE_KNIGHT)
-        } else if BitBoard::get(self.w_rook, file_rank) {
-            return Some(WHITE_ROOK)
-        } else if BitBoard::get(self.w_queen, file_rank) {
-            return Some(WHITE_QUEEN)
-        } else if BitBoard::get(self.w_king, file_rank) {
-            return Some(WHITE_KING)
-        } else if BitBoard::get(self.b_pawn, file_rank) {
-            return Some(BLACK_PAWN)
-        } else if BitBoard::get(self.b_bishop, file_rank) {
-            return Some(BLACK_BISHOP)
-        } else if BitBoard::get(self.b_knight, file_rank) {
-            return Some(BLACK_KNIGHT)
-        } else if BitBoard::get(self.b_rook, file_rank) {
-            return Some(BLACK_ROOK)
-        } else if BitBoard::get(self.b_queen, file_rank) {
-            return Some(BLACK_QUEEN)
-        } else if BitBoard::get(self.b_king, file_rank) {
-            return Some(BLACK_KING)
+        let pieces = [
+            (self.w_pawn, WHITE_PAWN),
+            (self.w_bishop, WHITE_BISHOP),
+            (self.w_knight, WHITE_KNIGHT),
+            (self.w_rook, WHITE_ROOK),
+            (self.w_queen, WHITE_QUEEN),
+            (self.w_king, WHITE_KING),
+            (self.b_pawn, BLACK_PAWN),
+            (self.b_bishop, BLACK_BISHOP),
+            (self.b_knight, BLACK_KNIGHT),
+            (self.b_rook, BLACK_ROOK),
+            (self.b_queen, BLACK_QUEEN),
+            (self.b_king, BLACK_KING),
+        ];
+
+        for &(bitboard, piece) in &pieces {
+            if BitBoard::get(bitboard, file_rank) {
+                return Some(piece);
+            }
         }
+
         None
+    }
+
+    pub fn print_attacked_squares(&self, color: Color) {
+        let mut board = [['.'; 8]; 8];
+
+        let attacked_squares = match color {
+            Color::White => &self.white_attacked_squares,
+            Color::Black => &self.black_attacked_squares,
+        };
+
+        for (square, pieces) in attacked_squares.iter().enumerate() {
+            if !pieces.is_empty() {
+                let file_rank = FileRank::get_file_rank(square as u8).unwrap();
+                let row = 7 - file_rank.rank();
+                let col = file_rank.file();
+                board[row as usize][col as usize] = 'x';
+            }
+        }
+
+        println!("  a b c d e f g h");
+        println!(" +----------------+");
+
+        for (i, row) in board.iter().rev().enumerate() {
+            print!("{}|", 8 - i);
+            for col in row {
+                print!("{} ", col);
+            }
+            println!("|{}", 8 - i);
+        }
+
+        println!(" +----------------+");
+        println!("  a b c d e f g h");
     }
 }
 
@@ -427,9 +466,9 @@ impl FenParser for BitBoard {
 
 impl Default for BitBoard {
     fn default() -> Self {
-        let db = Arc::new(MoveLookupTable::init());
+        let move_lookup_table = Arc::new(MoveLookupTable::init());
         Self {
-            db,
+            move_lookup_table,
             w_pawn: 0u64,
             w_bishop: 0u64,
             w_knight: 0u64,
@@ -451,9 +490,10 @@ impl Default for BitBoard {
             },
             halfmove_clock: 0u8,
             fullmove_number: 0u8,
-            black_moves: Vec::new(),
-            white_moves: Vec::new(),
-            attacked_squared: Vec::new(),
+            black_legal_moves: Vec::new(),
+            white_legal_moves: Vec::new(),
+            white_attacked_squares: Vec::new(),
+            black_attacked_squares: Vec::new()
         }
     }
 }
