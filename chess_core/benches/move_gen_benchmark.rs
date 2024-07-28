@@ -1,8 +1,7 @@
 
-use std::sync::Arc;
 
 use chess_core::{magic_gen::MoveLookupTable, BitBoard, FenParser};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 
 

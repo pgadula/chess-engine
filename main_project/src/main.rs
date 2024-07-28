@@ -10,9 +10,10 @@ fn main() {
 
     game.print();
     game.calculate_moves();
-
+    
+    
     // game.print_attacked_squares(Color::White);
-    game.print_attacked_squares(Color::Black);
+    game.print_attacked_squares(Color::White);
 
     // for ele in &game.white_legal_moves[FileRank::A6.index()] {
     //     print!("{:?} ", ele );
@@ -20,13 +21,14 @@ fn main() {
     for ele in &game.white_attacked_squares[FileRank::A3.index()] {
         print!("{:?} ", ele);
     }
-    // FileRank::iter().for_each(|fr| {
-    //     let attacked = &game.white_attacked_squares[fr.index()];
-    //     if !attacked.is_empty(){
-    //         print!("{:?} attacked by ", fr);
-    //         println!("{:?}", attacked );
-    //     }
-    // });
+    FileRank::iter().for_each(|fr| {
+        let w_attacked = &game.white_attacked_squares[fr.index()];
+
+        if !w_attacked.is_empty(){
+            print!("{:?} attacked by ", fr);
+            println!("{:?}", w_attacked );
+        }
+    });
     // let notations = [
     //     "e4",
     //     "d5",

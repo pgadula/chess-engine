@@ -3,14 +3,20 @@ use std::iter::zip;
 use crate::{
     base_types::{Color, FileRank, PieceLocation, PieceType},
     file_rank::{
-        FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1,
-        NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_3, RANK_6,
+        FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
+        NOT_RANK_8, RANK_3, RANK_6,
     },
-    utility::bits::{pop_bit, pop_lsb},
+    utility::{bits::{clear_bit, pop_bit, pop_lsb}, print_as_board},
     BitBoard,
 };
 
-pub fn get_pawn_moves(color: Color, pawns:u64, all_blockers: u64, moves: &mut [Vec<FileRank>; 64], attacked_squared: &mut [Vec<PieceLocation>; 64]) {
+pub fn get_pawn_moves(
+    color: Color,
+    pawns: u64,
+    all_blockers: u64,
+    moves: &mut [Vec<FileRank>; 64],
+    attacked_squared: &mut [Vec<PieceLocation>; 64],
+) {
     let mut pawns = pawns;
 
     let rank_3_or_6 = if color == Color::White {
@@ -21,6 +27,9 @@ pub fn get_pawn_moves(color: Color, pawns:u64, all_blockers: u64, moves: &mut [V
 
     while pawns > 0 {
         let index = pawns.trailing_zeros();
+        let pawn_file_rank = FileRank::get_file_rank(index as u8).unwrap();
+        let mut attack_pattern = get_pawn_pattern_attacks(color, pawn_file_rank);
+
         let isolated_pawn = 1u64 << index as u64;
         let mut position: &mut Vec<FileRank> = &mut moves[index as usize];
         let single_push: u64 = if color == Color::White {
@@ -36,22 +45,33 @@ pub fn get_pawn_moves(color: Color, pawns:u64, all_blockers: u64, moves: &mut [V
         if single_push > 0 {
             let attack_index = single_push.trailing_zeros() as usize;
             let fr = FileRank::get_file_rank(attack_index as u8).unwrap();
-            attacked_squared[attack_index].push(PieceLocation{
-                color:color,
-                file_rank:FileRank::get_file_rank(index as u8).unwrap(),
-                piece: PieceType::Pawn
+            attacked_squared[attack_index].push(PieceLocation {
+                color,
+                file_rank: FileRank::get_file_rank(index as u8).unwrap(),
+                piece: PieceType::Pawn,
             });
-            position.push( fr);
+            position.push(fr);
         }
         if double_push > 0 {
             let attack_index: usize = double_push.trailing_zeros() as usize;
             let fr = FileRank::get_file_rank(attack_index as u8).unwrap();
             position.push(fr);
-            attacked_squared[attack_index].push(PieceLocation{
-                color:color,
-                file_rank:FileRank::get_file_rank(index as u8).unwrap(),
-                piece: PieceType::Pawn
+            attacked_squared[attack_index].push(PieceLocation {
+                color,
+                file_rank: FileRank::get_file_rank(index as u8).unwrap(),
+                piece: PieceType::Pawn,
             });
+        }
+        while attack_pattern > 0 {
+            let attack_index: usize = attack_pattern.trailing_zeros() as usize;
+            let fr = FileRank::get_file_rank(attack_index as u8).unwrap();
+            position.push(fr);
+
+            if color == Color::White && pawn_file_rank == FileRank::D2{
+                print_as_board(attack_pattern);
+            }
+
+            clear_bit(&mut attack_pattern, fr)
         }
 
         pop_bit(&mut pawns, index as u8)
@@ -182,7 +202,7 @@ pub fn _gen_bishop_attacks_on_the_fly(file_rank: FileRank, bit_board: u64) -> u6
     attacks
 }
 
-pub fn get_pawn_attacks(side: Color, file_rank: FileRank) -> u64 {
+pub fn get_pawn_pattern_attacks(side: Color, file_rank: FileRank) -> u64 {
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     let start = 1u64 << tr * 8 + tf;
@@ -229,9 +249,14 @@ pub fn get_king_attacks(file_rank: FileRank) -> u64 {
     attacks
 }
 
-pub fn fill_moves(file_rank: FileRank, piece: PieceType, mut bit_moves: u64, position: &mut Vec<FileRank>) {
+pub fn fill_moves(
+    file_rank: FileRank,
+    piece: PieceType,
+    mut bit_moves: u64,
+    position: &mut Vec<FileRank>,
+) {
     while bit_moves > 0 {
-        let i:usize = pop_lsb(&mut bit_moves) as usize;
+        let i: usize = pop_lsb(&mut bit_moves) as usize;
         position.push(FileRank::get_file_rank(i as u8).unwrap());
     }
 }
