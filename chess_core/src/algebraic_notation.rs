@@ -1,10 +1,10 @@
 use std::str::Chars;
 
-use crate::base_types::AlgebraicNotationToken;
+use crate::types::AlgebraicNotationToken;
 
 pub struct AlgebraicNotation<'a> {
-    input: Chars<'a>,
-    castling_symbol: char,
+    pub(crate) input: Chars<'a>,
+    pub(crate) castling_symbol: char,
 }
 
 impl<'a> AlgebraicNotation<'a> {
@@ -27,12 +27,12 @@ impl<'a> AlgebraicNotation<'a> {
                 '#' => return Some(AlgebraicNotationToken::Checkmate),
                 castling_symbol => {
                     return self.parse_castling();
-                },
+                }
                 '=' => {
                     if let Some(promotion_piece) = self.input.next() {
                         return Some(AlgebraicNotationToken::Promotion(promotion_piece));
                     }
-                },
+                }
                 '-' => return Some(AlgebraicNotationToken::MoveIndicator),
                 _ => {}
             }
@@ -40,7 +40,7 @@ impl<'a> AlgebraicNotation<'a> {
         None
     }
 
-    fn parse_castling(&mut self) -> Option<AlgebraicNotationToken> {
+    pub(crate) fn parse_castling(&mut self) -> Option<AlgebraicNotationToken> {
         let symbol = self.castling_symbol;
 
         let king_castling_pattern = format!("-{}", symbol);
@@ -60,7 +60,7 @@ impl<'a> AlgebraicNotation<'a> {
 
         None
     }
-    fn consume_pattern(&mut self, pattern: &str) {
+    pub(crate) fn consume_pattern(&mut self, pattern: &str) {
         for _ in pattern.chars() {
             self.input.next();
         }

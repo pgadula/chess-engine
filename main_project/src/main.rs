@@ -1,6 +1,5 @@
-use chess_core::{
-    algebraic_notation::AlgebraicNotation, base_types::{AlgebraicNotationToken, Color, FileRank}, BitBoard, FenParser,
-};
+use chess_core::{algebraic_notation::AlgebraicNotation, bitboard::{BitBoard, FenParser}, types::{AlgebraicNotationToken, Color, FileRank}};
+
 
 fn main() {
     let fen = "1nbqkbnr/pppppppp/R7/8/4P3/2rR4/PPPP1PPP/RNBQKBNR w KQkq e3 0 1";

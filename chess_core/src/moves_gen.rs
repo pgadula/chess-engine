@@ -1,13 +1,13 @@
 use std::iter::zip;
 
-use crate::{
-    base_types::{Color, FileRank, PieceLocation, PieceType},
-    file_rank::{
-        FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
-        NOT_RANK_8, RANK_3, RANK_6,
-    },
-    utility::{bits::{clear_bit, pop_bit, pop_lsb}, print_as_board},
-    BitBoard,
+use crate::{bitboard::BitBoard, file_rank::{
+    FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
+    NOT_RANK_8, RANK_3, RANK_6,
+}, utility::{clear_bit, pop_bit, pop_lsb}};
+
+use super::{
+    types::{Color, FileRank, PieceLocation, PieceType},
+    utility::print_as_board,
 };
 
 pub fn get_pawn_moves(
@@ -67,7 +67,7 @@ pub fn get_pawn_moves(
             let fr = FileRank::get_file_rank(attack_index as u8).unwrap();
             position.push(fr);
 
-            if color == Color::White && pawn_file_rank == FileRank::D2{
+            if color == Color::White && pawn_file_rank == FileRank::D2 {
                 print_as_board(attack_pattern);
             }
 

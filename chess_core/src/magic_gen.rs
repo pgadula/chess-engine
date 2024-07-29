@@ -1,10 +1,15 @@
 use rand::Rng;
 
-use crate::{
-    base_types::FileRank,
+use crate::bitboard::BitBoard;
+
+use super::{
     moves_gen::{_gen_bishop_attacks_on_the_fly, _gen_rook_move_fly},
-    precalculated::{BISHOP_ATTACK_MASK, BISHOP_MAGIC_NUMBERS, BISHOP_SHIFTS, ROOK_ATTACK_MASK, ROOK_MAGIC_NUMBERS, ROOK_SHIFTS},
-    utility::bits::{bit_count, get_lsb_index, pop_bit}, BitBoard,
+    precalculated::{
+        BISHOP_ATTACK_MASK, BISHOP_MAGIC_NUMBERS, BISHOP_SHIFTS, ROOK_ATTACK_MASK,
+        ROOK_MAGIC_NUMBERS, ROOK_SHIFTS,
+    },
+    types::FileRank,
+    utility::{bit_count, get_lsb_index, pop_bit},
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -46,7 +51,7 @@ impl MoveLookupTable {
                 let attack = _gen_rook_move_fly(*fr, subset);
                 r_table[magic_index] = attack;
             }
-            
+
             for subset in b_subsets {
                 let magic_index = MagicHelper::get_magic_index(subset, b_magic_number, b_shift);
                 let attack = _gen_bishop_attacks_on_the_fly(*fr, subset);
@@ -54,7 +59,6 @@ impl MoveLookupTable {
             }
             bishop[fr_index] = b_table;
             rook[fr_index] = r_table;
-
         }
 
         MoveLookupTable {
@@ -89,8 +93,8 @@ impl MoveLookupTable {
 }
 
 pub struct MagicHelper {
-    magic_numbers: [u64; 64],
-    shifts: [usize; 64],
+    pub(crate) magic_numbers: [u64; 64],
+    pub(crate) shifts: [usize; 64],
 }
 
 impl MagicHelper {
@@ -104,7 +108,7 @@ impl MagicHelper {
         n & n1 & n2
     }
 
-    fn generate_magics(mask_attacks: [u64; 64]) -> MagicHelper {
+    pub(crate) fn generate_magics(mask_attacks: [u64; 64]) -> MagicHelper {
         let mut magic_numbers: [u64; 64] = [0; 64];
         let mut shifts = [0; 64];
 
@@ -166,7 +170,7 @@ impl MagicHelper {
         subsets
     }
 
-    fn calculate_occupancy(index: usize, attack_mask: u64) -> u64 {
+    pub(crate) fn calculate_occupancy(index: usize, attack_mask: u64) -> u64 {
         let mut mask = attack_mask;
         let mut occupancy = 0u64;
         let bit_count = bit_count(attack_mask);
@@ -182,7 +186,7 @@ impl MagicHelper {
         occupancy
     }
 
-    fn get_magic_index(blockers: u64, magic_number: u64, shift: usize) -> usize {
+    pub(crate) fn get_magic_index(blockers: u64, magic_number: u64, shift: usize) -> usize {
         ((blockers.wrapping_mul(magic_number)) >> (shift)) as usize
     }
 }
