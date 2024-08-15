@@ -15,6 +15,7 @@ pub fn get_pawn_moves(
     en_passant: &Option<FileRank>,
     moves: &mut [Vec<PieceLocation>; 64],
     attacked_squared: &mut [Vec<PieceLocation>; 64],
+    attack_mask:& mut u64
 ) {
     let mut pawns = pawns;
 
@@ -48,8 +49,11 @@ pub fn get_pawn_moves(
         } else {
             (single_push & rank_3_or_6) << 8 & all_blockers
         };
+  
+        let all_moves_mask = single_push | double_push | attack_pattern;
+        *attack_mask |= all_moves_mask;
 
-       for file_rank in get_file_ranks(single_push | double_push | attack_pattern) {
+       for file_rank in get_file_ranks(all_moves_mask) {
             attacked_squared[file_rank.index()].push(PieceLocation {
                 file_rank: FileRank::get_file_rank(index as u8).unwrap(),
                 piece: Piece::from(&PieceType::Pawn, &color)
@@ -240,7 +244,6 @@ pub fn fill_moves(
     mut bit_moves: u64,
     position: &mut Vec<PieceLocation>,
     attacked_squared: &mut Vec<PieceLocation>,
-
 ) {
     while bit_moves > 0 {
         let i: usize = pop_lsb(&mut bit_moves) as usize;

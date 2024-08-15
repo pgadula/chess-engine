@@ -4,7 +4,7 @@ use chess_core::{
     algebraic_notation::AlgebraicNotation,
     bitboard::{self, BitBoard, FenParser},
     types::{AlgebraicNotationToken, Color, FileRank},
-    utility::{get_heatmap, print_heatmap},
+    utility::{bit_count, get_heatmap, print_as_board, print_heatmap},
 };
 use test_cases::TEST_CASES;
 
@@ -20,19 +20,11 @@ fn main() {
         let mut game = BitBoard::deserialize(&ele.fen);
         game.calculate_moves();
         let count = if game.turn == Color::Black {
-            game.black_attacks_from
-                .iter()
-                .map(|e| e.len())
-                .reduce(|e, p| e + p)
-                .unwrap_or(0)
+            bit_count(game.b_attacks_mask)
         } else {
-            game.white_attacks_from
-                .iter()
-                .map(|e| e.len())
-                .reduce(|e, p| e + p)
-                .unwrap_or(0)
+            bit_count(game.w_attacks_mask)
+
         };
-        game.detect_check(&game.turn);
         game.print();
         println!("FEN: {:?}", ele.fen);
         println!("en_passant: {:?}", game.en_passant);
@@ -42,7 +34,8 @@ fn main() {
 
         }
         print_heatmap(&game);
-        println!("Has check: {:?}", game.detect_check(&game.turn));
+        println!("Has check: {:?}", game.detect_check(&game.w_attacks_mask, &game.b_king));
+        print_as_board(game.w_attacks_mask);
         println!("expected nodes: {}, received: {}", ele.nodes, count);
     }
 

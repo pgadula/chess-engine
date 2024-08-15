@@ -1,4 +1,4 @@
-use std::{array, sync::Arc};
+use std::{array, borrow::Borrow, sync::Arc};
 
 use crate::{
     magic_gen::MoveLookupTable,
@@ -8,7 +8,7 @@ use crate::{
         PieceLocation, PieceType, BLACK_BISHOP, BLACK_KING, BLACK_KNIGHT, BLACK_PAWN, BLACK_QUEEN,
         BLACK_ROOK, WHITE_BISHOP, WHITE_KING, WHITE_KNIGHT, WHITE_PAWN, WHITE_QUEEN, WHITE_ROOK,
     },
-    utility::{clear_bit, get_file_ranks, get_lsb_index, pop_lsb, set_bit},
+    utility::{clear_bit, get_file_ranks, get_lsb_index, pop_lsb, print_as_board, set_bit},
 };
 
 #[derive(Debug, Clone)]
@@ -38,6 +38,8 @@ pub struct BitBoard {
     pub white_attacked_squares: Vec<Vec<PieceLocation>>,
     pub black_attacks_from: Vec<Vec<PieceLocation>>,
     pub black_attacked_squares: Vec<Vec<PieceLocation>>,
+    pub w_attacks_mask: u64,
+    pub b_attacks_mask: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -91,34 +93,26 @@ impl BitBoard {
             color: Color::Black,
         };
 
-        let (w_for_position, w_attacked) = self.get_pseudolegal_moves(&white);
-        let (b_for_position, b_attacked) = self.get_pseudolegal_moves(&black);
+        let (w_for_position, w_attacked, w_mask) = self.get_pseudolegal_moves(&white);
+        let (b_for_position, b_attacked, b_mask) = self.get_pseudolegal_moves(&black);
         self.white_attacked_squares = w_attacked;
         self.white_attacks_from = w_for_position;
 
         self.black_attacked_squares = b_attacked;
         self.black_attacks_from = b_for_position;
+        self.b_attacks_mask = b_mask;
+        self.w_attacks_mask = w_mask;
     }
 
-    pub fn detect_check(&self, turn: &Color) -> bool {
-        let king_position = self.get_king(turn);
-        let attacked_square = if *turn == Color::White {
-            &self.black_attacked_squares
-        } else {
-            &self.white_attacked_squares
-        };
-
-        let result = &self.white_attacked_squares[FileRank::C5.index()];
-        if attacked_square[king_position.index()].len() > 0 {
-            return true;
-        }
-        false
+    pub fn detect_check(&self, king_mask: &u64, attacks_mask: &u64) -> bool {
+        let mask = king_mask & attacks_mask;
+        mask > 0
     }
 
     fn get_pseudolegal_moves(
         &self,
         side: &BoardSide,
-    ) -> (Vec<Vec<PieceLocation>>, Vec<Vec<PieceLocation>>) {
+    ) -> (Vec<Vec<PieceLocation>>, Vec<Vec<PieceLocation>>, u64) {
         let BoardSide {
             mut bishops,
             mut friendly_blockers,
@@ -133,24 +127,39 @@ impl BitBoard {
         let color = color.clone();
         let lookup_table = self.move_lookup_table.clone();
         let rev_friendly_blockers = !friendly_blockers;
-        
+
         let mut moves: [Vec<PieceLocation>; 64] = array::from_fn(|_| Vec::with_capacity(64));
         let mut attacked_squares: [Vec<PieceLocation>; 64] =
             array::from_fn(|_| Vec::with_capacity(64));
-        
+        let mut attack_mask = 0u64;
+
         for rook_position in get_file_ranks(rooks) {
             let i = rook_position.index();
             let position: &mut Vec<PieceLocation> = &mut moves[i];
             let mut rook_move: u64 =
                 lookup_table.get_rook_attack(rook_position, self) & rev_friendly_blockers;
-            fill_moves(rook_position, Piece::from(&PieceType::Rook, &color),rook_move, position, &mut attacked_squares[i]);
+            attack_mask |= rook_move;
+            fill_moves(
+                rook_position,
+                Piece::from(&PieceType::Rook, &color),
+                rook_move,
+                position,
+                &mut attacked_squares[i],
+            );
         }
         for bishop_position in get_file_ranks(bishops) {
             let i = bishop_position.index();
             let position: &mut Vec<PieceLocation> = &mut moves[i];
             let bishop_moves: u64 =
                 lookup_table.get_bishop_attack(bishop_position, self) & rev_friendly_blockers;
-            fill_moves(bishop_position, Piece::from(&PieceType::Bishop, &color),bishop_moves, position, &mut attacked_squares[i]);
+            attack_mask |= bishop_moves;
+            fill_moves(
+                bishop_position,
+                Piece::from(&PieceType::Bishop, &color),
+                bishop_moves,
+                position,
+                &mut attacked_squares[i],
+            );
         }
 
         for queen_position in get_file_ranks(queens) {
@@ -159,15 +168,28 @@ impl BitBoard {
             let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, &self);
             let rook_moves: u64 = lookup_table.get_rook_attack(queen_position, &self);
             let sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
-            fill_moves(queen_position, Piece::from(&PieceType::Queen, &color) ,sliding_moves, position, &mut attacked_squares[i]);
+            attack_mask |= sliding_moves;
+            fill_moves(
+                queen_position,
+                Piece::from(&PieceType::Queen, &color),
+                sliding_moves,
+                position,
+                &mut attacked_squares[i],
+            );
         }
-
 
         for knight_position in get_file_ranks(knights) {
             let i = knight_position.index();
             let position: &mut Vec<PieceLocation> = &mut moves[i];
             let attacks = get_knight_attacks(knight_position) & rev_friendly_blockers;
-            fill_moves(knight_position, Piece::from(&PieceType::Knight, &color), attacks, position, &mut attacked_squares[i]);
+            attack_mask |= attacks;
+            fill_moves(
+                knight_position,
+                Piece::from(&PieceType::Knight, &color),
+                attacks,
+                position,
+                &mut attacked_squares[i],
+            );
         }
 
         let pawns = if color == Color::White {
@@ -183,55 +205,57 @@ impl BitBoard {
             &self.en_passant,
             &mut moves,
             &mut attacked_squares,
+            &mut attack_mask,
         );
 
         for king_position in get_file_ranks(king) {
             let i = king_position.index();
             let position: &mut Vec<PieceLocation> = &mut moves[i];
             let mut attacks = get_king_attacks(king_position) & rev_friendly_blockers;
-            fill_moves(king_position, Piece::from(&PieceType::King, &color), attacks, position, &mut attacked_squares[i]);
+            attack_mask |= attacks;
+            fill_moves(
+                king_position,
+                Piece::from(&PieceType::King, &color),
+                attacks,
+                position,
+                &mut attacked_squares[i],
+            );
         }
         let collection_of_attacked_squares = attacked_squares.to_vec();
-        (moves.to_vec(), attacked_squares.to_vec())
+        (moves.to_vec(), attacked_squares.to_vec(), attack_mask)
     }
 
     pub fn new_game() -> BitBoard {
         BitBoard::deserialize("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
 
-    pub fn set_piece(&mut self, piece: &Piece, file_rank: FileRank) {
-        match (piece.piece_type, piece.color) {
-            (PieceType::Pawn, Color::White) => set_bit(&mut self.w_pawn, file_rank),
-            (PieceType::Bishop, Color::White) => set_bit(&mut self.w_bishop, file_rank),
-            (PieceType::Knight, Color::White) => set_bit(&mut self.w_knight, file_rank),
-            (PieceType::Rook, Color::White) => set_bit(&mut self.w_rook, file_rank),
-            (PieceType::Queen, Color::White) => set_bit(&mut self.w_queen, file_rank),
-            (PieceType::King, Color::White) => set_bit(&mut self.w_king, file_rank),
-            (PieceType::Pawn, Color::Black) => set_bit(&mut self.b_pawn, file_rank),
-            (PieceType::Bishop, Color::Black) => set_bit(&mut self.b_bishop, file_rank),
-            (PieceType::Knight, Color::Black) => set_bit(&mut self.b_knight, file_rank),
-            (PieceType::Rook, Color::Black) => set_bit(&mut self.b_rook, file_rank),
-            (PieceType::Queen, Color::Black) => set_bit(&mut self.b_queen, file_rank),
-            (PieceType::King, Color::Black) => set_bit(&mut self.b_king, file_rank),
+    pub fn set_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
+        let mut bitboard = self.get_piece_bitboard(piece, file_rank);
+        set_bit(&mut bitboard, &file_rank);
+    }
+    pub fn clear_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
+        {
+            let mut bitboard = self.get_piece_bitboard(piece, file_rank);
+            clear_bit(&mut bitboard, file_rank);
         }
+    }
+    fn get_piece_bitboard(&mut self, piece: &Piece, file_rank: &FileRank) -> &mut u64 {
+        return match (piece.piece_type, piece.color) {
+            (PieceType::Pawn, Color::White) => & mut self.w_pawn,
+            (PieceType::Bishop, Color::White) => & mut self.w_bishop,
+            (PieceType::Knight, Color::White) => & mut self.w_knight,
+            (PieceType::Rook, Color::White) => & mut self.w_rook,
+            (PieceType::Queen, Color::White) => & mut self.w_queen,
+            (PieceType::King, Color::White) => & mut self.w_king,
+            (PieceType::Pawn, Color::Black) => & mut self.b_pawn,
+            (PieceType::Bishop, Color::Black) => & mut self.b_bishop,
+            (PieceType::Knight, Color::Black) => & mut self.b_knight,
+            (PieceType::Rook, Color::Black) => & mut self.b_rook,
+            (PieceType::Queen, Color::Black) => & mut self.b_queen,
+            (PieceType::King, Color::Black) => & mut self.b_king,
+        };
     }
 
-    pub fn clear_piece(&mut self, piece: &Piece, file_rank: FileRank) {
-        match (piece.piece_type, piece.color) {
-            (PieceType::Pawn, Color::White) => clear_bit(&mut self.w_pawn, file_rank),
-            (PieceType::Bishop, Color::White) => clear_bit(&mut self.w_bishop, file_rank),
-            (PieceType::Knight, Color::White) => clear_bit(&mut self.w_knight, file_rank),
-            (PieceType::Rook, Color::White) => clear_bit(&mut self.w_rook, file_rank),
-            (PieceType::Queen, Color::White) => clear_bit(&mut self.w_queen, file_rank),
-            (PieceType::King, Color::White) => clear_bit(&mut self.w_king, file_rank),
-            (PieceType::Pawn, Color::Black) => clear_bit(&mut self.b_pawn, file_rank),
-            (PieceType::Bishop, Color::Black) => clear_bit(&mut self.b_bishop, file_rank),
-            (PieceType::Knight, Color::Black) => clear_bit(&mut self.b_knight, file_rank),
-            (PieceType::Rook, Color::Black) => clear_bit(&mut self.b_rook, file_rank),
-            (PieceType::Queen, Color::Black) => clear_bit(&mut self.b_queen, file_rank),
-            (PieceType::King, Color::Black) => clear_bit(&mut self.b_king, file_rank),
-        }
-    }
     pub fn get_all_pieces(&self) -> u64 {
         return (self.get_white_pieces()) | (self.get_black_pieces());
     }
@@ -248,8 +272,8 @@ impl BitBoard {
         return !self.get_all_pieces();
     }
 
-    pub fn get(bit_board: u64, file_rank: FileRank) -> bool {
-        let file_rank_num = file_rank as u8;
+    pub fn get(bit_board: u64, file_rank: &FileRank) -> bool {
+        let file_rank_num = (*file_rank) as u8;
         let mask = 1u64 << file_rank_num;
         return (bit_board & mask) != 0;
     }
@@ -291,7 +315,7 @@ impl BitBoard {
                 print!("{}|", row + 1);
             }
 
-            let piece = self.get_piece_at(file_rank.clone());
+            let piece = self.get_piece_at(&file_rank);
 
             if let Some(p) = piece {
                 match (p.piece_type, p.color) {
@@ -318,7 +342,7 @@ impl BitBoard {
         println!("  a b c d e f g h")
     }
 
-    pub fn get_piece_at(&self, file_rank: FileRank) -> Option<Piece> {
+    pub fn get_piece_at(&self, file_rank: &FileRank) -> Option<Piece> {
         let pieces = [
             (self.w_pawn, WHITE_PAWN),
             (self.w_bishop, WHITE_BISHOP),
@@ -405,7 +429,7 @@ impl FenParser for BitBoard {
             if let Some(piece) = get_piece_from_char(char) {
                 let index = (row * 8) + col;
                 if let Some(rank_file) = FileRank::get_file_rank(index) {
-                    game.set_piece(piece, rank_file);
+                    game.set_piece(piece, &rank_file);
                 }
                 col += 1;
             } else {
@@ -485,6 +509,8 @@ impl Default for BitBoard {
             white_attacks_from: Vec::new(),
             white_attacked_squares: Vec::new(),
             black_attacked_squares: Vec::new(),
+            w_attacks_mask: 0u64,
+            b_attacks_mask: 0u64,
         }
     }
 }
