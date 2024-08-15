@@ -1,33 +1,73 @@
-use chess_core::{algebraic_notation::AlgebraicNotation, bitboard::{BitBoard, FenParser}, types::{AlgebraicNotationToken, Color, FileRank}};
+mod test_cases;
 
+use chess_core::{
+    algebraic_notation::AlgebraicNotation,
+    bitboard::{self, BitBoard, FenParser},
+    types::{AlgebraicNotationToken, Color, FileRank},
+    utility::{get_heatmap, print_heatmap},
+};
+use test_cases::TEST_CASES;
 
 fn main() {
     let fen = "1nbqkbnr/pppppppp/R7/8/4P3/2rR4/PPPP1PPP/RNBQKBNR w KQkq e3 0 1";
 
-    let mut game = BitBoard::deserialize(fen);
-    let board: u64 = 0xF;
+    for ele in TEST_CASES
+        .iter()
+        .skip(1)
+        .filter(|e| e.depth == 1)
+        .filter(|p| p.nodes == 8)
+    {
+        let mut game = BitBoard::deserialize(&ele.fen);
+        game.calculate_moves();
+        let count = if game.turn == Color::Black {
+            game.black_attacks_from
+                .iter()
+                .map(|e| e.len())
+                .reduce(|e, p| e + p)
+                .unwrap_or(0)
+        } else {
+            game.white_attacks_from
+                .iter()
+                .map(|e| e.len())
+                .reduce(|e, p| e + p)
+                .unwrap_or(0)
+        };
+        game.detect_check(&game.turn);
+        game.print();
+        println!("FEN: {:?}", ele.fen);
+        println!("en_passant: {:?}", game.en_passant);
 
-    game.print();
-    game.calculate_moves();
-    
-    
-    // game.print_attacked_squares(Color::White);
-    game.print_attacked_squares(Color::White);
+        for mv in &game.black_attacked_squares {
+            println!("moves: {:?}", mv);
 
-    // for ele in &game.white_legal_moves[FileRank::A6.index()] {
-    //     print!("{:?} ", ele );
-    // }
-    for ele in &game.white_attacked_squares[FileRank::A3.index()] {
-        print!("{:?} ", ele);
-    }
-    FileRank::iter().for_each(|fr| {
-        let w_attacked = &game.white_attacked_squares[fr.index()];
-
-        if !w_attacked.is_empty(){
-            print!("{:?} attacked by ", fr);
-            println!("{:?}", w_attacked );
         }
-    });
+        println!("Has check: {:?}", game.detect_check(&game.turn));
+        println!("expected nodes: {}, received: {}", ele.nodes, count);
+    }
+
+    // let board: u64 = 0xF;
+
+    // game.print();
+
+    // // game.print_attacked_squares(Color::White);
+    // game.print_attacked_squares(Color::White);
+    // let heatmap = print_heatmap(&game);
+    // println!("heatmap {:?}", heatmap);
+
+    // // for ele in &game.white_legal_moves[FileRank::A6.index()] {
+    // //     print!("{:?} ", ele );
+    // // }
+    // for ele in &game.white_attacked_squares[FileRank::A3.index()] {
+    //     print!("{:?} ", ele);
+    // }
+    // FileRank::iter().for_each(|fr| {
+    //     let w_attacked = &game.white_attacked_squares[fr.index()];
+
+    //     if !w_attacked.is_empty() {
+    //         print!("{:?} attacked by ", fr);
+    //         println!("{:?}", w_attacked);
+    //     }
+    // });
     // let notations = [
     //     "e4",
     //     "d5",
@@ -58,21 +98,20 @@ fn main() {
     //     "R1d1",
     // ];
 
-
-//    let notation = [
-//         "Nbd2",           // Disambiguation
-//         "R1d1",           // Disambiguation
-//         "e8=Q+",          // Pawn promotion with check
-//         "a1=R#",          // Pawn promotion with checkmate
-//         "exd6 e.p. +",    // En Passant with check
-//         "exd6 e.p. #",    // En Passant with checkmate
-//         "Nf7+ Nxd8++",    // Double check
-//         "Rxf7 Nf6+",      // Multi-move notation
-//         "1. e4 e5 2. Nf3 Nc6 3. O-O", // Complex sequence
-//         "Qd1",            // Non-standard notation
-//         "Kf1"             // Non-standard notation
-//     ];
-//     parse_notation(notation.to_vec());
+    //    let notation = [
+    //         "Nbd2",           // Disambiguation
+    //         "R1d1",           // Disambiguation
+    //         "e8=Q+",          // Pawn promotion with check
+    //         "a1=R#",          // Pawn promotion with checkmate
+    //         "exd6 e.p. +",    // En Passant with check
+    //         "exd6 e.p. #",    // En Passant with checkmate
+    //         "Nf7+ Nxd8++",    // Double check
+    //         "Rxf7 Nf6+",      // Multi-move notation
+    //         "1. e4 e5 2. Nf3 Nc6 3. O-O", // Complex sequence
+    //         "Qd1",            // Non-standard notation
+    //         "Kf1"             // Non-standard notation
+    //     ];
+    //     parse_notation(notation.to_vec());
 }
 
 fn parse_notation(unhandled: Vec<&str>) {
@@ -172,7 +211,6 @@ fn parse_notation(unhandled: Vec<&str>) {
                         println!("ERROR token#:{} unknown move {:?}", pattern.len(), pattern)
                     }
                 }
-
             }
             _ => {
                 println!("ERROR token#:{} unknown move {:?}", tokens.len(), tokens)

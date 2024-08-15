@@ -1,4 +1,4 @@
-    use std::slice::Iter;
+    use std::{fmt::Display, slice::Iter};
 
     use self::FileRank::*;
 
@@ -23,6 +23,14 @@
     pub struct Piece {
         pub piece_type: PieceType,
         pub color: Color
+    }
+    impl Piece {
+        pub fn from(piece_type: &PieceType, color: &Color) -> Self {
+            Piece { 
+                piece_type: *piece_type, 
+                color: *color 
+            }
+        }
     }
 
     // Define constants for each piece
@@ -155,7 +163,17 @@
                 None
             }
         }
+        pub fn from_string(value: &str) -> Option<Self> {
+            let index = FILE_RANK_CHAR
+             .iter()
+             .position(|&r| r == value);
+             if let Some(i) = index{
+                 return Some(FILE_RANK[i])
+             }
+             None
+         }
      }
+
 
     pub struct BoardSide {
         pub rooks: u64,
@@ -165,6 +183,7 @@
         pub knights: u64,
         pub pawns: u64,
         pub friendly_blockers: u64,
+        pub opposite_blockers: u64,
         pub color:Color
     }
 
@@ -184,7 +203,13 @@
 
     #[derive(Debug, Clone, Copy)]
     pub struct PieceLocation{
-        pub piece:PieceType,
+        pub piece:Piece,
         pub file_rank:FileRank,
-        pub color:Color
+    }
+
+    impl Display for PieceLocation {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let result = format!("{:?} {:?} {:?}", self.piece.piece_type, self.piece.color, self.file_rank);
+            f.write_str(&result)
+        }
     }

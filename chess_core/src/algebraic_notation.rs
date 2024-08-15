@@ -25,14 +25,14 @@ impl<'a> AlgebraicNotation<'a> {
                 'x' => return Some(AlgebraicNotationToken::Capture),
                 '+' => return Some(AlgebraicNotationToken::Check),
                 '#' => return Some(AlgebraicNotationToken::Checkmate),
-                castling_symbol => {
+                'O' | '0' => {
                     return self.parse_castling();
-                }
+                },
                 '=' => {
                     if let Some(promotion_piece) = self.input.next() {
                         return Some(AlgebraicNotationToken::Promotion(promotion_piece));
                     }
-                }
+                },
                 '-' => return Some(AlgebraicNotationToken::MoveIndicator),
                 _ => {}
             }
@@ -46,7 +46,7 @@ impl<'a> AlgebraicNotation<'a> {
         let king_castling_pattern = format!("-{}", symbol);
         let queen_castling_pattern = format!("-{}-{}", symbol, symbol);
 
-        let mut peek_input = self.input.clone().take(4).collect::<String>();
+        let peek_input: String = self.input.clone().take(4).collect::<String>();
 
         if peek_input.starts_with(&queen_castling_pattern) {
             self.consume_pattern(&queen_castling_pattern);
