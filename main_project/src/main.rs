@@ -37,10 +37,11 @@ fn main() {
         println!("FEN: {:?}", ele.fen);
         println!("en_passant: {:?}", game.en_passant);
 
-        for mv in &game.black_attacked_squares {
+        for mv in &game.black_attacks_from[FileRank::C5.index()] {
             println!("moves: {:?}", mv);
 
         }
+        print_heatmap(&game);
         println!("Has check: {:?}", game.detect_check(&game.turn));
         println!("expected nodes: {}, received: {}", ele.nodes, count);
     }

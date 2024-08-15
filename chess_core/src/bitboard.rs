@@ -8,7 +8,7 @@ use crate::{
         PieceLocation, PieceType, BLACK_BISHOP, BLACK_KING, BLACK_KNIGHT, BLACK_PAWN, BLACK_QUEEN,
         BLACK_ROOK, WHITE_BISHOP, WHITE_KING, WHITE_KNIGHT, WHITE_PAWN, WHITE_QUEEN, WHITE_ROOK,
     },
-    utility::{clear_bit, get_lsb_index, pop_lsb, set_bit},
+    utility::{clear_bit, get_file_ranks, get_lsb_index, pop_lsb, set_bit},
 };
 
 #[derive(Debug, Clone)]
@@ -67,7 +67,6 @@ impl BitBoard {
     }
 
     pub fn calculate_moves(&mut self) {
-        let move_counter: u8 = 0;
         let db = &self.move_lookup_table;
         let white = BoardSide {
             rooks: self.w_rook,
@@ -134,70 +133,41 @@ impl BitBoard {
         let color = color.clone();
         let lookup_table = self.move_lookup_table.clone();
         let rev_friendly_blockers = !friendly_blockers;
-
+        
         let mut moves: [Vec<PieceLocation>; 64] = array::from_fn(|_| Vec::with_capacity(64));
         let mut attacked_squares: [Vec<PieceLocation>; 64] =
             array::from_fn(|_| Vec::with_capacity(64));
-
-        while rooks > 0 {
-            let i = pop_lsb(&mut rooks) as usize;
+        
+        for rook_position in get_file_ranks(rooks) {
+            let i = rook_position.index();
             let position: &mut Vec<PieceLocation> = &mut moves[i];
-            let file_rank = FileRank::get_file_rank(i as u8).unwrap();
             let mut rook_move: u64 =
-                lookup_table.get_rook_attack(file_rank, self) & rev_friendly_blockers;
-
-            fill_moves(file_rank, PieceType::Rook, &color,rook_move, position);
-            for pl in position {
-                attacked_squares[i as usize].push(PieceLocation {
-                    file_rank,
-                    piece: Piece::from(&PieceType::Rook, &color),
-                })
-            }
+                lookup_table.get_rook_attack(rook_position, self) & rev_friendly_blockers;
+            fill_moves(rook_position, Piece::from(&PieceType::Rook, &color),rook_move, position, &mut attacked_squares[i]);
         }
-
-        while bishops > 0 {
-            let index = pop_lsb(&mut bishops) as usize;
-            let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<PieceLocation> = &mut moves[index];
+        for bishop_position in get_file_ranks(bishops) {
+            let i = bishop_position.index();
+            let position: &mut Vec<PieceLocation> = &mut moves[i];
             let bishop_moves: u64 =
-                lookup_table.get_bishop_attack(file_rank, self) & rev_friendly_blockers;
-            fill_moves(file_rank, PieceType::Bishop, &color,bishop_moves, position);
-            for pl in position {
-                attacked_squares[index as usize].push(PieceLocation {
-                    file_rank,
-                    piece: Piece::from(&PieceType::Bishop, &color),
-                })
-            }
+                lookup_table.get_bishop_attack(bishop_position, self) & rev_friendly_blockers;
+            fill_moves(bishop_position, Piece::from(&PieceType::Bishop, &color),bishop_moves, position, &mut attacked_squares[i]);
         }
 
-        while queens > 0 {
-            let index = pop_lsb(&mut queens) as usize;
-            let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<PieceLocation> = &mut moves[index];
-            let bishop_moves: u64 = lookup_table.get_bishop_attack(file_rank, &self);
-            let rook_moves: u64 = lookup_table.get_rook_attack(file_rank, &self);
+        for queen_position in get_file_ranks(queens) {
+            let i = queen_position.index();
+            let position: &mut Vec<PieceLocation> = &mut moves[i];
+            let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, &self);
+            let rook_moves: u64 = lookup_table.get_rook_attack(queen_position, &self);
             let sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
-            fill_moves(file_rank, PieceType::Queen,&color ,sliding_moves, position);
-            for pl in position {
-                attacked_squares[index as usize].push(PieceLocation {
-                    file_rank,
-                    piece: Piece::from(&PieceType::Queen, &color),
-                })
-            }
+            fill_moves(queen_position, Piece::from(&PieceType::Queen, &color) ,sliding_moves, position, &mut attacked_squares[i]);
         }
 
-        while knights > 0 {
-            let index = pop_lsb(&mut knights) as usize;
-            let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<PieceLocation> = &mut moves[index];
-            let attacks = get_knight_attacks(file_rank) & rev_friendly_blockers;
-            fill_moves(file_rank, PieceType::Knight, &color, attacks, position);
-            for pl in position {
-                attacked_squares[index as usize].push(PieceLocation {
-                    file_rank,
-                    piece: Piece::from(&PieceType::King, &color),
-                })
-            }
+
+        for knight_position in get_file_ranks(knights) {
+            let i = knight_position.index();
+            let position: &mut Vec<PieceLocation> = &mut moves[i];
+            let attacks = get_knight_attacks(knight_position) & rev_friendly_blockers;
+            fill_moves(knight_position, Piece::from(&PieceType::Knight, &color), attacks, position, &mut attacked_squares[i]);
         }
 
         let pawns = if color == Color::White {
@@ -215,18 +185,11 @@ impl BitBoard {
             &mut attacked_squares,
         );
 
-        while king > 0 {
-            let index = pop_lsb(&mut king) as usize;
-            let file_rank = FileRank::get_file_rank(index as u8).unwrap();
-            let position: &mut Vec<PieceLocation> = &mut moves[index];
-            let mut attacks = get_king_attacks(file_rank) & rev_friendly_blockers;
-            fill_moves(file_rank, PieceType::King, &color, attacks, position);
-            for fr in position {
-                attacked_squares[index].push(PieceLocation {
-                    file_rank,
-                    piece: Piece::from(&PieceType::King, &color),
-                })
-            }
+        for king_position in get_file_ranks(king) {
+            let i = king_position.index();
+            let position: &mut Vec<PieceLocation> = &mut moves[i];
+            let mut attacks = get_king_attacks(king_position) & rev_friendly_blockers;
+            fill_moves(king_position, Piece::from(&PieceType::King, &color), attacks, position, &mut attacked_squares[i]);
         }
         let collection_of_attacked_squares = attacked_squares.to_vec();
         (moves.to_vec(), attacked_squares.to_vec())
