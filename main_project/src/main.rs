@@ -3,7 +3,8 @@ mod test_cases;
 use chess_core::{
     algebraic_notation::AlgebraicNotation,
     bitboard::{self, BitBoard, FenParser},
-    types::{AlgebraicNotationToken, Color, FileRank},
+    file_rank::RANK_3,
+    types::{AlgebraicNotationToken, Attack, BoardSide, Color, FileRank, Piece, PieceLocation, PieceType},
     utility::{bit_count, get_heatmap, print_as_board, print_heatmap},
 };
 use test_cases::TEST_CASES;
@@ -11,33 +12,56 @@ use test_cases::TEST_CASES;
 fn main() {
     let fen = "1nbqkbnr/pppppppp/R7/8/4P3/2rR4/PPPP1PPP/RNBQKBNR w KQkq e3 0 1";
 
-    for ele in TEST_CASES
-        .iter()
-        .skip(1)
-        .filter(|e| e.depth == 1)
-        .filter(|p| p.nodes == 8)
-    {
-        let mut game = BitBoard::deserialize(&ele.fen);
-        game.calculate_moves();
-        let count = if game.turn == Color::Black {
-            bit_count(game.b_attacks_mask)
-        } else {
-            bit_count(game.w_attacks_mask)
+    // for test_position in TEST_CASES.iter().filter(|e| e.depth == 1) {
+    // }
+    debug_move_generator(&TEST_CASES[0]);
 
-        };
-        game.print();
-        println!("FEN: {:?}", ele.fen);
-        println!("en_passant: {:?}", game.en_passant);
 
-        for mv in &game.black_attacks_from[FileRank::C5.index()] {
-            println!("moves: {:?}", mv);
+        // for attack in valid_attacks {
+        //     println!("{:?}", attack);
+        // }
+        // let n_attacks = &valid_attacks.count();
+        // if  (*n_attacks) == 0 {
+        //     println!("Check mate");
+        // }
+        // for (index, ele) in game.black_attacked_squares.iter().enumerate() {
+        //     let square_file_rank = FileRank::get_file_rank(index as u8).unwrap();
+        //     for p in ele {
+        //         let mut clone_game = game.clone();
+        //         clone_game.clear_piece(&p.piece, &p.file_rank);
+        //         clone_game.set_piece(&p.piece, &square_file_rank);
+        //         if let Some(en_passant_file_rank) = clone_game.en_passant{
+        //             if en_passant_file_rank == square_file_rank {
+        //                 println!("{:?}", en_passant_file_rank);
+        //                 let upper_file_rank = FileRank::get_file_rank((en_passant_file_rank.index() - 8) as  u8).unwrap();
+        //                 println!("upper file rank {:?}", upper_file_rank);
+        //                 clone_game.clear_piece(  &Piece{
+        //                     color: Color::White,
+        //                     piece_type: PieceType::Pawn
+        //                 }, &upper_file_rank)
+        //             }
 
-        }
-        print_heatmap(&game);
-        println!("Has check: {:?}", game.detect_check(&game.w_attacks_mask, &game.b_king));
-        print_as_board(game.w_attacks_mask);
-        println!("expected nodes: {}, received: {}", ele.nodes, count);
-    }
+        //         }
+
+        //         clone_game.calculate_moves();
+
+        //         let has_check = clone_game.detect_check(&clone_game.b_king, &clone_game.w_attacks_mask);
+        //         if has_check == false {
+        //             clone_game.print();
+        //             println!("valid :{:?} {:?}", &square_file_rank, &p.piece);
+        //         }
+        //     }
+        // }
+        // println!("FEN: {:?}", ele.fen);
+        // println!("en_passant: {:?}", game.en_passant);
+
+        // for mv in &game.black_attacks_from {
+        //     println!("moves: {:?}", mv);
+        // }
+        // print_heatmap(&game);
+
+        // print_as_board(game.b_attacks_mask);
+        // println!("expected nodes: {}, received: {}", ele.nodes, count);
 
     // let board: u64 = 0xF;
 
@@ -106,6 +130,64 @@ fn main() {
     //         "Kf1"             // Non-standard notation
     //     ];
     //     parse_notation(notation.to_vec());
+}
+
+fn debug_move_generator(test_position: &test_cases::TestPosition) {
+    let mut game: BitBoard = BitBoard::deserialize(&test_position.fen);
+    game.calculate_moves();
+
+
+    let valid_attacks:Vec<&Attack> = game
+        .flat_black_attacks
+        .iter()
+        .map(|attack| {
+            let mut cloned_game: BitBoard = game.clone();
+
+            if let Some(target_piece) = cloned_game.get_piece_at(&attack.target) {
+                cloned_game.clear_piece(&target_piece, &attack.target)
+            };
+            cloned_game.set_piece(&attack.piece, &attack.target);
+            cloned_game.clear_piece(&attack.piece, &attack.from);
+            if let Some(en_passant_file_rank) = cloned_game.en_passant {
+                if en_passant_file_rank == attack.target {
+                    let file_rank_mask = en_passant_file_rank.mask();
+                    let target_file_rank = if (file_rank_mask & RANK_3) > 0 {
+                        FileRank::get_from_mask(file_rank_mask >> 8).unwrap()
+                    } else {
+                        FileRank::get_from_mask(file_rank_mask << 8).unwrap()
+                    };
+                    cloned_game.clear_piece(
+                        &Piece {
+                            color: cloned_game.turn.opposite(),
+                            piece_type: PieceType::Pawn,
+                        },
+                        &target_file_rank,
+                    )
+                }
+            }
+
+            cloned_game.calculate_moves();
+            let BoardSide {
+                king,
+                opposite_attacks,
+                ..
+            } = cloned_game.get_player_info(&cloned_game.turn);
+
+            let check = cloned_game.detect_check(&king, &opposite_attacks);
+
+            (check, attack)
+        })
+        .filter(|attack| attack.0 == false)
+        .map(|tuple| tuple.1).collect();
+    let count = valid_attacks.len();
+    println!(
+        "fen: {}\nexpected nodes: {} received: {}\n",
+        test_position.fen, test_position.nodes, count,
+    );
+
+    for attack in valid_attacks {
+        println!("{:?}", attack)
+    }
 }
 
 fn parse_notation(unhandled: Vec<&str>) {

@@ -17,6 +17,14 @@
         White,
         Black,
     }
+    impl Color {
+        pub fn opposite(&self)->Color{
+            if (*self) == Color::White{
+                return Color::Black;
+            }
+            return Color::White;
+        }
+    }
 
     #[derive(Debug, PartialEq, Clone, Copy)]
 
@@ -124,7 +132,11 @@
 
          pub fn index(self)->usize{
             (self.rank() * 8 + self.file()) as usize
-          }
+        }
+
+        pub fn mask(self) -> u64 {
+            1u64 << self.index()
+        }    
      }
 
     pub(crate) const FILE_RANK_CHAR: [&'static str; 64] = [
@@ -163,6 +175,10 @@
                 None
             }
         }
+        pub fn get_from_mask(mask: u64) -> Option<FileRank> {
+            FileRank::get_file_rank(mask.trailing_zeros() as u8)
+        }
+
         pub fn from_string(value: &str) -> Option<Self> {
             let index = FILE_RANK_CHAR
              .iter()
@@ -182,9 +198,25 @@
         pub king: u64,
         pub knights: u64,
         pub pawns: u64,
+
+        pub opposite_rooks: u64,
+        pub opposite_bishops: u64,
+        pub opposite_queens: u64,
+        pub opposite_king: u64,
+        pub opposite_knights: u64,
+        pub opposite_pawns: u64,
+
+        pub opposite_attacks: u64,
+
         pub friendly_blockers: u64,
         pub opposite_blockers: u64,
-        pub color:Color
+        pub color:Color,
+
+        // pub from_moves: &Vec<Vec<PieceLocation>>,
+        // pub attacked_squares: &Vec<Vec<PieceLocation>>,
+
+        // pub opposite_from_moves: &Vec<Vec<PieceLocation>>,
+        // pub opposite_attacked_squares: &Vec<Vec<PieceLocation>>,
     }
 
     #[derive(Debug)]
@@ -212,4 +244,11 @@
             let result = format!("{:?} {:?} {:?}", self.piece.piece_type, self.piece.color, self.file_rank);
             f.write_str(&result)
         }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct Attack{
+        pub piece:Piece,
+        pub from: FileRank,
+        pub target: FileRank
     }

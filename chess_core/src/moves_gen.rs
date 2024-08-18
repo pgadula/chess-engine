@@ -3,7 +3,7 @@ use std::iter::zip;
 use crate::{bitboard::BitBoard, file_rank::{
     FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
     NOT_RANK_8, RANK_3, RANK_6,
-}, types::Piece, utility::{clear_bit, get_file_ranks, pop_bit, pop_lsb, set_bit, set_bit_by_index}};
+}, types::{Attack, Piece}, utility::{clear_bit, get_file_ranks, pop_bit, pop_lsb, set_bit, set_bit_by_index}};
 
 use super::types::{Color, FileRank, PieceLocation, PieceType};
 
@@ -15,7 +15,8 @@ pub fn get_pawn_moves(
     en_passant: &Option<FileRank>,
     moves: &mut [Vec<PieceLocation>; 64],
     attacked_squared: &mut [Vec<PieceLocation>; 64],
-    attack_mask:& mut u64
+    attack_mask:& mut u64,
+    flat_attacks: &mut Vec<Attack>
 ) {
     let mut pawns = pawns;
 
@@ -24,7 +25,7 @@ pub fn get_pawn_moves(
     } else {
         RANK_6
     };
-
+    
     while pawns > 0 {
         let index = pawns.trailing_zeros();
         let pawn_file_rank = FileRank::get_file_rank(index as u8).unwrap();
@@ -62,6 +63,11 @@ pub fn get_pawn_moves(
                 file_rank,
                 piece:Piece::from(&PieceType::Pawn, &color)
             });
+            flat_attacks.push(Attack{
+                from: pawn_file_rank,
+                piece: Piece::from(&PieceType::Pawn, &color),
+                target: file_rank
+            })
        }
         pop_bit(&mut pawns, index as u8)
     }
@@ -244,20 +250,25 @@ pub fn fill_moves(
     mut bit_moves: u64,
     position: &mut Vec<PieceLocation>,
     attacked_squared: &mut Vec<PieceLocation>,
+    flat_attacks:&mut Vec<Attack>
 ) {
+    attacked_squared.push(PieceLocation {
+        file_rank: piece_file_rank,
+        piece: piece
+    });
     while bit_moves > 0 {
         let i: usize = pop_lsb(&mut bit_moves) as usize;
         let fr = FileRank::get_file_rank(i as u8).unwrap();
+        flat_attacks.push(Attack{
+            piece,
+            from: piece_file_rank,
+            target: fr,
+        });
         position.push(
             PieceLocation{
                 file_rank:fr,
                 piece: piece
             }
         );
-        attacked_squared.push(PieceLocation {
-            file_rank:piece_file_rank,
-            piece: piece
-        })
-
     }
 }
