@@ -8,7 +8,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut game = BitBoard::deserialize(fen);
 
 
-    c.bench_function("move generation", |b| b.iter(|| game.calculate_moves()));
+    c.bench_function("move generation", |b| b.iter(|| game.calculate_pseudolegal_moves()));
 }
 
 criterion_group!(benches, criterion_benchmark);

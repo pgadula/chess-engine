@@ -70,19 +70,21 @@ impl BitBoard {
         FileRank::get_file_rank(get_lsb_index(king) as u8).unwrap()
     }
 
-    pub fn calculate_moves(&mut self) {
+    pub fn calculate_pseudolegal_moves(&mut self) {
         let db = &self.move_lookup_table;
         let white = self.get_player_info(&Color::White);
         let black = self.get_player_info(&Color::Black);
 
-        let (w_for_position, w_attacked, w_mask, w_flat_attacks) = self.get_pseudolegal_moves(&white);
-        let (b_for_position, b_attacked, b_mask, b_flat_attacks) = self.get_pseudolegal_moves(&black);
+        let (w_for_position, w_attacked, w_mask, w_flat_attacks) =
+            self.get_pseudolegal_moves(&white);
+        let (b_for_position, b_attacked, b_mask, b_flat_attacks) =
+            self.get_pseudolegal_moves(&black);
         self.white_attacked_squares = w_attacked;
         self.white_attacks_from = w_for_position;
 
         self.black_attacked_squares = b_attacked;
         self.black_attacks_from = b_for_position;
-        
+
         self.b_attacks_mask = b_mask;
         self.w_attacks_mask = w_mask;
 
@@ -95,10 +97,15 @@ impl BitBoard {
         mask > 0
     }
 
-    pub fn get_pseudolegal_moves(
+    fn get_pseudolegal_moves(
         &self,
         side: &BoardSide,
-    ) -> (Vec<Vec<PieceLocation>>, Vec<Vec<PieceLocation>>, u64, Vec<Attack>) {
+    ) -> (
+        Vec<Vec<PieceLocation>>,
+        Vec<Vec<PieceLocation>>,
+        u64,
+        Vec<Attack>,
+    ) {
         let BoardSide {
             mut bishops,
             mut friendly_blockers,
@@ -193,7 +200,7 @@ impl BitBoard {
             &mut moves,
             &mut attacked_squares,
             &mut attack_mask,
-            &mut flat_attacks
+            &mut flat_attacks,
         );
 
         for king_position in get_file_ranks(king) {
@@ -211,7 +218,12 @@ impl BitBoard {
             );
         }
         let collection_of_attacked_squares = attacked_squares.to_vec();
-        (moves.to_vec(), attacked_squares.to_vec(), attack_mask, flat_attacks)
+        (
+            moves.to_vec(),
+            attacked_squares.to_vec(),
+            attack_mask,
+            flat_attacks,
+        )
     }
 
     pub fn new_game() -> BitBoard {
@@ -408,7 +420,7 @@ impl BitBoard {
 
                 opposite_blockers: self.get_black_pieces(),
                 friendly_blockers: self.get_white_pieces(),
-                
+
                 color: Color::White,
             }
         } else {

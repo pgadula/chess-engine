@@ -14,7 +14,7 @@ fn main() {
 
     // for test_position in TEST_CASES.iter().filter(|e| e.depth == 1) {
     // }
-    debug_move_generator(&TEST_CASES[0]);
+    debug_move_generator(&TEST_CASES[5]);
 
 
         // for attack in valid_attacks {
@@ -134,39 +134,18 @@ fn main() {
 
 fn debug_move_generator(test_position: &test_cases::TestPosition) {
     let mut game: BitBoard = BitBoard::deserialize(&test_position.fen);
-    game.calculate_moves();
+    game.calculate_pseudolegal_moves();
+    let attacks = if game.turn == Color::White { &game.flat_white_attacks } else { &game.flat_black_attacks }; 
 
-
-    let valid_attacks:Vec<&Attack> = game
-        .flat_black_attacks
+    let valid_attacks:Vec<&Attack> = attacks
         .iter()
         .map(|attack| {
             let mut cloned_game: BitBoard = game.clone();
 
-            if let Some(target_piece) = cloned_game.get_piece_at(&attack.target) {
-                cloned_game.clear_piece(&target_piece, &attack.target)
-            };
-            cloned_game.set_piece(&attack.piece, &attack.target);
-            cloned_game.clear_piece(&attack.piece, &attack.from);
-            if let Some(en_passant_file_rank) = cloned_game.en_passant {
-                if en_passant_file_rank == attack.target {
-                    let file_rank_mask = en_passant_file_rank.mask();
-                    let target_file_rank = if (file_rank_mask & RANK_3) > 0 {
-                        FileRank::get_from_mask(file_rank_mask >> 8).unwrap()
-                    } else {
-                        FileRank::get_from_mask(file_rank_mask << 8).unwrap()
-                    };
-                    cloned_game.clear_piece(
-                        &Piece {
-                            color: cloned_game.turn.opposite(),
-                            piece_type: PieceType::Pawn,
-                        },
-                        &target_file_rank,
-                    )
-                }
-            }
+            handle_normal_attack(&mut cloned_game, attack);
+            handle_en_passant(&mut cloned_game, attack);
 
-            cloned_game.calculate_moves();
+            cloned_game.calculate_pseudolegal_moves();
             let BoardSide {
                 king,
                 opposite_attacks,
@@ -187,6 +166,37 @@ fn debug_move_generator(test_position: &test_cases::TestPosition) {
 
     for attack in valid_attacks {
         println!("{:?}", attack)
+    }
+}
+
+fn handle_normal_attack(cloned_game: &mut BitBoard, attack: &Attack) {
+    let target_piece = cloned_game.get_piece_at(&attack.target);
+            
+    if let Some(target_piece) = target_piece {
+        cloned_game.clear_piece(&target_piece, &attack.target);
+    }
+            
+    cloned_game.set_piece(&attack.piece, &attack.target);
+    cloned_game.clear_piece(&attack.piece, &attack.from);
+}
+
+fn handle_en_passant(game: &mut BitBoard, attack: &Attack) {
+    if let Some(en_passant_file_rank) = game.en_passant {
+        if en_passant_file_rank == attack.target {
+            let file_rank_mask = en_passant_file_rank.mask();
+            let target_file_rank = if (file_rank_mask & RANK_3) > 0 {
+                FileRank::get_from_mask(file_rank_mask >> 8).unwrap()
+            } else {
+                FileRank::get_from_mask(file_rank_mask << 8).unwrap()
+            };
+            game.clear_piece(
+                &Piece {
+                    color: game.turn.opposite(),
+                    piece_type: PieceType::Pawn,
+                },
+                &target_file_rank,
+            )
+        }
     }
 }
 
