@@ -3,7 +3,7 @@ use std::iter::zip;
 use crate::{bitboard::BitBoard, file_rank::{
     FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
     NOT_RANK_8, RANK_3, RANK_6,
-}, types::{Attack, Color, FileRank, Piece, PieceLocation, PieceType}, utility::{clear_bit, get_file_ranks, pop_bit, pop_lsb, set_bit, set_bit_by_index}};
+}, types::{PieceMove, Color, FileRank, Piece, PieceType}, utility::{clear_bit, get_file_ranks, pop_bit, pop_lsb, set_bit, set_bit_by_index}};
 
 
 pub fn get_pawn_moves(
@@ -13,7 +13,7 @@ pub fn get_pawn_moves(
     opposite_blockers: u64,
     en_passant: &Option<FileRank>,
     attack_mask:& mut u64,
-    flat_attacks: &mut Vec<Attack>
+    flat_attacks: &mut Vec<PieceMove>
 ) {
     let mut pawns = pawns;
 
@@ -51,7 +51,7 @@ pub fn get_pawn_moves(
         *attack_mask |= all_moves_mask;
 
        for file_rank in get_file_ranks(all_moves_mask) {
-            flat_attacks.push(Attack{
+            flat_attacks.push(PieceMove{
                 from: pawn_file_rank,
                 piece: Piece::from(&PieceType::Pawn, &color),
                 target: file_rank
@@ -236,13 +236,13 @@ pub fn fill_moves(
     piece_file_rank: FileRank,
     piece: Piece,
     mut bit_moves: u64,
-    flat_attacks: &mut Vec<Attack>
+    flat_attacks: &mut Vec<PieceMove>
 ) {
 
     while bit_moves > 0 {
         let i: usize = pop_lsb(&mut bit_moves) as usize;
         let fr = FileRank::get_file_rank(i as u8).unwrap();
-        flat_attacks.push(Attack{
+        flat_attacks.push(PieceMove{
             piece,
             from: piece_file_rank,
             target: fr,

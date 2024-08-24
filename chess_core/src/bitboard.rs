@@ -4,8 +4,8 @@ use crate::{
     magic_gen::MoveLookupTable,
     moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves},
     types::{
-        get_piece_from_char, AlgebraicNotationToken, Attack, BoardSide, Color, FileRank, Piece,
-        PieceIndex, PieceLocation, PieceType, PIECE_CHAR_ARRAY
+        get_piece_from_char, AlgebraicNotationToken, PieceMove, BoardSide, Color, FileRank, Piece,
+        PieceIndex, PieceType, PIECES_ARRAY,
     },
     utility::{clear_bit, get_file_ranks, get_lsb_index, pop_lsb, print_as_board, set_bit},
 };
@@ -21,8 +21,8 @@ pub struct BitBoard {
     pub en_passant: Option<FileRank>,
     pub move_lookup_table: Arc<MoveLookupTable>,
 
-    pub flat_white_attacks: Vec<Attack>,
-    pub flat_black_attacks: Vec<Attack>,
+    pub flat_white_attacks: Vec<PieceMove>,
+    pub flat_black_attacks: Vec<PieceMove>,
     pub w_attacks_mask: u64,
     pub b_attacks_mask: u64,
 }
@@ -46,9 +46,9 @@ impl BitBoard {
     }
     pub fn get_king(&self, color: &Color) -> FileRank {
         let king = if *color == Color::White {
-            self.bitboard[PieceIndex::K.index()]
+            self.bitboard[PieceIndex::K.idx()]
         } else {
-            self.bitboard[PieceIndex::k.index()]
+            self.bitboard[PieceIndex::k.idx()]
         };
         FileRank::get_file_rank(get_lsb_index(king) as u8).unwrap()
     }
@@ -73,7 +73,7 @@ impl BitBoard {
         mask > 0
     }
 
-    fn get_pseudolegal_moves(&self, side: &BoardSide) -> (u64, Vec<Attack>) {
+    fn get_pseudolegal_moves(&self, side: &BoardSide) -> (u64, Vec<PieceMove>) {
         let BoardSide {
             mut bishops,
             mut friendly_blockers,
@@ -90,7 +90,7 @@ impl BitBoard {
         let lookup_table = self.move_lookup_table.clone();
         let rev_friendly_blockers = !friendly_blockers;
 
-        let mut flat_attacks: Vec<Attack> = Vec::with_capacity(50);
+        let mut flat_attacks: Vec<PieceMove> = Vec::with_capacity(50);
         let mut attack_mask = 0u64;
 
         for rook_position in get_file_ranks(rooks) {
@@ -241,20 +241,7 @@ impl BitBoard {
             let piece = self.get_piece_at(&file_rank);
 
             if let Some(p) = piece {
-                match (p.piece_type, p.color) {
-                    (PieceType::Pawn, Color::White) => print!("♙ "),
-                    (PieceType::Bishop, Color::White) => print!("♗ "),
-                    (PieceType::Knight, Color::White) => print!("♘ "),
-                    (PieceType::Rook, Color::White) => print!("♖ "),
-                    (PieceType::Queen, Color::White) => print!("♕ "),
-                    (PieceType::King, Color::White) => print!("♔ "),
-                    (PieceType::Pawn, Color::Black) => print!("♟︎ "),
-                    (PieceType::Bishop, Color::Black) => print!("♝ "),
-                    (PieceType::Knight, Color::Black) => print!("♞ "),
-                    (PieceType::Rook, Color::Black) => print!("♜ "),
-                    (PieceType::Queen, Color::Black) => print!("♛ "),
-                    (PieceType::King, Color::Black) => print!("♚ "),
-                }
+                print!("{} ", p.piece_symbol());
             } else {
                 print!(". ");
             }
@@ -266,7 +253,7 @@ impl BitBoard {
     }
 
     pub fn get_piece_at(&self, file_rank: &FileRank) -> Option<Piece> {
-        for piece in PIECE_CHAR_ARRAY {
+        for piece in PIECES_ARRAY {
             if BitBoard::get(self.bitboard[piece.bitboard_index()], file_rank) {
                 return Some(piece);
             }
@@ -278,19 +265,19 @@ impl BitBoard {
     pub fn get_player_info(&self, color: &Color) -> BoardSide {
         if *color == Color::White {
             BoardSide {
-                bishops: self.bitboard[PieceIndex::B.index()],
-                king: self.bitboard[PieceIndex::K.index()],
-                knights: self.bitboard[PieceIndex::N.index()],
-                pawns: self.bitboard[PieceIndex::P.index()],
-                queens: self.bitboard[PieceIndex::Q.index()],
-                rooks: self.bitboard[PieceIndex::R.index()],
+                bishops: self.bitboard[PieceIndex::B.idx()],
+                king: self.bitboard[PieceIndex::K.idx()],
+                knights: self.bitboard[PieceIndex::N.idx()],
+                pawns: self.bitboard[PieceIndex::P.idx()],
+                queens: self.bitboard[PieceIndex::Q.idx()],
+                rooks: self.bitboard[PieceIndex::R.idx()],
 
-                opposite_bishops: self.bitboard[PieceIndex::b.index()],
-                opposite_king: self.bitboard[PieceIndex::k.index()],
-                opposite_knights: self.bitboard[PieceIndex::n.index()],
-                opposite_pawns: self.bitboard[PieceIndex::p.index()],
-                opposite_queens: self.bitboard[PieceIndex::q.index()],
-                opposite_rooks: self.bitboard[PieceIndex::r.index()],
+                opposite_bishops: self.bitboard[PieceIndex::b.idx()],
+                opposite_king: self.bitboard[PieceIndex::k.idx()],
+                opposite_knights: self.bitboard[PieceIndex::n.idx()],
+                opposite_pawns: self.bitboard[PieceIndex::p.idx()],
+                opposite_queens: self.bitboard[PieceIndex::q.idx()],
+                opposite_rooks: self.bitboard[PieceIndex::r.idx()],
                 opposite_attacks: self.b_attacks_mask,
 
                 opposite_blockers: self.get_black_pieces(),
@@ -300,19 +287,19 @@ impl BitBoard {
             }
         } else {
             BoardSide {
-                bishops: self.bitboard[PieceIndex::b.index()],
-                king: self.bitboard[PieceIndex::k.index()],
-                knights: self.bitboard[PieceIndex::n.index()],
-                pawns: self.bitboard[PieceIndex::p.index()],
-                queens: self.bitboard[PieceIndex::q.index()],
-                rooks: self.bitboard[PieceIndex::r.index()],
+                bishops: self.bitboard[PieceIndex::b.idx()],
+                king: self.bitboard[PieceIndex::k.idx()],
+                knights: self.bitboard[PieceIndex::n.idx()],
+                pawns: self.bitboard[PieceIndex::p.idx()],
+                queens: self.bitboard[PieceIndex::q.idx()],
+                rooks: self.bitboard[PieceIndex::r.idx()],
 
-                opposite_bishops: self.bitboard[PieceIndex::B.index()],
-                opposite_king: self.bitboard[PieceIndex::K.index()],
-                opposite_knights: self.bitboard[PieceIndex::N.index()],
-                opposite_pawns: self.bitboard[PieceIndex::P.index()],
-                opposite_queens: self.bitboard[PieceIndex::Q.index()],
-                opposite_rooks: self.bitboard[PieceIndex::R.index()],
+                opposite_bishops: self.bitboard[PieceIndex::B.idx()],
+                opposite_king: self.bitboard[PieceIndex::K.idx()],
+                opposite_knights: self.bitboard[PieceIndex::N.idx()],
+                opposite_pawns: self.bitboard[PieceIndex::P.idx()],
+                opposite_queens: self.bitboard[PieceIndex::Q.idx()],
+                opposite_rooks: self.bitboard[PieceIndex::R.idx()],
                 opposite_attacks: self.w_attacks_mask,
 
                 opposite_blockers: self.get_white_pieces(),

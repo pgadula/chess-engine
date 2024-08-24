@@ -29,7 +29,7 @@
     }
     
     impl PieceIndex {
-        pub fn index(&self)->usize{
+        pub fn idx(&self)->usize{
             *self as usize
         }
     }
@@ -63,37 +63,60 @@
             }
         }
         pub fn bitboard_index(&self)->usize{
-            PIECE_CHAR_ARRAY.iter().position(|p| p == self).unwrap_or_else(|| panic!("Invalid piece"))
+            PIECES_ARRAY.iter().position(|p| p == self).unwrap_or_else(|| panic!("Invalid piece"))
+        }
+
+        pub fn symbol(&self)->char{
+            match (self.piece_type, self.color) {
+                (PieceType::Pawn, Color::White) => 'P',
+                (PieceType::Pawn, Color::Black) => 'p',
+                (PieceType::Knight, Color::White) => 'N',
+                (PieceType::Knight, Color::Black) => 'n',
+                (PieceType::Bishop, Color::White) => 'B',
+                (PieceType::Bishop, Color::Black) => 'b',
+                (PieceType::Rook, Color::White) => 'R',
+                (PieceType::Rook, Color::Black) => 'r',
+                (PieceType::Queen, Color::White) => 'Q',
+                (PieceType::Queen, Color::Black) => 'q',
+                (PieceType::King, Color::White) => 'K',
+                (PieceType::King, Color::Black) => 'k',
+            }
+        }
+
+        pub fn piece_symbol(&self) -> char {
+            match (self.piece_type, self.color) {
+                (PieceType::Pawn, Color::White) => '♙',
+                (PieceType::Pawn, Color::Black) => '♟',
+                (PieceType::Knight, Color::White) => '♘',
+                (PieceType::Knight, Color::Black) => '♞',
+                (PieceType::Bishop, Color::White) => '♗',
+                (PieceType::Bishop, Color::Black) => '♝',
+                (PieceType::Rook, Color::White) => '♖',
+                (PieceType::Rook, Color::Black) => '♜',
+                (PieceType::Queen, Color::White) => '♕',
+                (PieceType::Queen, Color::Black) => '♛',
+                (PieceType::King, Color::White) => '♔',
+                (PieceType::King, Color::Black) => '♚',
+            }
         }
     }
 
     // Define constants for each piece
     pub const WHITE_PAWN: Piece = Piece { piece_type: PieceType::Pawn, color: Color::White };
-
     pub const WHITE_BISHOP: Piece = Piece { piece_type: PieceType::Bishop, color: Color::White };
-
     pub const WHITE_KNIGHT: Piece = Piece { piece_type: PieceType::Knight, color: Color::White };
-
     pub const WHITE_ROOK: Piece = Piece { piece_type: PieceType::Rook, color: Color::White };
-
     pub const WHITE_QUEEN: Piece = Piece { piece_type: PieceType::Queen, color: Color::White };
-
     pub const WHITE_KING: Piece = Piece { piece_type: PieceType::King, color: Color::White };
-
     pub const BLACK_PAWN: Piece = Piece { piece_type: PieceType::Pawn, color: Color::Black };
-
     pub const BLACK_BISHOP: Piece = Piece { piece_type: PieceType::Bishop, color: Color::Black };
-
     pub const BLACK_KNIGHT: Piece = Piece { piece_type: PieceType::Knight, color: Color::Black };
-
     pub const BLACK_ROOK: Piece = Piece { piece_type: PieceType::Rook, color: Color::Black };
-
     pub const BLACK_QUEEN: Piece = Piece { piece_type: PieceType::Queen, color: Color::Black };
-
     pub const BLACK_KING: Piece = Piece { piece_type: PieceType::King, color: Color::Black };
 
     // Create an array of all pieces
-    pub(crate) const PIECE_CHAR_ARRAY: [Piece; 12] = [
+    pub(crate) const PIECES_ARRAY: [Piece; 12] = [
         WHITE_PAWN,    // 'P'
         WHITE_BISHOP,  // 'B'
         WHITE_KNIGHT,  // 'N'
@@ -113,7 +136,7 @@
         if index < 0{
             return None;
         }
-        Some(&PIECE_CHAR_ARRAY[index as usize])
+        Some(&PIECES_ARRAY[index as usize])
     }
 
     pub(crate) fn get_char_value(c: char) -> i32 {
@@ -188,10 +211,9 @@
     ];
 
     impl FileRank {
-
         /// get iterator with order starting from A8 to H1
          pub fn iter() -> Iter<'static, FileRank> {
-         FILE_RANK.iter()
+            FILE_RANK.iter()
          }
 
          pub fn get_file_rank(value: u8) -> Option<FileRank> {
@@ -267,20 +289,7 @@
     }
 
     #[derive(Debug, Clone, Copy)]
-    pub struct PieceLocation{
-        pub piece:Piece,
-        pub file_rank:FileRank,
-    }
-
-    impl Display for PieceLocation {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let result = format!("{:?} {:?} {:?}", self.piece.piece_type, self.piece.color, self.file_rank);
-            f.write_str(&result)
-        }
-    }
-
-    #[derive(Debug, Clone, Copy)]
-    pub struct Attack{
+    pub struct PieceMove{
         pub piece:Piece,
         pub from: FileRank,
         pub target: FileRank
