@@ -5,9 +5,7 @@ use crate::{
     moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves},
     types::{
         get_piece_from_char, AlgebraicNotationToken, Attack, BoardSide, Color, FileRank, Piece,
-        PieceIndex, PieceLocation, PieceType, BLACK_BISHOP, BLACK_KING, BLACK_KNIGHT, BLACK_PAWN,
-        BLACK_QUEEN, BLACK_ROOK, WHITE_BISHOP, WHITE_KING, WHITE_KNIGHT, WHITE_PAWN, WHITE_QUEEN,
-        WHITE_ROOK,
+        PieceIndex, PieceLocation, PieceType, PIECE_CHAR_ARRAY
     },
     utility::{clear_bit, get_file_ranks, get_lsb_index, pop_lsb, print_as_board, set_bit},
 };
@@ -104,7 +102,7 @@ impl BitBoard {
                 rook_position,
                 Piece::from(&PieceType::Rook, &color),
                 rook_move,
-                &mut flat_attacks
+                &mut flat_attacks,
             );
         }
         for bishop_position in get_file_ranks(bishops) {
@@ -116,7 +114,7 @@ impl BitBoard {
                 bishop_position,
                 Piece::from(&PieceType::Bishop, &color),
                 bishop_moves,
-                &mut flat_attacks
+                &mut flat_attacks,
             );
         }
 
@@ -130,7 +128,7 @@ impl BitBoard {
                 queen_position,
                 Piece::from(&PieceType::Queen, &color),
                 sliding_moves,
-                &mut flat_attacks
+                &mut flat_attacks,
             );
         }
 
@@ -142,7 +140,7 @@ impl BitBoard {
                 knight_position,
                 Piece::from(&PieceType::Knight, &color),
                 attacks,
-                &mut flat_attacks
+                &mut flat_attacks,
             );
         }
 
@@ -164,7 +162,7 @@ impl BitBoard {
                 king_position,
                 Piece::from(&PieceType::King, &color),
                 attacks,
-                &mut flat_attacks
+                &mut flat_attacks,
             );
         }
         (attack_mask, flat_attacks)
@@ -186,7 +184,7 @@ impl BitBoard {
     }
 
     fn get_piece_bitboard(&mut self, piece: &Piece, file_rank: &FileRank) -> &mut u64 {
-        return &mut self.bitboard[piece.bitboard_index()]
+        return &mut self.bitboard[piece.bitboard_index()];
     }
 
     pub fn get_all_pieces(&self) -> u64 {
@@ -268,23 +266,8 @@ impl BitBoard {
     }
 
     pub fn get_piece_at(&self, file_rank: &FileRank) -> Option<Piece> {
-        let pieces = [
-            (self.bitboard[PieceIndex::P.index()], WHITE_PAWN),
-            (self.bitboard[PieceIndex::B.index()], WHITE_BISHOP),
-            (self.bitboard[PieceIndex::N.index()], WHITE_KNIGHT),
-            (self.bitboard[PieceIndex::R.index()], WHITE_ROOK),
-            (self.bitboard[PieceIndex::Q.index()], WHITE_QUEEN),
-            (self.bitboard[PieceIndex::K.index()], WHITE_KING),
-            (self.bitboard[PieceIndex::p.index()], BLACK_PAWN),
-            (self.bitboard[PieceIndex::b.index()], BLACK_BISHOP),
-            (self.bitboard[PieceIndex::n.index()], BLACK_KNIGHT),
-            (self.bitboard[PieceIndex::r.index()], BLACK_ROOK),
-            (self.bitboard[PieceIndex::q.index()], BLACK_QUEEN),
-            (self.bitboard[PieceIndex::k.index()], BLACK_KING),
-        ];
-
-        for &(bitboard, piece) in &pieces {
-            if BitBoard::get(bitboard, file_rank) {
+        for piece in PIECE_CHAR_ARRAY {
+            if BitBoard::get(self.bitboard[piece.bitboard_index()], file_rank) {
                 return Some(piece);
             }
         }
