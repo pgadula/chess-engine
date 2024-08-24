@@ -441,23 +441,3 @@ impl Default for BitBoard {
         }
     }
 }
-
-
-
-    // pub fn deserialize_move(&self, input: &str) -> Option<AlgebraicNotationToken> {
-    //     let mut iterator = input.chars();
-    //     if let Some(c) = iterator.next() {
-    //         match c {
-    //             'K' | 'Q' | 'R' | 'B' | 'N' | 'P' | 'k' | 'q' | 'r' | 'b' | 'n' | 'p' => {
-    //                 return Some(AlgebraicNotationToken::Piece(c));
-    //             }
-    //             'a'..='h' => return Some(AlgebraicNotationToken::File(c)),
-    //             '1'..='8' => return Some(AlgebraicNotationToken::Rank(c)),
-    //             'x' => return Some(AlgebraicNotationToken::Capture),
-    //             _ => {
-    //                 return None;
-    //             }
-    //         }
-    //     }
-    //     return None;
-    // }
