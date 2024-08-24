@@ -12,6 +12,28 @@
         King,
     }
 
+    #[derive(Copy, Clone)]
+    pub enum PieceIndex {
+        P,
+        B,
+        N,
+        R,
+        Q,
+        K,
+        p,
+        b,
+        n,
+        r,
+        q,
+        k,
+    }
+    
+    impl PieceIndex {
+        pub fn index(&self)->usize{
+            *self as usize
+        }
+    }
+
     #[derive(Debug, PartialEq, Clone, Copy)]
     pub enum Color {
         White,
@@ -26,6 +48,7 @@
         }
     }
 
+
     #[derive(Debug, PartialEq, Clone, Copy)]
 
     pub struct Piece {
@@ -38,6 +61,9 @@
                 piece_type: *piece_type, 
                 color: *color 
             }
+        }
+        pub fn bitboard_index(&self)->usize{
+            PIECE_CHAR_ARRAY.iter().position(|p| p == self).unwrap()
         }
     }
 
