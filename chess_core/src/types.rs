@@ -63,7 +63,7 @@
             }
         }
         pub fn bitboard_index(&self)->usize{
-            PIECE_CHAR_ARRAY.iter().position(|p| p == self).unwrap()
+            PIECE_CHAR_ARRAY.iter().position(|p| p == self).unwrap_or_else(|| panic!("Invalid piece"))
         }
     }
 
@@ -215,7 +215,14 @@
              None
          }
      }
-
+     pub struct PieceCollection {
+        pub rooks: u64,
+        pub bishops: u64,
+        pub queens: u64,
+        pub king: u64,
+        pub knights: u64,
+        pub pawns: u64,
+    }
 
     pub struct BoardSide {
         pub rooks: u64,

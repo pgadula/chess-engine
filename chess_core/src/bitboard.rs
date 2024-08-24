@@ -193,7 +193,7 @@ impl BitBoard {
         return (self.get_white_pieces()) | (self.get_black_pieces());
     }
     pub fn get_white_pieces(&self) -> u64 {
-        let result = self.bitboard[0..5]
+        let result = self.bitboard[0..6]
             .iter()
             .copied()
             .reduce(|acc, b| acc | b)

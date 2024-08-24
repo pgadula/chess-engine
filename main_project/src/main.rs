@@ -15,16 +15,20 @@ fn main() {
 
     // print_as_board(white_queen_castle_mask); 
     // for test_position in TEST_CASES.iter().filter(|e| e.depth == 1) {
+    //     debug_move_generator(test_position);
     // }
-    debug_move_generator(&TEST_CASES[1]);
+    debug_move_generator(&TEST_CASES[5]);
 
 }
 
 fn debug_move_generator(test_position: &test_cases::TestPosition) {
     let mut game: BitBoard = BitBoard::deserialize(&test_position.fen);
     game.calculate_pseudolegal_moves();
-    print_as_board(game.b_attacks_mask);
+    print_as_board(game.get_black_pieces());
+    // print_as_board(game.b_attacks_mask);
+    game.print();
     let attacks = if game.turn == Color::White { &game.flat_white_attacks } else { &game.flat_black_attacks }; 
+
 
     let valid_attacks:Vec<&Attack> = attacks
         .iter()
