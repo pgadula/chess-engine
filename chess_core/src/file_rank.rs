@@ -45,3 +45,9 @@
     pub const EDGES: u64 = RANK_1 | RANK_8 | FILE_H | FILE_A;
 
     pub const FILES_CHAR:[char; 8] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+
+    pub const BLACK_KING_CASTLE_MASK: u64 = (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7);
+    pub const BLACK_QUEEN_CASTLE_MASK: u64 = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4);
+
+    pub const WHITE_KING_CASTLE_MASK: u64 = (1 << 60) | (1 << 61) | (1 << 62) | (1 << 63);
+    pub const WHITE_QUEEN_CASTLE_MASK: u64 = (1 << 56) | (1 << 57) | (1 << 58) | (1 << 59) | (1 << 60);
