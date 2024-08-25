@@ -1,4 +1,4 @@
-    use std::{fmt::Display, slice::Iter};
+    use std::slice::Iter;
 
     use self::FileRank::*;
 
@@ -267,11 +267,12 @@
         pub opposite_blockers: u64,
         pub color:Color,
 
-        // pub from_moves: &Vec<Vec<PieceLocation>>,
-        // pub attacked_squares: &Vec<Vec<PieceLocation>>,
+        pub KING_MASK_CASTLING: u64,
+        pub QUEEN_MASK_CASTLING: u64,
 
-        // pub opposite_from_moves: &Vec<Vec<PieceLocation>>,
-        // pub opposite_attacked_squares: &Vec<Vec<PieceLocation>>,
+
+        pub castling_queen_side:bool,
+        pub castling_king_side: bool
     }
 
     #[derive(Debug)]
@@ -292,5 +293,16 @@
     pub struct PieceMove{
         pub piece:Piece,
         pub from: FileRank,
-        pub target: FileRank
+        pub target: FileRank,
+        pub move_type: Option<MoveType>
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    pub enum MoveType{
+        Quite,
+        Capture,
+        Promotion,
+        CaptureWithPromotion,
+        CastleKingSide,
+        CastleQueenSide
     }

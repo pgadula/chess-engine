@@ -3,7 +3,7 @@ use std::iter::zip;
 use crate::{bitboard::BitBoard, file_rank::{
     FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
     NOT_RANK_8, RANK_3, RANK_6,
-}, types::{PieceMove, Color, FileRank, Piece, PieceType}, utility::{clear_bit, get_file_ranks, pop_bit, pop_lsb, set_bit, set_bit_by_index}};
+}, types::{PieceMove, Color, FileRank, Piece, PieceType}, utility::{get_file_ranks, pop_bit, pop_lsb, set_bit_by_index}};
 
 
 pub fn get_pawn_moves(
@@ -54,7 +54,8 @@ pub fn get_pawn_moves(
             flat_attacks.push(PieceMove{
                 from: pawn_file_rank,
                 piece: Piece::from(&PieceType::Pawn, &color),
-                target: file_rank
+                target: file_rank,
+                move_type: None
             })
        }
         pop_bit(&mut pawns, index as u8)
@@ -246,6 +247,7 @@ pub fn fill_moves(
             piece,
             from: piece_file_rank,
             target: fr,
+            move_type: None
         });
 
     }
