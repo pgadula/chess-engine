@@ -11,6 +11,7 @@
         Queen,
         King,
     }
+    pub const PROMOTION_PIECES:[PieceType; 4] = [PieceType::Bishop, PieceType::Queen, PieceType::Knight, PieceType::Rook];
 
     #[derive(Copy, Clone)]
     pub enum PieceIndex {
@@ -294,15 +295,15 @@
         pub piece:Piece,
         pub from: FileRank,
         pub target: FileRank,
-        pub move_type: Option<MoveType>
+        pub move_type: MoveType
     }
 
     #[derive(Debug, Clone, Copy)]
     pub enum MoveType{
         Quite,
         Capture,
-        Promotion,
-        CaptureWithPromotion,
+        Promotion(PieceType),
+        CaptureWithPromotion(PieceType),
         CastleKingSide,
         CastleQueenSide
     }

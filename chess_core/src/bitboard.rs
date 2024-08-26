@@ -9,7 +9,7 @@ use crate::{
     moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves},
     types::{
         get_piece_from_char, BoardSide, Color, FileRank, MoveType, Piece, PieceIndex, PieceMove,
-        PieceType, PIECES_ARRAY,
+        PieceType, BLACK_ROOK, PIECES_ARRAY, WHITE_KING, WHITE_ROOK,
     },
     utility::{clear_bit, get_file_ranks, get_lsb_index, print_as_board, set_bit},
 };
@@ -49,6 +49,108 @@ impl BitBoard {
         Default::default()
     }
 
+    pub fn apply(&mut self, piece_move: &PieceMove) {
+        match piece_move.move_type {
+            MoveType::Capture => {
+                self.handle_capture(piece_move);
+                self.move_piece(piece_move);
+            }
+            MoveType::CaptureWithPromotion(PieceType::Rook) => {
+                self.capture_with_promotion(piece_move, &PieceType::Rook);
+            }
+            MoveType::CaptureWithPromotion(PieceType::Bishop) => {
+                self.capture_with_promotion(piece_move, &PieceType::Bishop);
+            }
+            MoveType::CaptureWithPromotion(PieceType::Knight) => {
+                self.capture_with_promotion(piece_move, &PieceType::Knight);
+            }
+            MoveType::CaptureWithPromotion(PieceType::Queen) => {
+                self.capture_with_promotion(piece_move, &PieceType::Queen);
+            }
+            MoveType::CastleKingSide => {
+                self.clear_piece(&piece_move.piece, &piece_move.from);
+                self.set_piece(&piece_move.piece, &piece_move.target);
+                if piece_move.piece.color == Color::White {
+                    self.clear_piece(&WHITE_ROOK, &FileRank::H1);
+                    self.set_piece(&WHITE_ROOK, &FileRank::F1);
+                } else {
+                    self.clear_piece(&BLACK_ROOK, &FileRank::H8);
+                    self.set_piece(&BLACK_ROOK, &FileRank::F8);
+                }
+            }
+            MoveType::CastleQueenSide => {
+                self.clear_piece(&piece_move.piece, &piece_move.from);
+                self.set_piece(&piece_move.piece, &piece_move.target);
+                if piece_move.piece.color == Color::White {
+                    self.clear_piece(&WHITE_ROOK, &FileRank::A1);
+                    self.set_piece(&WHITE_ROOK, &FileRank::D1);
+                } else {
+                    self.clear_piece(&BLACK_ROOK, &FileRank::A8);
+                    self.set_piece(&BLACK_ROOK, &FileRank::D8);
+                }
+            }
+            MoveType::Promotion(PieceType::Rook) => self.promotion(piece_move, &PieceType::Rook),
+            MoveType::Promotion(PieceType::Bishop) => {
+                self.promotion(piece_move, &PieceType::Bishop)
+            }
+            MoveType::Promotion(PieceType::Knight) => {
+                self.promotion(piece_move, &PieceType::Knight)
+            }
+            MoveType::Promotion(PieceType::Queen) => self.promotion(piece_move, &PieceType::Queen),
+            MoveType::Quite => self.move_piece(piece_move),
+            _ => {
+                print!("Invalid move {:?}", piece_move)
+            }
+        }
+    }
+
+    fn move_piece(&mut self, piece_move: &PieceMove) {
+        self.clear_piece(&piece_move.piece, &piece_move.from);
+        self.set_piece(&piece_move.piece, &piece_move.target);
+    }
+
+    fn capture_with_promotion(&mut self, piece_move: &PieceMove, promotion: &PieceType) {
+        self.handle_capture(piece_move);
+        self.promotion(piece_move, promotion);
+    }
+
+    fn promotion(&mut self, piece_move: &PieceMove, promotion: &PieceType) {
+        let new_piece = &Piece {
+            piece_type: *promotion,
+            color: piece_move.piece.color.clone(),
+        };
+        self.clear_piece(&piece_move.piece, &piece_move.from);
+        self.set_piece(new_piece, &piece_move.target);
+    }
+
+    fn handle_capture(&mut self, piece_move: &PieceMove) {
+        if let Some(target_piece) = self.get_piece_at(&piece_move.target) {
+            self.clear_piece(&target_piece, &piece_move.target)
+        } else {
+            if (piece_move.piece.piece_type == PieceType::Pawn) {
+                if let Some(en_passant_file_rank) = self.en_passant {
+                    if en_passant_file_rank == piece_move.target {
+                        let file_rank_mask = en_passant_file_rank.mask();
+                        let target_file_rank = if (file_rank_mask & RANK_3) > 0 {
+                            FileRank::get_from_mask(file_rank_mask >> 8).unwrap()
+                        } else {
+                            FileRank::get_from_mask(file_rank_mask << 8).unwrap()
+                        };
+                        self.clear_piece(
+                            &Piece {
+                                color: self.turn.opposite(),
+                                piece_type: PieceType::Pawn,
+                            },
+                            &target_file_rank,
+                        )
+                    }
+                }
+            }
+
+            print!("Cannot capture empty square {:?}", piece_move)
+        }
+    }
+
     pub fn calculate_pseudolegal_moves(&mut self) {
         let db = &self.move_lookup_table;
         let white = self.get_player_info(&Color::White);
@@ -65,14 +167,15 @@ impl BitBoard {
 
         let side = &self.get_player_info(&self.turn);
         if let Some(castlings) = self.get_castling_moves(side) {
+            print!("{:?}", castlings);
             for ele in castlings {
                 if Color::White == self.turn {
                     self.flat_white_moves.push(ele);
                     self.w_moves_mask |= ele.target.mask();
                 } else {
+                    self.flat_black_moves.push(ele);
+                    self.b_moves_mask |= ele.target.mask();
                 }
-                self.flat_black_moves.push(ele);
-                self.b_moves_mask |= ele.target.mask();
             }
         }
     }
@@ -175,6 +278,7 @@ impl BitBoard {
                 Piece::from(&PieceType::Rook, &color),
                 rook_move,
                 &mut flat_moves,
+                opposite_blockers,
             );
         }
         for bishop_position in get_file_ranks(bishops) {
@@ -187,6 +291,7 @@ impl BitBoard {
                 Piece::from(&PieceType::Bishop, &color),
                 bishop_moves,
                 &mut flat_moves,
+                opposite_blockers,
             );
         }
 
@@ -201,6 +306,7 @@ impl BitBoard {
                 Piece::from(&PieceType::Queen, &color),
                 sliding_moves,
                 &mut flat_moves,
+                opposite_blockers,
             );
         }
 
@@ -213,6 +319,7 @@ impl BitBoard {
                 Piece::from(&PieceType::Knight, &color),
                 attacks,
                 &mut flat_moves,
+                opposite_blockers,
             );
         }
 
@@ -235,6 +342,7 @@ impl BitBoard {
                 Piece::from(&PieceType::King, &color),
                 attacks,
                 &mut flat_moves,
+                opposite_blockers,
             );
 
             // side.friendly_blockers
@@ -302,13 +410,14 @@ impl BitBoard {
                     piece: king_piece,
                     from: starting_king_file_rank,
                     target: targets[1],
-                    move_type: Some(MoveType::CastleKingSide),
+                    move_type: MoveType::CastleKingSide,
                 }
             })
         }
 
         let queen_side_free_from_attack = (opposite_attacks & QUEEN_MASK_CASTLING) == 0;
-        let has_space_queen_side = (friendly_blockers & QUEEN_MASK_CASTLING) == 0;
+        let has_space_queen_side = (blockers_without_king & QUEEN_MASK_CASTLING) == 0;
+
         if *castling_queen_side
             && queen_side_free_from_attack
             && has_space_queen_side
@@ -319,7 +428,7 @@ impl BitBoard {
                     piece: king_piece,
                     from: starting_king_file_rank,
                     target: targets[0],
-                    move_type: Some(MoveType::CastleQueenSide),
+                    move_type: MoveType::CastleQueenSide,
                 }
             })
         }

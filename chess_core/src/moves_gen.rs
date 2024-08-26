@@ -1,9 +1,8 @@
 use std::iter::zip;
 
 use crate::{bitboard::BitBoard, file_rank::{
-    FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8,
-    NOT_RANK_8, RANK_3, RANK_6,
-}, types::{PieceMove, Color, FileRank, Piece, PieceType}, utility::{get_file_ranks, pop_bit, pop_lsb, set_bit_by_index}};
+    self, FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_1, RANK_3, RANK_6, RANK_8
+}, types::{Color, FileRank, MoveType, Piece, PieceMove, PieceType, PROMOTION_PIECES}, utility::{get_file_ranks, pop_bit, pop_lsb, set_bit_by_index}};
 
 
 pub fn get_pawn_moves(
@@ -46,16 +45,56 @@ pub fn get_pawn_moves(
         } else {
             (single_push & rank_3_or_6) << 8 & all_blockers
         };
-  
+        for file_rank in get_file_ranks(attack_pattern){
+            if file_rank.mask() & RANK_8 > 0 || file_rank.mask() & RANK_1 > 0{
+                for piece_type in PROMOTION_PIECES {
+                    flat_attacks.push(PieceMove{
+                        from: pawn_file_rank,
+                        piece: Piece::from(&PieceType::Pawn, &color),
+                        target: file_rank,
+                        move_type: MoveType::CaptureWithPromotion(piece_type)
+                    }) 
+                }
+            }else{
+                flat_attacks.push(PieceMove{
+                    from: pawn_file_rank,
+                    piece: Piece::from(&PieceType::Pawn, &color),
+                    target: file_rank,
+                    move_type: MoveType::Capture
+                })
+            }
+         
+        }
+        for file_rank in get_file_ranks(single_push){
+            if file_rank.mask() & RANK_8 > 0 || file_rank.mask() & RANK_1 > 0{
+                for piece_type in PROMOTION_PIECES {
+                    flat_attacks.push(PieceMove{
+                        from: pawn_file_rank,
+                        piece: Piece::from(&PieceType::Pawn, &color),
+                        target: file_rank,
+                        move_type: MoveType::Promotion(piece_type)
+                    }) 
+                }
+            }else{
+                flat_attacks.push(PieceMove{
+                    from: pawn_file_rank,
+                    piece: Piece::from(&PieceType::Pawn, &color),
+                    target: file_rank,
+                    move_type:MoveType::Quite
+                })
+            }
+         
+        }
+
         let all_moves_mask = single_push | double_push | attack_pattern;
         *attack_mask |= all_moves_mask;
 
-       for file_rank in get_file_ranks(all_moves_mask) {
+       for file_rank in get_file_ranks(double_push) {
             flat_attacks.push(PieceMove{
                 from: pawn_file_rank,
                 piece: Piece::from(&PieceType::Pawn, &color),
                 target: file_rank,
-                move_type: None
+                move_type: MoveType::Quite
             })
        }
         pop_bit(&mut pawns, index as u8)
@@ -237,17 +276,23 @@ pub fn fill_moves(
     piece_file_rank: FileRank,
     piece: Piece,
     mut bit_moves: u64,
-    flat_attacks: &mut Vec<PieceMove>
+    flat_attacks: &mut Vec<PieceMove>,
+    opposite_blockers: u64
 ) {
 
     while bit_moves > 0 {
         let i: usize = pop_lsb(&mut bit_moves) as usize;
         let fr = FileRank::get_file_rank(i as u8).unwrap();
+        let move_type = if opposite_blockers & fr.mask() > 0 {
+            MoveType::Capture
+        } else{
+            MoveType::Quite
+        };
         flat_attacks.push(PieceMove{
             piece,
             from: piece_file_rank,
             target: fr,
-            move_type: None
+            move_type
         });
 
     }
