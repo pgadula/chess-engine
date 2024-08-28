@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub struct TestPosition{
     pub depth:u8,
     pub nodes:usize,
@@ -120,4 +121,40 @@ pub const TEST_CASES: &[TestPosition] = &[
       nodes:23527,
       fen:"8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1"
    }
+];
+
+
+
+
+
+pub const TEST_POSITIONS2: &[TestPosition] = &[
+   TestPosition { depth: 1, nodes: 45, fen: "rnbq1k1r/pp1Pb1pp/2p2p2/8/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 44, fen: "rnbq1k1r/p2Pbppp/1pp5/8/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 44, fen: "rnbq1k1r/1p1Pbppp/p1p5/8/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 44, fen: "rnbq1k1r/pp1Pbppp/8/2p5/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 44, fen: "rnbq1k1r/pp1Pbpp1/2p5/7p/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 43, fen: "rnbq1k1r/pp1Pbp1p/2p5/6p1/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 45, fen: "rnbq1k1r/pp1Pb1pp/2p5/5p2/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 43, fen: "rnbq1k1r/p2Pbppp/2p5/1p6/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 44, fen: "rnbq1k1r/1p1Pbppp/2p5/p7/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 34, fen: "rnbq1k1r/pp1Pbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R b KQ - 0 8" },
+   TestPosition { depth: 1, nodes: 44, fen: "rnbq1kr1/pp1Pbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 44, fen: "rnbq2kr/pp1Pbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 52, fen: "rnb1qk1r/pp1Pbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 40, fen: "rnb2k1r/pp1qbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 48, fen: "rnb2k1r/ppqPbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 47, fen: "rnb2k1r/pp1Pbppp/1qp5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 9, fen: "rnb2k1r/pp1Pbppp/2p5/q7/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 41, fen: "rn1q1k1r/pp1bbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 41, fen: "r1bq1k1r/pp1nbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 0 9" },
+   TestPosition { depth: 1, nodes: 44, fen: "r1bq1k1r/pp1Pbppp/n1p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 44, fen: "rnbq1k1r/pp1P1ppp/2p2b2/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 44, fen: "rnbq1k1r/pp1P1ppp/2pb4/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 42, fen: "rnbq1k1r/pp1P1ppp/2p5/6b1/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 43, fen: "rnbq1k1r/pp1P1ppp/2p5/2b5/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 42, fen: "rnbq1k1r/pp1P1ppp/2p5/8/2B4b/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 8, fen: "rnbq1k1r/pp1P1ppp/2p5/8/1bB5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 42, fen: "rnbq1k1r/pp1P1ppp/2p5/8/2B5/bP6/P1P1N1PP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 42, fen: "rnbq1k1r/pp1Pbppp/2p5/8/2B1n3/1P6/P1P1N1PP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 5, fen: "rnbq1k1r/pp1Pbppp/2p5/8/2B5/1P1n4/P1P1N1PP/RNBQK2R w KQ - 1 9" },
 ];

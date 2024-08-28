@@ -1,70 +1,93 @@
 mod test_cases;
 
+use std::{collections::HashMap, usize};
+
 use chess_core::{
-    algebraic_notation::AlgebraicNotation,
-    bitboard::{self, BitBoard, FenParser},
-    file_rank::{BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, RANK_3, RANK_8, WHITE_KING_CASTLE_MASK, WHITE_QUEEN_CASTLE_MASK},
-    types::{AlgebraicNotationToken, BoardSide, Color, FileRank, MoveType, Piece, PieceIndex, PieceMove, PieceType},
-    utility::{bit_count, print_as_board},
+    bitboard::{BitBoard, FenParser},
+    types::{FileRank, PieceMove, BLACK_PAWN, WHITE_PAWN},
 };
-use test_cases::TEST_CASES;
+use test_cases::{TestPosition, TEST_POSITIONS2};
 
 fn main() {
-    let fen = "rnb1kbnr/pp1pq1pp/4p3/5p2/2PpP1P1/2NQB3/PP3P1P/R3KBNR w KQkq - 1 8";
-    let mut game = BitBoard::deserialize(fen);
-    // let king = game.bitboard[PieceIndex::k.idx()];
-    // handle_castling(&game);
-    // let mask = (game.get_black_pieces() & RANK_8) ^  ;
-    // print_as_board(mask);
-
-    // for test_position in TEST_CASES.iter() {
-    //     debug_move_generator(test_position);
+    // let fen = "rnb1kbnr/pp1pq1pp/4p3/5p2/2PpP1P1/2NQB3/PP3P1P/R3KBNR w KQkq - 1 8";
+    // let mut game = BitBoard::deserialize(fen);
+    let test_case = TestPosition{
+        depth:1,
+        fen:"rnb1qk1r/pp1Pbppp/2p5/8/1PB5/8/P1P1NnPP/RNBQK2R w KQ - 1 9",
+        nodes: 53
+    };
+    // for case in TEST_POSITIONS2 {
+    //     let mut calc = CalculationObject::new();
+    //     calc.debug_move_generator(&case)
     // }
-    // debug_move_generator(&TEST_CASES[5]);
-
-    game.calculate_pseudolegal_moves();
-    game.print();
-
-    let valid_attacks: Vec<&PieceMove> = game.get_valid_moves();
-    for attack in valid_attacks {
-        println!();
-        println!("{:?}", attack);
-        let mut c_game = game.clone();
-        c_game.print();
-        c_game.apply(attack);
-        c_game.print();
 
 
-        println!();
-    }
+    // println!("{:?}",game.en_passant);
+    // print!("{}", game.id());
+
+    let mut calc = CalculationObject::new();
+    calc.debug_move_generator(&test_case)
+
+
+}
+struct CalculationObject {
+    unique_position: HashMap<usize, usize>,
 }
 
+impl CalculationObject {
+    fn new() -> Self {
+        CalculationObject {
+            unique_position: HashMap::new(),
+        }
+    }
+
+    fn debug_move_generator(&mut self, test_position: &test_cases::TestPosition) {
+        let mut game: BitBoard = BitBoard::deserialize(&test_position.fen);
 
 
-fn debug_move_generator(test_position: &test_cases::TestPosition) {
-    let mut game: BitBoard = BitBoard::deserialize(&test_position.fen);
-    game.calculate_pseudolegal_moves();
-    // print_as_board(game.b_attacks_mask);
-    game.print();
 
-    let valid_attacks: Vec<&PieceMove> = game.get_valid_moves();
-    let count = valid_attacks.len();
-    println!(
-        "fen: {}\nexpected nodes: {} received: {}\n",
-        test_position.fen, test_position.nodes, count,
-    );
+        let total = self.get_total_nodes(&mut game, 2);
+        if total != test_position.nodes {
+            println!("fen:{} depth:{}", test_position.fen, test_position.depth);
 
-    for attack in valid_attacks {
-        println!();
-        println!("{:?}", attack);
-        let mut c_game = game.clone();
-        c_game.print();
-        c_game.apply(attack);
-        c_game.print();
+            println!("result: {} expected:{}", total, test_position.nodes);
+            println!();
+        }
+    }
+
+    pub fn get_total_nodes(&mut self, game: &mut BitBoard, depth: u8) -> usize {
+        if depth == 0 {
+            return 0;
+        }
+
+        // if let Some(nodes) = self.unique_position.get(&game.id()) {
+        //     // println!("hit cache {}", game.id());
+        //     return *nodes;
+        // }
+        game.calculate_pseudolegal_moves();
+        let valid_attacks = game.get_valid_moves();
 
 
-        println!();
+
+
+
+
+        // let mut result_from_inner = 0;
+        // result_from_inner = valid_attacks
+        //     .iter()
+        //     .map(|v| {
+        //         let mut clone = game.clone();
+        //         clone.apply(v);
+
+        //         self.get_total_nodes(&mut clone, depth - 1)
+        //     })
+        //     .sum();
+
+
+
+        // let result = valid_attacks.len() + result_from_inner;
+        // self.unique_position.insert(game.id(), result);
+        // result
+        valid_attacks.len()
     }
 }
-
-
