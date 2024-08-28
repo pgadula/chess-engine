@@ -42,7 +42,7 @@ pub struct Castling {
 
 pub trait FenParser {
     fn deserialize(fen: &str) -> BitBoard;
-    fn serialize(self, output: &mut str) -> &str;
+    fn serialize(&self) -> String ;
 }
 
 impl BitBoard {
@@ -499,7 +499,7 @@ impl BitBoard {
         return !self.get_all_pieces();
     }
 
-    pub fn get(bit_board: u64, file_rank: &FileRank) -> bool {
+    pub fn has(bit_board: u64, file_rank: &FileRank) -> bool {
         let file_rank_num = (*file_rank) as u8;
         let mask = 1u64 << file_rank_num;
         return (bit_board & mask) != 0;
@@ -541,7 +541,7 @@ impl BitBoard {
 
     pub fn get_piece_at(&self, file_rank: &FileRank) -> Option<Piece> {
         for piece in PIECES_ARRAY {
-            if BitBoard::get(self.bitboard[piece.bitboard_index()], file_rank) {
+            if BitBoard::has(self.bitboard[piece.bitboard_index()], file_rank) {
                 return Some(piece);
             }
         }
@@ -680,8 +680,71 @@ impl FenParser for BitBoard {
         game
     }
 
-    fn serialize(self, _output: &mut str) -> &str {
-        todo!()
+    fn serialize(&self) -> String  {
+        let mut piece_placement = String::new();
+        let mut row_pieces = vec![0u8; 8];
+        let mut active_color = if self.turn == Color::White { "w" } else { "b" };
+        let mut castling_rights = String::new();
+        let mut en_passant = String::from("-");
+        let halfmove_clock = self.halfmove_clock.to_string();
+        let fullmove_number = self.fullmove_number.to_string();
+
+            for rank in 0..8 {
+                let mut empty_count = 0;
+                for file in 0..8 {
+                    let index = rank * 8 + file;
+                    let file_rank = FileRank::get_file_rank(index).unwrap();
+                    if let Some(piece) = self.get_piece_at(&file_rank) {
+                        if empty_count > 0 {
+                            piece_placement.push_str(&empty_count.to_string());
+                            empty_count = 0;
+                        }
+                        piece_placement.push(piece.symbol());
+                    } else {
+                        empty_count += 1;
+                    }
+                }
+                if empty_count > 0 {
+                    piece_placement.push_str(&empty_count.to_string());
+                }
+                if rank < 7 {
+                    piece_placement.push('/');
+                }
+        }
+
+        // Determine castling rights
+        if self.castling.w_king_side {
+            castling_rights.push('K');
+        }
+        if self.castling.w_queen_side {
+            castling_rights.push('Q');
+        }
+        if self.castling.b_king_side {
+            castling_rights.push('k');
+        }
+        if self.castling.b_queen_side {
+            castling_rights.push('q');
+        }
+        if castling_rights.is_empty() {
+            castling_rights.push('-');
+        }
+
+        if let Some(en_passant_square) = self.en_passant {
+            en_passant = en_passant_square.to_string();
+        }
+
+
+        let fen_string = format!(
+            "{} {} {} {} {} {}",
+            piece_placement,
+            active_color,
+            castling_rights,
+            en_passant,
+            halfmove_clock,
+            fullmove_number
+        );
+
+        fen_string
     }
 }
 
