@@ -40,11 +40,7 @@ pub fn get_pawn_moves(
         } else {
             (isolated_pawn << 8) & all_blockers
         };
-        let double_push: u64 = if color == Color::White {
-            (single_push & rank_3_or_6) >> 8 & all_blockers
-        } else {
-            (single_push & rank_3_or_6) << 8 & all_blockers
-        };
+
         for file_rank in get_file_ranks(attack_pattern){
             if file_rank.mask() & RANK_8 > 0 || file_rank.mask() & RANK_1 > 0{
                 for piece_type in PROMOTION_PIECES {
@@ -85,16 +81,27 @@ pub fn get_pawn_moves(
             }
          
         }
-
+        let double_push: u64 = if color == Color::White {
+            (single_push & rank_3_or_6) >> 8 & all_blockers
+        } else {
+            (single_push & rank_3_or_6) << 8 & all_blockers
+        };
         let all_moves_mask = single_push | double_push | attack_pattern;
         *attack_mask |= all_moves_mask;
 
        for file_rank in get_file_ranks(double_push) {
+            let en_passant_fr = if color == Color::White{
+                FileRank::get_file_rank(( file_rank.mask() >>  8) as u8).unwrap()
+            }
+            else{
+                FileRank::get_file_rank(( file_rank.mask() << 8) as u8).unwrap()
+            };
+
             flat_attacks.push(PieceMove{
                 from: pawn_file_rank,
                 piece: Piece::from(&PieceType::Pawn, &color),
                 target: file_rank,
-                move_type: MoveType::Quite
+                move_type: MoveType::DoublePush(Some(en_passant_fr))
             })
        }
         pop_bit(&mut pawns, index as u8)

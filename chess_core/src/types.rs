@@ -319,7 +319,7 @@
         pub move_type: MoveType
     }
     impl PieceMove {
-        pub fn get_simple_notation(&self)->String{
+        pub fn uci(&self)->String{
             match self.move_type {
                 MoveType::Promotion(promotion_piece) | MoveType::CaptureWithPromotion(promotion_piece) => {
                     return format!("{}{}{}", self.from, self.target, promotion_piece.get_symbol());
@@ -334,7 +334,7 @@
     #[derive(Debug, Clone, Copy)]
     pub enum MoveType{
         Quite,
-        DoublePush,
+        DoublePush(Option<FileRank>),
         Capture,
         Promotion(PieceType),
         CaptureWithPromotion(PieceType),

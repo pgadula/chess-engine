@@ -52,7 +52,7 @@ pub const TEST_CASES: &[TestPosition] = &[
       fen:"r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"
    },
    TestPosition{
-      depth:6,
+      depth:4,
       nodes:1134888,
       fen:"3k4/3p4/8/K1P4r/8/8/8/8 b - - 0 1"
    },

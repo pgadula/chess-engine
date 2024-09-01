@@ -1,75 +1,112 @@
 mod test_cases;
 
-use std::collections::HashSet;
-use std::num::ParseIntError;
-use std::process::Command;
-use std::str::Utf8Error;
 use std::collections::HashMap;
+use std::io;
+use std::num::ParseIntError;
+use std::process::{Command, Stdio};
+use std::str::Utf8Error;
+use std::{collections::HashSet, io::Write};
 
 use chess_core::{
     bitboard::{BitBoard, FenParser},
     types::PieceMove,
 };
-use test_cases::{TestPosition, TEST_CASES};
+use test_cases::{TestPosition, TEST_CASE, TEST_CASES};
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
 
 fn main() {
-    let fen = "rnb1kbnr/pp1pq1pp/4p3/5p2/2PpP1P1/2NQB3/PP3P1P/R3KBNR w KQkq - 1 8";
+    // let fen = "rnb1kbnr/pp1pq1pp/4p3/5p2/2PpP1P1/2NQB3/PP3P1P/R3KBNR w KQkq - 1 8";
 
-    let mut game = BitBoard::deserialize(fen);
-    let test_case = TestPosition {
-        depth: 1,
-        fen: "rnb1qk1r/pp1Pbppp/2p5/8/1PB5/8/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        nodes: 53,
-    };
-    for case in TEST_CASES {
-        let mut calc = CalculationObject::new();
-        calc.debug_move_generator(case)
+    // let mut game = BitBoard::new_game();
+
+    for ele in TEST_CASES {
+            let mut calc = CalculationObject::new(&ele.fen, ele.depth as usize);
+            calc.debug_move_generator();
+
     }
 
-    // let mut calc = CalculationObject::new();
-    // calc.debug_move_generator(&TEST_CASE)
+    // let test_case = TestPosition {
+    //     depth: 1,
+    //     fen: "3k3r/3p4/K7/2P5/8/8/8/8 b - - 2 2",
+    //     nodes: 53,
+    // };
+
+    // let mut calc = CalculationObject::new(&test_case.fen, 4);
+    // calc.debug_move_generator();
 }
 #[derive(Debug)]
 enum Error {
     CommandError(std::io::Error),
     Utf8Error(Utf8Error),
     ParseError(ParseIntError),
+    MissingOutput,
 }
-fn python_move_calculator(fen: &str, depth:&str) -> Result<usize, Error> {
+#[derive(Debug)]
 
-    let result = Command::new("python")
-        .args([
-            "../../python_position_checker/position_calculator.py",
-            fen,
-            depth,
-        ])
-        .output();
+struct StockfishOutput {
+    nodes_for_moves: HashMap<String, usize>,
+    total_nodes: usize,
+}
+fn stock_fish_perft(fen: &str, depth: usize) -> Result<StockfishOutput, Error> {
+    // Path to your Stockfish executable
+    let stockfish_path = "C:\\Users\\przemek\\Downloads\\stockfish-windows-x86-64-sse41-popcnt\\stockfish\\stockfish.exe";
 
-    match result {
-        Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout).replace("\r\n", "");
-            let count: Result<usize, Error> = stdout.parse().map_err(|op| Error::ParseError(op));
-            if count.is_err() {
-                eprintln!("{:?}", stdout)
-            }
-            return count;
-            // Parse the string to an unsigned integer
-            match stdout.trim().parse::<usize>() {
-                Ok(value) => Ok(value), // Return the parsed value
-                Err(err) => {
-                    eprintln!("Failed to parse output to usize.");
-                    Err(Error::ParseError(err))
-                }
-            }
+    // Start the Stockfish process with piped stdin and stdout
+    let mut process = Command::new(stockfish_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .map_err(Error::CommandError)?;
+
+    // Prepare the commands to send to Stockfish
+    if let Some(mut stdin) = process.stdin.take() {
+        let commands = format!("position fen {}\ngo perft {}\nquit\n", fen, depth);
+
+        stdin
+            .write_all(commands.as_bytes())
+            .map_err(Error::CommandError)?;
+        stdin.flush().map_err(Error::CommandError)?;
+    } else {
+        return Err(Error::MissingOutput);
+    }
+
+    let output = process.wait_with_output().map_err(Error::CommandError)?;
+
+    if !output.status.success() {
+        return Err(Error::CommandError(io::Error::new(
+            io::ErrorKind::Other,
+            "Stockfish process failed",
+        )));
+    }
+    let mut count = 0;
+    let mut move_node_map: HashMap<String, usize> = HashMap::new();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    for line in stdout.lines() {
+        if let Some((move_str, count_str)) = line.split_once(": ") {
+            let count = count_str
+                .trim()
+                .replace(",", "")
+                .parse::<usize>()
+                .map_err(Error::ParseError)?;
+            move_node_map.insert(move_str.to_string(), count);
         }
-        Err(err) => {
-            eprintln!("Error during calling python script: {:?}", err);
-            Err(Error::CommandError(err))
+        if line.starts_with("Nodes searched:") {
+            if let Some(count_str) = line.split(':').nth(1) {
+                count = count_str
+                    .trim()
+                    .replace(",", "")
+                    .parse::<usize>()
+                    .map_err(Error::ParseError)?;
+            }
         }
     }
+    return Ok(StockfishOutput {
+        nodes_for_moves: move_node_map,
+        total_nodes: count,
+    });
 }
 
 fn python_get_moves(fen: &str) -> Option<Vec<String>> {
@@ -98,62 +135,98 @@ fn python_get_moves(fen: &str) -> Option<Vec<String>> {
         }
     }
 }
+fn apply_move(fen: &str, move_uci: &str) -> Option<String> {
+    let result = Command::new("python")
+        .args(["../../python_position_checker/apply_move.py", fen, move_uci])
+        .output();
+
+    match result {
+        Ok(output) => {
+            let result = String::from_utf8_lossy(&output.stdout).to_string().replace("\r\n", "");
+            return Some(result);
+            // Parse the string to an unsigned integer
+        }
+        Err(err) => {
+            eprintln!("Error during calling python script: {:?}", err);
+            None // Default value in case of error
+        }
+    }
+}
 struct CalculationObject {
-    unique_position: HashMap<String, usize>,
+    stock_fish_output: StockfishOutput,
+    fen: String,
+    max_depth: usize,
 }
 
 impl CalculationObject {
-    fn new() -> Self {
+    fn new(fen: &str, depth: usize) -> Self {
+        let stock_fish_output = stock_fish_perft(fen, depth).unwrap();
         CalculationObject {
-            unique_position: HashMap::new(),
+            stock_fish_output,
+            fen: fen.clone().to_owned(),
+            max_depth: depth,
         }
     }
 
-    fn debug_move_generator(&mut self, test_position: &test_cases::TestPosition) {
-        let mut game: BitBoard = BitBoard::deserialize(&test_position.fen);
-        let nodes = self.get_total_nodes(&mut game, test_position.depth);
+    fn debug_move_generator(&mut self) {
+        let mut game: BitBoard = BitBoard::deserialize(&self.fen);
+        let nodes = self.get_total_nodes(&mut game, self.max_depth);
 
-        println!("
-         for fen:{}
-         with depth {}
-         internal_calculation: {}
-         expected: {}
-         ",test_position.fen, test_position.depth, nodes, test_position.nodes);
-        if nodes != test_position.nodes {
+        if nodes != self.stock_fish_output.total_nodes {
             println!(
                 "{}ERROR {}fen:{} depth:{}{}",
-                RED, RESET, test_position.fen, test_position.depth, RESET
+                RED, RESET, self.fen, self.max_depth, RESET
             );
             println!(
                 "result: {} expected:{} {}",
-                nodes, test_position.nodes, RESET
+                nodes, self.stock_fish_output.total_nodes, RESET
             );
             println!();
         } else {
             println!(
-                "{}SUCCESS{}: depth:{} fen:{}",
-                GREEN, RESET, test_position.depth, test_position.fen,
+                "{}SUCCESS{}: depth:{} fen:{} nodes: {}",
+                GREEN, RESET, self.max_depth, self.fen, nodes
             );
             println!()
         }
     }
 
-    pub fn get_total_nodes(&mut self, game: &mut BitBoard, depth: u8) -> usize {
+    pub fn get_total_nodes(&mut self, game: &mut BitBoard, depth: usize) -> usize {
         if depth == 0 {
             return 1;
         }
         game.calculate_pseudolegal_moves();
         let valid_attacks = game.get_valid_moves();
-        let mut nodes  = 0;
+        let mut nodes = 0;
 
-        for attack in valid_attacks.iter() {
+        for valid_move in valid_attacks.iter() {
             // Apply the move and calculate the result
             let mut clone_game = game.clone();
-            clone_game.apply(attack);
-            let clone_fen = clone_game.serialize();
-            clone_game.calculate_pseudolegal_moves();
+            let move_uci = valid_move.uci();
+            let before = clone_game.serialize();
+            clone_game.apply(valid_move);
+            let after = clone_game.serialize();
 
-            nodes+= self.get_total_nodes(&mut clone_game.clone(), depth - 1);
+            let move_nodes = self.get_total_nodes(&mut clone_game.clone(), depth - 1);
+            // let calc_fen = apply_move(&before, &move_uci).unwrap();
+
+            // if after != calc_fen {
+            //     println!();
+            //     clone_game.print();
+            //     println!(
+            //         "
+            //         ####################
+            //         before: {before}
+            //         move: {move_uci} {:?}
+            //         expected: {calc_fen}
+            //         received: {after}
+            //         ####################
+            //     ",
+            //     valid_move.move_type
+            // )
+            // }
+
+            nodes += move_nodes
         }
 
         nodes
@@ -163,7 +236,7 @@ impl CalculationObject {
 fn log_diff(fen: &str, valid_attacks: Vec<&PieceMove>) {
     let valid_attack_strings = valid_attacks
         .iter()
-        .map(|f| f.get_simple_notation())
+        .map(|f| f.uci())
         .collect::<Vec<String>>();
 
     let all_possibilities = python_get_moves(&fen).unwrap_or(Vec::new());
@@ -182,5 +255,5 @@ fn log_diff(fen: &str, valid_attacks: Vec<&PieceMove>) {
         println!("redundant: {:?}", difference_b);
         println!("missing: {:?}", difference_a);
         println!("{fen}");
-    } 
+    }
 }

@@ -1,4 +1,5 @@
 use crate::file_rank::{RANK_4, RANK_5};
+use crate::utility::print_as_board;
 use crate::{
     file_rank::{
         BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, RANK_3, WHITE_KING_CASTLE_MASK,
@@ -41,7 +42,7 @@ pub struct Castling {
 
 pub trait FenParser {
     fn deserialize(fen: &str) -> BitBoard;
-    fn serialize(&self) -> String ;
+    fn serialize(&self) -> String;
 }
 
 impl BitBoard {
@@ -66,9 +67,6 @@ impl BitBoard {
         if self.turn == Color::Black {
             self.fullmove_number += 1;
         }
-        if piece_move.from == piece_move.target{
-            panic!("Invalid move, cannot move to the same place {:?}", piece_move)
-        }
         let mut en_passant_is_updated = false;
         match piece_move.move_type {
             MoveType::Capture => {
@@ -91,7 +89,7 @@ impl BitBoard {
                     self.set_piece(&BLACK_ROOK, &FileRank::F8);
                     self.castling.b_king_side = false;
                 }
-                self.halfmove_clock = 0;
+                self.reset_half_moves();
             }
             MoveType::CastleQueenSide => {
                 self.clear_piece(&piece_move.piece, &piece_move.from);
@@ -105,33 +103,64 @@ impl BitBoard {
                     self.set_piece(&BLACK_ROOK, &FileRank::D8);
                     self.castling.b_queen_side = false;
                 }
-                self.halfmove_clock = 0;
+                self.reset_half_moves();
             }
-            MoveType::DoublePush => {
+            MoveType::DoublePush(en_passant_option) => {
+                // Debug print
                 self.move_piece(piece_move);
-                let target_mask = piece_move.target.mask();
-                let is_valid_rank_for_black = target_mask & RANK_5 > 0;
-                let is_valid_rank_for_white = (target_mask & RANK_4) > 0;
-                let en_passant = if is_valid_rank_for_white {
-                    FileRank::get_from_mask(target_mask << 8)
-                } else if is_valid_rank_for_black {
-                    FileRank::get_from_mask(target_mask >> 8)
-                } else {
-                    print!(
-                        "Invalid target square for double push move type {:?}",
-                        piece_move
-                    );
-                    None
-                };
-                self.en_passant = en_passant;
-                en_passant_is_updated = true;
-                self.halfmove_clock = 0;
+                self.en_passant = en_passant_option;
+                if en_passant_option.is_some(){
+                    en_passant_is_updated = true;
+                }
+                self.reset_half_moves();
             }
             MoveType::Quite => {
-                if piece_move.piece.piece_type == PieceType::Pawn{
-                    self.halfmove_clock = 0;
+                if piece_move.piece.piece_type == PieceType::Pawn {
+                    self.reset_half_moves();
                 }
-                self.move_piece(piece_move)},
+                if piece_move.piece.piece_type == PieceType::King {
+                    if self.turn == Color::White && piece_move.from == FileRank::E1 {
+                        self.castling.w_king_side = false;
+                        self.castling.w_queen_side = false;
+                        self.reset_half_moves();
+                    }
+                    if self.turn == Color::Black && piece_move.from == FileRank::E8 {
+                        self.castling.b_king_side = false;
+                        self.castling.b_queen_side = false;
+                        self.reset_half_moves();
+                    }
+                }
+                if piece_move.piece.piece_type == PieceType::Rook {
+                    match piece_move.piece.color {
+                        Color::White => {
+                            if piece_move.from == FileRank::A1 && self.castling.w_queen_side == true
+                            {
+                                self.castling.w_queen_side = false;
+                                self.reset_half_moves();
+                            }
+                            if piece_move.from == FileRank::H1 && self.castling.b_king_side == true
+                            {
+                                self.castling.w_king_side = false;
+                                self.reset_half_moves();
+                            }
+                        }
+                        Color::Black => {
+                            if piece_move.from == FileRank::A8 && self.castling.b_queen_side == true
+                            {
+                                self.castling.b_queen_side = false;
+                                self.reset_half_moves();
+                            }
+                            if piece_move.from == FileRank::H8 && self.castling.b_king_side == true
+                            {
+                                self.castling.b_king_side = false;
+                                self.reset_half_moves();
+                            }
+                        }
+                    }
+                }
+
+                self.move_piece(piece_move)
+            }
             _ => {
                 print!("Unrecognized move {:?}", piece_move)
             }
@@ -153,7 +182,7 @@ impl BitBoard {
     }
 
     fn promotion(&mut self, piece_move: &PieceMove, promotion: &PieceType) {
-        self.halfmove_clock = 0;
+        self.reset_half_moves();
         let new_piece = &Piece {
             piece_type: *promotion,
             color: piece_move.piece.color.clone(),
@@ -163,7 +192,7 @@ impl BitBoard {
     }
 
     fn handle_capture(&mut self, piece_move: &PieceMove) {
-        self.halfmove_clock = 0;
+        self.reset_half_moves();
         if let Some(target_piece) = self.get_piece_at(&piece_move.target) {
             self.clear_piece(&target_piece, &piece_move.target)
         } else {
@@ -190,6 +219,9 @@ impl BitBoard {
                 self.print();
             }
         }
+    }
+    pub fn reset_half_moves(&mut self) {
+        self.halfmove_clock = 0;
     }
 
     pub fn calculate_pseudolegal_moves(&mut self) {
@@ -333,7 +365,7 @@ impl BitBoard {
             side.opposite_blockers,
             &self.en_passant,
             &mut move_mask,
-            &mut flat_moves,
+            &mut flat_moves
         );
 
         for king_position in get_file_ranks(king) {
@@ -347,7 +379,6 @@ impl BitBoard {
                 &mut flat_moves,
                 opposite_blockers,
             );
-
         }
 
         (move_mask, flat_moves)
@@ -524,7 +555,8 @@ impl BitBoard {
 
         println!("|1");
         println!(" +----------------+");
-        println!("  a b c d e f g h")
+        println!("  a b c d e f g h");
+        println!("fen: {}", BitBoard::serialize(&self))
     }
 
     pub fn get_piece_at(&self, file_rank: &FileRank) -> Option<Piece> {
@@ -668,7 +700,7 @@ impl FenParser for BitBoard {
         game
     }
 
-    fn serialize(&self) -> String  {
+    fn serialize(&self) -> String {
         let mut piece_placement = String::new();
         let mut row_pieces = vec![0u8; 8];
         let mut active_color = if self.turn == Color::White { "w" } else { "b" };
@@ -677,27 +709,27 @@ impl FenParser for BitBoard {
         let halfmove_clock = self.halfmove_clock.to_string();
         let fullmove_number = self.fullmove_number.to_string();
 
-            for rank in 0..8 {
-                let mut empty_count = 0;
-                for file in 0..8 {
-                    let index = rank * 8 + file;
-                    let file_rank = FileRank::get_file_rank(index).unwrap();
-                    if let Some(piece) = self.get_piece_at(&file_rank) {
-                        if empty_count > 0 {
-                            piece_placement.push_str(&empty_count.to_string());
-                            empty_count = 0;
-                        }
-                        piece_placement.push(piece.symbol());
-                    } else {
-                        empty_count += 1;
+        for rank in 0..8 {
+            let mut empty_count = 0;
+            for file in 0..8 {
+                let index = rank * 8 + file;
+                let file_rank = FileRank::get_file_rank(index).unwrap();
+                if let Some(piece) = self.get_piece_at(&file_rank) {
+                    if empty_count > 0 {
+                        piece_placement.push_str(&empty_count.to_string());
+                        empty_count = 0;
                     }
+                    piece_placement.push(piece.symbol());
+                } else {
+                    empty_count += 1;
                 }
-                if empty_count > 0 {
-                    piece_placement.push_str(&empty_count.to_string());
-                }
-                if rank < 7 {
-                    piece_placement.push('/');
-                }
+            }
+            if empty_count > 0 {
+                piece_placement.push_str(&empty_count.to_string());
+            }
+            if rank < 7 {
+                piece_placement.push('/');
+            }
         }
 
         // Determine castling rights
@@ -720,7 +752,6 @@ impl FenParser for BitBoard {
         if let Some(en_passant_square) = self.en_passant {
             en_passant = en_passant_square.to_string();
         }
-
 
         let fen_string = format!(
             "{} {} {} {} {} {}",
