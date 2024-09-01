@@ -1,4 +1,4 @@
-use crate::{bitboard::BitBoard, types::FileRank};
+use crate::types::FileRank;
 
 pub fn print_as_board(number: u64) {
     // Convert the number to a 64-bit binary string, padded with zeros if necessary

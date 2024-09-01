@@ -289,8 +289,8 @@
         pub opposite_blockers: u64,
         pub color:Color,
 
-        pub KING_MASK_CASTLING: u64,
-        pub QUEEN_MASK_CASTLING: u64,
+        pub king_mask_castling: u64,
+        pub queen_mask_castling: u64,
 
 
         pub castling_queen_side:bool,

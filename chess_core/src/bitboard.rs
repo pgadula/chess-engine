@@ -8,11 +8,10 @@ use crate::{
     moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves},
     types::{
         get_piece_from_char, BoardSide, Color, FileRank, MoveType, Piece, PieceIndex, PieceMove,
-        PieceType, BLACK_ROOK, PIECES_ARRAY, WHITE_KING, WHITE_ROOK,
+        PieceType, BLACK_ROOK, PIECES_ARRAY, WHITE_ROOK,
     },
-    utility::{clear_bit, get_file_ranks, get_lsb_index, print_as_board, set_bit},
+    utility::{clear_bit, get_file_ranks, set_bit},
 };
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -129,7 +128,7 @@ impl BitBoard {
                 self.halfmove_clock = 0;
             }
             MoveType::Quite => {
-                if(piece_move.piece.piece_type == PieceType::Pawn){
+                if piece_move.piece.piece_type == PieceType::Pawn{
                     self.halfmove_clock = 0;
                 }
                 self.move_piece(piece_move)},
@@ -168,7 +167,7 @@ impl BitBoard {
         if let Some(target_piece) = self.get_piece_at(&piece_move.target) {
             self.clear_piece(&target_piece, &piece_move.target)
         } else {
-            if (piece_move.piece.piece_type == PieceType::Pawn) {
+            if piece_move.piece.piece_type == PieceType::Pawn {
                 if let Some(en_passant_file_rank) = self.en_passant {
                     if en_passant_file_rank == piece_move.target {
                         let file_rank_mask = en_passant_file_rank.mask();
@@ -237,9 +236,7 @@ impl BitBoard {
             .iter()
             .map(|piece_move: &PieceMove| {
                 let mut game: BitBoard = self.clone();
-
                 game.apply(piece_move);
-
                 game.calculate_pseudolegal_moves();
                 let BoardSide {
                     king,
@@ -248,7 +245,6 @@ impl BitBoard {
                 } = game.get_player_info(&game.turn.opposite());
 
                 let check = game.detect_check(&king, &opposite_attacks);
-
                 (check, piece_move)
             })
             .filter(|attack| attack.0 == false)
@@ -342,7 +338,7 @@ impl BitBoard {
 
         for king_position in get_file_ranks(king) {
             let i = king_position.index();
-            let mut attacks = get_king_attacks(king_position) & rev_friendly_blockers;
+            let attacks = get_king_attacks(king_position) & rev_friendly_blockers;
             move_mask |= attacks;
             fill_moves(
                 king_position,
@@ -352,7 +348,6 @@ impl BitBoard {
                 opposite_blockers,
             );
 
-            // side.friendly_blockers
         }
 
         (move_mask, flat_moves)
@@ -365,8 +360,8 @@ impl BitBoard {
             castling_king_side,
             castling_queen_side,
             opposite_attacks,
-            KING_MASK_CASTLING,
-            QUEEN_MASK_CASTLING,
+            king_mask_castling,
+            queen_mask_castling,
             color,
             friendly_blockers,
             ..
@@ -403,9 +398,9 @@ impl BitBoard {
             [FileRank::A8, FileRank::H8]
         };
 
-        let king_side_free_from_attack = (opposite_attacks & KING_MASK_CASTLING) == 0;
+        let king_side_free_from_attack = (opposite_attacks & king_mask_castling) == 0;
         let blockers_without_king = friendly_blockers & (!king);
-        let has_space_king_side = (blockers_without_king & KING_MASK_CASTLING) == 0;
+        let has_space_king_side = (blockers_without_king & king_mask_castling) == 0;
 
         if *castling_king_side
             && king_side_free_from_attack
@@ -422,8 +417,8 @@ impl BitBoard {
             })
         }
 
-        let queen_side_free_from_attack = (opposite_attacks & QUEEN_MASK_CASTLING) == 0;
-        let has_space_queen_side = (blockers_without_king & QUEEN_MASK_CASTLING) == 0;
+        let queen_side_free_from_attack = (opposite_attacks & queen_mask_castling) == 0;
+        let has_space_queen_side = (blockers_without_king & queen_mask_castling) == 0;
 
         if *castling_queen_side
             && queen_side_free_from_attack
@@ -455,6 +450,7 @@ impl BitBoard {
         let mut bitboard = self.get_piece_bitboard(piece, file_rank);
         set_bit(&mut bitboard, &file_rank);
     }
+
     pub fn clear_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
         {
             let mut bitboard = self.get_piece_bitboard(piece, file_rank);
@@ -563,8 +559,8 @@ impl BitBoard {
 
                 castling_king_side: self.castling.w_king_side,
                 castling_queen_side: self.castling.w_queen_side,
-                KING_MASK_CASTLING: WHITE_KING_CASTLE_MASK,
-                QUEEN_MASK_CASTLING: WHITE_QUEEN_CASTLE_MASK,
+                king_mask_castling: WHITE_KING_CASTLE_MASK,
+                queen_mask_castling: WHITE_QUEEN_CASTLE_MASK,
 
                 color: Color::White,
             }
@@ -590,8 +586,8 @@ impl BitBoard {
 
                 castling_king_side: self.castling.b_king_side,
                 castling_queen_side: self.castling.b_queen_side,
-                KING_MASK_CASTLING: BLACK_KING_CASTLE_MASK,
-                QUEEN_MASK_CASTLING: BLACK_QUEEN_CASTLE_MASK,
+                king_mask_castling: BLACK_KING_CASTLE_MASK,
+                queen_mask_castling: BLACK_QUEEN_CASTLE_MASK,
 
                 color: Color::Black,
             }

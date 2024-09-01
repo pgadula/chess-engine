@@ -4,14 +4,13 @@ use std::collections::HashSet;
 use std::num::ParseIntError;
 use std::process::Command;
 use std::str::Utf8Error;
-use std::{collections::HashMap, usize};
+use std::collections::HashMap;
 
-use chess_core::utility::print_as_board;
 use chess_core::{
     bitboard::{BitBoard, FenParser},
-    types::{FileRank, PieceMove, BLACK_PAWN, WHITE_PAWN},
+    types::PieceMove,
 };
-use test_cases::{TestPosition, TEST_CASE, TEST_CASES};
+use test_cases::{TestPosition, TEST_CASES};
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
@@ -179,7 +178,7 @@ fn log_diff(fen: &str, valid_attacks: Vec<&PieceMove>) {
         .difference(&all_possibilities_set)
         .cloned()
         .collect();
-    if (difference_a.len() > 0 || difference_b.len() > 0) {
+    if difference_a.len() > 0 || difference_b.len() > 0 {
         println!("redundant: {:?}", difference_b);
         println!("missing: {:?}", difference_a);
         println!("{fen}");
