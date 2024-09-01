@@ -2,7 +2,7 @@ use std::iter::zip;
 
 use crate::{bitboard::BitBoard, file_rank::{
     self, FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_1, RANK_3, RANK_6, RANK_8
-}, types::{Color, FileRank, MoveType, Piece, PieceMove, PieceType, PROMOTION_PIECES}, utility::{get_file_ranks, pop_bit, pop_lsb, set_bit_by_index}};
+}, types::{Color, FileRank, MoveType, Piece, PieceMove, PieceType, PROMOTION_PIECES}, utility::{get_file_ranks, pop_bit, pop_lsb, print_as_board, set_bit_by_index}};
 
 
 pub fn get_pawn_moves(

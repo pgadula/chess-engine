@@ -63,7 +63,8 @@ impl BitBoard {
     }
 
     pub fn apply(&mut self, piece_move: &PieceMove) {
-        if self.turn == Color::White {
+        self.halfmove_clock += 1;
+        if self.turn == Color::Black {
             self.fullmove_number += 1;
         }
         if piece_move.from == piece_move.target{
@@ -75,17 +76,9 @@ impl BitBoard {
                 self.handle_capture(piece_move);
                 self.move_piece(piece_move);
             }
-            MoveType::CaptureWithPromotion(PieceType::Rook) => {
-                self.capture_with_promotion(piece_move, &PieceType::Rook);
-            }
-            MoveType::CaptureWithPromotion(PieceType::Bishop) => {
-                self.capture_with_promotion(piece_move, &PieceType::Bishop);
-            }
-            MoveType::CaptureWithPromotion(PieceType::Knight) => {
-                self.capture_with_promotion(piece_move, &PieceType::Knight);
-            }
-            MoveType::CaptureWithPromotion(PieceType::Queen) => {
-                self.capture_with_promotion(piece_move, &PieceType::Queen);
+            MoveType::Promotion(piece) => self.promotion(piece_move, &piece),
+            MoveType::CaptureWithPromotion(piece) => {
+                self.capture_with_promotion(piece_move, &piece);
             }
             MoveType::CastleKingSide => {
                 self.clear_piece(&piece_move.piece, &piece_move.from);
@@ -99,6 +92,7 @@ impl BitBoard {
                     self.set_piece(&BLACK_ROOK, &FileRank::F8);
                     self.castling.b_king_side = false;
                 }
+                self.halfmove_clock = 0;
             }
             MoveType::CastleQueenSide => {
                 self.clear_piece(&piece_move.piece, &piece_move.from);
@@ -112,15 +106,8 @@ impl BitBoard {
                     self.set_piece(&BLACK_ROOK, &FileRank::D8);
                     self.castling.b_queen_side = false;
                 }
+                self.halfmove_clock = 0;
             }
-            MoveType::Promotion(PieceType::Rook) => self.promotion(piece_move, &PieceType::Rook),
-            MoveType::Promotion(PieceType::Bishop) => {
-                self.promotion(piece_move, &PieceType::Bishop)
-            }
-            MoveType::Promotion(PieceType::Knight) => {
-                self.promotion(piece_move, &PieceType::Knight)
-            }
-            MoveType::Promotion(PieceType::Queen) => self.promotion(piece_move, &PieceType::Queen),
             MoveType::DoublePush => {
                 self.move_piece(piece_move);
                 let target_mask = piece_move.target.mask();
@@ -139,8 +126,13 @@ impl BitBoard {
                 };
                 self.en_passant = en_passant;
                 en_passant_is_updated = true;
+                self.halfmove_clock = 0;
             }
-            MoveType::Quite => self.move_piece(piece_move),
+            MoveType::Quite => {
+                if(piece_move.piece.piece_type == PieceType::Pawn){
+                    self.halfmove_clock = 0;
+                }
+                self.move_piece(piece_move)},
             _ => {
                 print!("Unrecognized move {:?}", piece_move)
             }
@@ -162,6 +154,7 @@ impl BitBoard {
     }
 
     fn promotion(&mut self, piece_move: &PieceMove, promotion: &PieceType) {
+        self.halfmove_clock = 0;
         let new_piece = &Piece {
             piece_type: *promotion,
             color: piece_move.piece.color.clone(),
@@ -171,6 +164,7 @@ impl BitBoard {
     }
 
     fn handle_capture(&mut self, piece_move: &PieceMove) {
+        self.halfmove_clock = 0;
         if let Some(target_piece) = self.get_piece_at(&piece_move.target) {
             self.clear_piece(&target_piece, &piece_move.target)
         } else {
@@ -214,6 +208,7 @@ impl BitBoard {
         self.flat_black_moves = b_flat_moves;
 
         let side = &self.get_player_info(&self.turn);
+
         if let Some(castlings) = self.get_castling_moves(side) {
             for ele in castlings {
                 if Color::White == self.turn {
@@ -284,7 +279,6 @@ impl BitBoard {
         let mut move_mask = 0u64;
 
         for rook_position in get_file_ranks(rooks) {
-            let i = rook_position.index();
             let mut rook_move: u64 =
                 lookup_table.get_rook_attack(rook_position, self) & rev_friendly_blockers;
             move_mask |= rook_move;
@@ -297,10 +291,10 @@ impl BitBoard {
             );
         }
         for bishop_position in get_file_ranks(bishops) {
-            let i = bishop_position.index();
             let bishop_moves: u64 =
                 lookup_table.get_bishop_attack(bishop_position, self) & rev_friendly_blockers;
             move_mask |= bishop_moves;
+
             fill_moves(
                 bishop_position,
                 Piece::from(&PieceType::Bishop, &color),
@@ -311,7 +305,6 @@ impl BitBoard {
         }
 
         for queen_position in get_file_ranks(queens) {
-            let i = queen_position.index();
             let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, &self);
             let rook_moves: u64 = lookup_table.get_rook_attack(queen_position, &self);
             let sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
@@ -326,7 +319,6 @@ impl BitBoard {
         }
 
         for knight_position in get_file_ranks(knights) {
-            let i = knight_position.index();
             let attacks = get_knight_attacks(knight_position) & rev_friendly_blockers;
             move_mask |= attacks;
             fill_moves(

@@ -124,6 +124,11 @@ pub const TEST_CASES: &[TestPosition] = &[
 ];
 
 
+pub const TEST_CASE:TestPosition = TestPosition{
+    depth: 1,
+    nodes: 43,
+    fen: "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQKR2 b KQ - 2 8"
+};
 
 
 
@@ -156,5 +161,5 @@ pub const TEST_POSITIONS2: &[TestPosition] = &[
    TestPosition { depth: 1, nodes: 8, fen: "rnbq1k1r/pp1P1ppp/2p5/8/1bB5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9" },
    TestPosition { depth: 1, nodes: 42, fen: "rnbq1k1r/pp1P1ppp/2p5/8/2B5/bP6/P1P1N1PP/RNBQK2R w KQ - 1 9" },
    TestPosition { depth: 1, nodes: 42, fen: "rnbq1k1r/pp1Pbppp/2p5/8/2B1n3/1P6/P1P1N1PP/RNBQK2R w KQ - 1 9" },
-   TestPosition { depth: 1, nodes: 5, fen: "rnbq1k1r/pp1Pbppp/2p5/8/2B5/1P1n4/P1P1N1PP/RNBQK2R w KQ - 1 9" },
+   TestPosition { depth: 1, nodes: 41, fen: "rnbq1k1r/pp1Pbppp/2p5/8/2B5/1P1n4/P1P1N1PP/RNBQK2R w KQ - 1 9" },
 ];

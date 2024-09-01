@@ -11,6 +11,20 @@
         Queen,
         King,
     }
+    impl PieceType {
+        pub fn get_symbol(&self)->char{
+            return match self {
+                PieceType::Pawn => 'p',
+                PieceType::Knight => 'n',
+                PieceType::Bishop => 'b',
+                PieceType::Rook => 'r',
+                PieceType::Queen => 'q',
+                PieceType::King => 'k',
+                _ => ' '
+            };
+        }
+    }
+
     pub const PROMOTION_PIECES:[PieceType; 4] = [PieceType::Bishop, PieceType::Queen, PieceType::Knight, PieceType::Rook];
 
     #[derive(Copy, Clone)]
@@ -303,6 +317,18 @@
         pub from: FileRank,
         pub target: FileRank,
         pub move_type: MoveType
+    }
+    impl PieceMove {
+        pub fn get_simple_notation(&self)->String{
+            match self.move_type {
+                MoveType::Promotion(promotion_piece) | MoveType::CaptureWithPromotion(promotion_piece) => {
+                    return format!("{}{}{}", self.from, self.target, promotion_piece.get_symbol());
+                }
+                _ => {
+                    return format!("{0}{1}", self.from, self.target);
+                }
+            }   
+        }
     }
 
     #[derive(Debug, Clone, Copy)]
