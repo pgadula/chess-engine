@@ -172,6 +172,28 @@ impl BitBoard {
     }
 
     fn move_piece(&mut self, piece_move: &PieceMove) {
+        match (piece_move.piece.color, piece_move.piece.piece_type) {
+            (Color::White, PieceType::King) => {
+                self.castling.w_king_side = false;
+                self.castling.w_queen_side = false;
+            }
+            (Color::Black, PieceType::King) => {
+                self.castling.b_king_side = false;
+                self.castling.b_queen_side = false;
+            }
+            (Color::White, PieceType::Rook) => match piece_move.from {
+                FileRank::A1 => {self.castling.w_queen_side = false;}
+                FileRank::H1 =>  {self.castling.w_king_side = false;}
+                _ => {}
+            },
+            (Color::Black, PieceType::Rook)=> match piece_move.from {
+                FileRank::A8 => {self.castling.b_queen_side = false;}
+                FileRank::H8 =>  {self.castling.b_king_side = false;}
+                _ => {}
+            },
+            _ => {}
+        }
+
         self.clear_piece(&piece_move.piece, &piece_move.from);
         self.set_piece(&piece_move.piece, &piece_move.target);
     }
@@ -194,6 +216,7 @@ impl BitBoard {
     fn handle_capture(&mut self, piece_move: &PieceMove) {
         self.reset_half_moves();
         if let Some(target_piece) = self.get_piece_at(&piece_move.target) {
+            self.clear_piece(&target_piece, &piece_move.target);
             if target_piece.piece_type == PieceType::Rook {
                 match (piece_move.target, piece_move.piece.color.opposite()) {
                     (FileRank::A1, Color::White) => {
@@ -211,8 +234,6 @@ impl BitBoard {
                     _ => {}
                 }
             }
-
-            self.clear_piece(&target_piece, &piece_move.target)
         } else {
             if piece_move.piece.piece_type == PieceType::Pawn {
                 if let Some(en_passant_file_rank) = self.en_passant {
@@ -750,7 +771,6 @@ impl FenParser for BitBoard {
             }
         }
 
-        // Determine castling rights
         if self.castling.w_king_side {
             castling_rights.push('K');
         }

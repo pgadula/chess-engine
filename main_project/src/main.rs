@@ -22,18 +22,11 @@ fn main() {
     // let mut game = BitBoard::new_game();
 
     for ele in TEST_CASES {
-            let mut calc = CalculationObject::new(&ele.fen, ele.depth as usize);
-            calc.debug_move_generator();
-
+        let mut calc = CalculationObject::new(&ele.fen, ele.depth as usize);
+        calc.debug_move_generator();
     }
 
-    // let test_case = TestPosition {
-    //     depth: 1,
-    //     fen: "3k3r/3p4/K7/2P5/8/8/8/8 b - - 2 2",
-    //     nodes: 53,
-    // };
-
-    // let mut calc = CalculationObject::new(&test_case.fen, 4);
+    // let mut calc = CalculationObject::new(&TEST_CASES[12].fen, TEST_CASES[12].depth as usize);
     // calc.debug_move_generator();
 }
 #[derive(Debug)]
@@ -142,7 +135,9 @@ fn apply_move(fen: &str, move_uci: &str) -> Option<String> {
 
     match result {
         Ok(output) => {
-            let result = String::from_utf8_lossy(&output.stdout).to_string().replace("\r\n", "");
+            let result = String::from_utf8_lossy(&output.stdout)
+                .to_string()
+                .replace("\r\n", "");
             return Some(result);
             // Parse the string to an unsigned integer
         }
@@ -198,6 +193,9 @@ impl CalculationObject {
         game.calculate_pseudolegal_moves();
         let valid_attacks = game.get_valid_moves();
         let mut nodes = 0;
+        let fen = BitBoard::serialize(&game);
+
+    //    log_diff(&fen, &valid_attacks);
 
         for valid_move in valid_attacks.iter() {
             // Apply the move and calculate the result
@@ -208,6 +206,10 @@ impl CalculationObject {
             let after = clone_game.serialize();
 
             let move_nodes = self.get_total_nodes(&mut clone_game.clone(), depth - 1);
+            nodes += move_nodes;
+
+
+
             // let calc_fen = apply_move(&before, &move_uci).unwrap();
 
             // if after != calc_fen {
@@ -226,14 +228,13 @@ impl CalculationObject {
             // )
             // }
 
-            nodes += move_nodes
         }
 
         nodes
     }
 }
 
-fn log_diff(fen: &str, valid_attacks: Vec<&PieceMove>) {
+fn log_diff(fen: &str, valid_attacks: &Vec<&PieceMove>) {
     let valid_attack_strings = valid_attacks
         .iter()
         .map(|f| f.uci())
