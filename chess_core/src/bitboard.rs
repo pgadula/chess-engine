@@ -84,12 +84,13 @@ impl BitBoard {
                     self.clear_piece(&WHITE_ROOK, &FileRank::H1);
                     self.set_piece(&WHITE_ROOK, &FileRank::F1);
                     self.castling.w_king_side = false;
+                    self.castling.w_queen_side = false;
                 } else {
                     self.clear_piece(&BLACK_ROOK, &FileRank::H8);
                     self.set_piece(&BLACK_ROOK, &FileRank::F8);
                     self.castling.b_king_side = false;
+                    self.castling.b_queen_side = false;
                 }
-                self.reset_half_moves();
             }
             MoveType::CastleQueenSide => {
                 self.clear_piece(&piece_move.piece, &piece_move.from);
@@ -97,13 +98,14 @@ impl BitBoard {
                 if piece_move.piece.color == Color::White {
                     self.clear_piece(&WHITE_ROOK, &FileRank::A1);
                     self.set_piece(&WHITE_ROOK, &FileRank::D1);
+                    self.castling.w_king_side = false;
                     self.castling.w_queen_side = false;
                 } else {
                     self.clear_piece(&BLACK_ROOK, &FileRank::A8);
                     self.set_piece(&BLACK_ROOK, &FileRank::D8);
+                    self.castling.b_king_side = false;
                     self.castling.b_queen_side = false;
                 }
-                self.reset_half_moves();
             }
             MoveType::DoublePush(en_passant_option) => {
                 // Debug print
@@ -118,42 +120,42 @@ impl BitBoard {
                 if piece_move.piece.piece_type == PieceType::Pawn {
                     self.reset_half_moves();
                 }
-                if piece_move.piece.piece_type == PieceType::King {
-                    if self.turn == Color::White && piece_move.from == FileRank::E1 {
-                        if self.castling.w_king_side || self.castling.w_queen_side {
-                            self.reset_half_moves();
-                        }
-                    }
-                    if self.turn == Color::Black && piece_move.from == FileRank::E8 {
-                        if self.castling.b_king_side || self.castling.b_queen_side {
-                            self.reset_half_moves();
-                        }
-                    }
-                }
+                // if piece_move.piece.piece_type == PieceType::King {
+                //     if self.turn == Color::White && piece_move.from == FileRank::E1 {
+                //         if self.castling.w_king_side || self.castling.w_queen_side {
+                //             self.reset_half_moves();
+                //         }
+                //     }
+                //     if self.turn == Color::Black && piece_move.from == FileRank::E8 {
+                //         if self.castling.b_king_side || self.castling.b_queen_side {
+                //             self.reset_half_moves();
+                //         }
+                //     }
+                // }
                 if piece_move.piece.piece_type == PieceType::Rook {
                     match piece_move.piece.color {
                         Color::White => {
                             if piece_move.from == FileRank::A1 && self.castling.w_queen_side == true
                             {
                                 self.castling.w_queen_side = false;
-                                self.reset_half_moves();
+                                // self.reset_half_moves();
                             }
-                            if piece_move.from == FileRank::H1 && self.castling.b_king_side == true
+                            if piece_move.from == FileRank::H1 && self.castling.w_king_side == true
                             {
                                 self.castling.w_king_side = false;
-                                self.reset_half_moves();
+                                // self.reset_half_moves();
                             }
                         }
                         Color::Black => {
                             if piece_move.from == FileRank::A8 && self.castling.b_queen_side == true
                             {
                                 self.castling.b_queen_side = false;
-                                self.reset_half_moves();
+                                // self.reset_half_moves();
                             }
                             if piece_move.from == FileRank::H8 && self.castling.b_king_side == true
                             {
                                 self.castling.b_king_side = false;
-                                self.reset_half_moves();
+                                // self.reset_half_moves();
                             }
                         }
                     }
@@ -182,13 +184,21 @@ impl BitBoard {
                 self.castling.b_queen_side = false;
             }
             (Color::White, PieceType::Rook) => match piece_move.from {
-                FileRank::A1 => {self.castling.w_queen_side = false;}
-                FileRank::H1 =>  {self.castling.w_king_side = false;}
+                FileRank::A1 => {
+                    self.castling.w_queen_side = false;
+                }
+                FileRank::H1 => {
+                    self.castling.w_king_side = false;
+                }
                 _ => {}
             },
-            (Color::Black, PieceType::Rook)=> match piece_move.from {
-                FileRank::A8 => {self.castling.b_queen_side = false;}
-                FileRank::H8 =>  {self.castling.b_king_side = false;}
+            (Color::Black, PieceType::Rook) => match piece_move.from {
+                FileRank::A8 => {
+                    self.castling.b_queen_side = false;
+                }
+                FileRank::H8 => {
+                    self.castling.b_king_side = false;
+                }
                 _ => {}
             },
             _ => {}

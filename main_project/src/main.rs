@@ -21,13 +21,13 @@ fn main() {
 
     // let mut game = BitBoard::new_game();
 
-    for ele in TEST_CASES {
-        let mut calc = CalculationObject::new(&ele.fen, ele.depth as usize);
-        calc.debug_move_generator();
-    }
+    // for ele in TEST_CASES {
+    //     let mut calc = CalculationObject::new(&ele.fen, ele.depth as usize);
+    //     calc.debug_move_generator();
+    // }
 
-    // let mut calc = CalculationObject::new(&TEST_CASES[12].fen, TEST_CASES[12].depth as usize);
-    // calc.debug_move_generator();
+    let mut calc = CalculationObject::new(&TEST_CASES[14].fen, TEST_CASES[14].depth as usize);
+    calc.debug_move_generator();
 }
 #[derive(Debug)]
 enum Error {
@@ -210,23 +210,23 @@ impl CalculationObject {
 
 
 
-            // let calc_fen = apply_move(&before, &move_uci).unwrap();
+            let calc_fen = apply_move(&before, &move_uci).unwrap();
 
-            // if after != calc_fen {
-            //     println!();
-            //     clone_game.print();
-            //     println!(
-            //         "
-            //         ####################
-            //         before: {before}
-            //         move: {move_uci} {:?}
-            //         expected: {calc_fen}
-            //         received: {after}
-            //         ####################
-            //     ",
-            //     valid_move.move_type
-            // )
-            // }
+            if after != calc_fen {
+                println!();
+                clone_game.print();
+                println!(
+                    "
+                    ####################
+                    before: {before}
+                    move: {move_uci} {:?}
+                    expected: {calc_fen}
+                    received: {after}
+                    ####################
+                ",
+                valid_move.move_type
+            )
+            }
 
         }
 
