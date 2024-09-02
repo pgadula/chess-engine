@@ -109,7 +109,7 @@ impl BitBoard {
                 // Debug print
                 self.move_piece(piece_move);
                 self.en_passant = en_passant_option;
-                if en_passant_option.is_some(){
+                if en_passant_option.is_some() {
                     en_passant_is_updated = true;
                 }
                 self.reset_half_moves();
@@ -120,14 +120,14 @@ impl BitBoard {
                 }
                 if piece_move.piece.piece_type == PieceType::King {
                     if self.turn == Color::White && piece_move.from == FileRank::E1 {
-                        self.castling.w_king_side = false;
-                        self.castling.w_queen_side = false;
-                        self.reset_half_moves();
+                        if self.castling.w_king_side || self.castling.w_queen_side {
+                            self.reset_half_moves();
+                        }
                     }
                     if self.turn == Color::Black && piece_move.from == FileRank::E8 {
-                        self.castling.b_king_side = false;
-                        self.castling.b_queen_side = false;
-                        self.reset_half_moves();
+                        if self.castling.b_king_side || self.castling.b_queen_side {
+                            self.reset_half_moves();
+                        }
                     }
                 }
                 if piece_move.piece.piece_type == PieceType::Rook {
@@ -194,6 +194,24 @@ impl BitBoard {
     fn handle_capture(&mut self, piece_move: &PieceMove) {
         self.reset_half_moves();
         if let Some(target_piece) = self.get_piece_at(&piece_move.target) {
+            if target_piece.piece_type == PieceType::Rook {
+                match (piece_move.target, piece_move.piece.color.opposite()) {
+                    (FileRank::A1, Color::White) => {
+                        self.castling.w_queen_side = false;
+                    }
+                    (FileRank::H1, Color::White) => {
+                        self.castling.w_king_side = false;
+                    }
+                    (FileRank::A8, Color::Black) => {
+                        self.castling.b_queen_side = false;
+                    }
+                    (FileRank::H8, Color::Black) => {
+                        self.castling.b_king_side = false;
+                    }
+                    _ => {}
+                }
+            }
+
             self.clear_piece(&target_piece, &piece_move.target)
         } else {
             if piece_move.piece.piece_type == PieceType::Pawn {
@@ -365,7 +383,7 @@ impl BitBoard {
             side.opposite_blockers,
             &self.en_passant,
             &mut move_mask,
-            &mut flat_moves
+            &mut flat_moves,
         );
 
         for king_position in get_file_ranks(king) {

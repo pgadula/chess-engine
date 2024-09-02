@@ -91,10 +91,10 @@ pub fn get_pawn_moves(
 
        for file_rank in get_file_ranks(double_push) {
             let en_passant_fr = if color == Color::White{
-                FileRank::get_file_rank(( file_rank.mask() >>  8) as u8).unwrap()
+                FileRank::get_from_mask(( file_rank.mask() <<  8)).unwrap()
             }
             else{
-                FileRank::get_file_rank(( file_rank.mask() << 8) as u8).unwrap()
+                FileRank::get_from_mask(( file_rank.mask() >> 8) ).unwrap()
             };
 
             flat_attacks.push(PieceMove{
