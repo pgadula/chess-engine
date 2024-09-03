@@ -1,4 +1,3 @@
-use crate::file_rank::{RANK_4, RANK_5};
 use crate::utility::print_as_board;
 use crate::{
     file_rank::{
@@ -444,8 +443,12 @@ impl BitBoard {
             queen_mask_castling,
             color,
             friendly_blockers,
+            opposite_blockers,
             ..
         } = side;
+
+        let blockers = opposite_blockers | friendly_blockers;
+
         let has_check = self.detect_check(&king, &opposite_attacks);
         if has_check || !(castling_king_side | castling_queen_side) {
             return None;
@@ -472,20 +475,19 @@ impl BitBoard {
         } else {
             [FileRank::C8, FileRank::G8]
         };
-        let rooks_start_field = if *color == Color::White {
+        let rooks_starting_field = if *color == Color::White {
             [FileRank::A1, FileRank::H1]
         } else {
             [FileRank::A8, FileRank::H8]
         };
-
+        let blockers_without_king = blockers & (!king);
         let king_side_free_from_attack = (opposite_attacks & king_mask_castling) == 0;
-        let blockers_without_king = friendly_blockers & (!king);
         let has_space_king_side = (blockers_without_king & king_mask_castling) == 0;
 
         if *castling_king_side
             && king_side_free_from_attack
             && has_space_king_side
-            && rooks_start_field[1].mask() & rooks > 0
+            && rooks_starting_field[1].mask() & rooks > 0
         {
             castlings.push({
                 PieceMove {
@@ -499,11 +501,10 @@ impl BitBoard {
 
         let queen_side_free_from_attack = (opposite_attacks & queen_mask_castling) == 0;
         let has_space_queen_side = (blockers_without_king & queen_mask_castling) == 0;
-
         if *castling_queen_side
             && queen_side_free_from_attack
             && has_space_queen_side
-            && (rooks_start_field[0].mask() & rooks) > 0
+            && (rooks_starting_field[0].mask() & rooks) > 0
         {
             castlings.push({
                 PieceMove {
@@ -642,7 +643,6 @@ impl BitBoard {
                 castling_queen_side: self.castling.w_queen_side,
                 king_mask_castling: WHITE_KING_CASTLE_MASK,
                 queen_mask_castling: WHITE_QUEEN_CASTLE_MASK,
-
                 color: Color::White,
             }
         } else {
@@ -667,9 +667,9 @@ impl BitBoard {
 
                 castling_king_side: self.castling.b_king_side,
                 castling_queen_side: self.castling.b_queen_side,
+
                 king_mask_castling: BLACK_KING_CASTLE_MASK,
                 queen_mask_castling: BLACK_QUEEN_CASTLE_MASK,
-
                 color: Color::Black,
             }
         }

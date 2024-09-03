@@ -7,6 +7,8 @@ use std::process::{Command, Stdio};
 use std::str::Utf8Error;
 use std::{collections::HashSet, io::Write};
 
+use chess_core::file_rank::{BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, WHITE_KING_CASTLE_MASK, WHITE_QUEEN_CASTLE_MASK};
+use chess_core::utility::print_as_board;
 use chess_core::{
     bitboard::{BitBoard, FenParser},
     types::PieceMove,
@@ -21,12 +23,13 @@ fn main() {
 
     // let mut game = BitBoard::new_game();
 
+
     // for ele in TEST_CASES {
     //     let mut calc = CalculationObject::new(&ele.fen, ele.depth as usize);
     //     calc.debug_move_generator();
     // }
 
-    let mut calc = CalculationObject::new(&TEST_CASES[14].fen, TEST_CASES[14].depth as usize);
+    let mut calc = CalculationObject::new("rB2kr2/Rb4bq/8/8/8/8/8/4K2R b Kq - 3 ", 1);
     calc.debug_move_generator();
 }
 #[derive(Debug)]
@@ -195,7 +198,7 @@ impl CalculationObject {
         let mut nodes = 0;
         let fen = BitBoard::serialize(&game);
 
-    //    log_diff(&fen, &valid_attacks);
+        log_diff(&fen, &valid_attacks);
 
         for valid_move in valid_attacks.iter() {
             // Apply the move and calculate the result
@@ -208,10 +211,7 @@ impl CalculationObject {
             let move_nodes = self.get_total_nodes(&mut clone_game.clone(), depth - 1);
             nodes += move_nodes;
 
-
-
             let calc_fen = apply_move(&before, &move_uci).unwrap();
-
             if after != calc_fen {
                 println!();
                 clone_game.print();
@@ -224,8 +224,9 @@ impl CalculationObject {
                     received: {after}
                     ####################
                 ",
-                valid_move.move_type
-            )
+                    valid_move.move_type
+                );
+                panic!("Invalid postion ")
             }
 
         }

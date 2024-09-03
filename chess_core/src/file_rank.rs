@@ -47,7 +47,7 @@
     pub const FILES_CHAR:[char; 8] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 
     pub const BLACK_KING_CASTLE_MASK: u64 = (1 << 4) | (1 << 5) | (1 << 6) ;
-    pub const BLACK_QUEEN_CASTLE_MASK: u64 = (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4);
+    pub const BLACK_QUEEN_CASTLE_MASK: u64 = (1 << 2) | (1 << 3) | (1 << 4);
 
     pub const WHITE_KING_CASTLE_MASK: u64 = (1 << 60) | (1 << 61) | (1 << 62);
-    pub const WHITE_QUEEN_CASTLE_MASK: u64 =  (1 << 57) | (1 << 58) | (1 << 59) | (1 << 60);
+    pub const WHITE_QUEEN_CASTLE_MASK: u64 = (1 << 58) | (1 << 59) | (1 << 60);
