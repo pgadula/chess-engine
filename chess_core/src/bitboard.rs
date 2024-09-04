@@ -498,9 +498,12 @@ impl BitBoard {
                 }
             })
         }
-
+        
+        let required_space_mask = if *color == Color::White  {
+            queen_mask_castling | (1u64 << 57)
+        } else {queen_mask_castling |  (1u64 << 1 )};
         let queen_side_free_from_attack = (opposite_attacks & queen_mask_castling) == 0;
-        let has_space_queen_side = (blockers_without_king & queen_mask_castling) == 0;
+        let has_space_queen_side = (blockers_without_king & required_space_mask) == 0;
         if *castling_queen_side
             && queen_side_free_from_attack
             && has_space_queen_side
