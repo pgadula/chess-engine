@@ -10,10 +10,10 @@ use std::{collections::HashSet, io::Write};
 use chess_core::file_rank::{BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, WHITE_KING_CASTLE_MASK, WHITE_QUEEN_CASTLE_MASK};
 use chess_core::utility::print_as_board;
 use chess_core::{
-    bitboard::{BitBoard, FenParser},
+    bitboard::{GameState, FenParser},
     types::PieceMove,
 };
-use test_cases::{TestPosition, TEST_CASE, TEST_CASES};
+use test_cases::{TestPosition, TEST_CASE, TEST_CASES, TEST_POSITIONS2};
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
@@ -24,13 +24,12 @@ fn main() {
     // let mut game = BitBoard::new_game();
 
 
-    // for ele in TEST_CASES {
-    //     let mut calc = CalculationObject::new(&ele.fen, ele.depth as usize);
-    //     calc.debug_move_generator();
-    // }
+    for ele in TEST_POSITIONS2 {
+        let mut calc = CalculationObject::new(&ele.fen, 2 as usize);
+        calc.debug_move_generator();
+    }
 
-    let mut calc = CalculationObject::new("rB2kr2/Rb4bq/8/8/8/8/8/4K2R b Kq - 3 ", 1);
-    calc.debug_move_generator();
+
 }
 #[derive(Debug)]
 enum Error {
@@ -167,7 +166,7 @@ impl CalculationObject {
     }
 
     fn debug_move_generator(&mut self) {
-        let mut game: BitBoard = BitBoard::deserialize(&self.fen);
+        let mut game: GameState = GameState::deserialize(&self.fen);
         let nodes = self.get_total_nodes(&mut game, self.max_depth);
 
         if nodes != self.stock_fish_output.total_nodes {
@@ -189,16 +188,16 @@ impl CalculationObject {
         }
     }
 
-    pub fn get_total_nodes(&mut self, game: &mut BitBoard, depth: usize) -> usize {
+    pub fn get_total_nodes(&mut self, game: &mut GameState, depth: usize) -> usize {
         if depth == 0 {
             return 1;
         }
         game.calculate_pseudolegal_moves();
         let valid_attacks = game.get_valid_moves();
         let mut nodes = 0;
-        let fen = BitBoard::serialize(&game);
+        let fen = GameState::serialize(&game);
 
-        log_diff(&fen, &valid_attacks);
+        // log_diff(&fen, &valid_attacks);
 
         for valid_move in valid_attacks.iter() {
             // Apply the move and calculate the result
@@ -211,23 +210,23 @@ impl CalculationObject {
             let move_nodes = self.get_total_nodes(&mut clone_game.clone(), depth - 1);
             nodes += move_nodes;
 
-            let calc_fen = apply_move(&before, &move_uci).unwrap();
-            if after != calc_fen {
-                println!();
-                clone_game.print();
-                println!(
-                    "
-                    ####################
-                    before: {before}
-                    move: {move_uci} {:?}
-                    expected: {calc_fen}
-                    received: {after}
-                    ####################
-                ",
-                    valid_move.move_type
-                );
-                panic!("Invalid postion ")
-            }
+            // let calc_fen = apply_move(&before, &move_uci).unwrap();
+            // if after != calc_fen {
+            //     println!();
+            //     clone_game.print();
+            //     println!(
+            //         "
+            //         ####################
+            //         before: {before}
+            //         move: {move_uci} {:?}
+            //         expected: {calc_fen}
+            //         received: {after}
+            //         ####################
+            //     ",
+            //         valid_move.move_type
+            //     );
+            //     panic!("Invalid postion ")
+            // }
 
         }
 

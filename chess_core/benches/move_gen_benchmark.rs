@@ -1,11 +1,11 @@
 
 
-use chess_core::bitboard::{BitBoard, FenParser};
+use chess_core::bitboard::{GameState, FenParser};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let fen = "1nbqkbnr/pppppppp/R7/8/4P3/2rR4/PPPP1PPP/RNBQKBNR w KQkq e3 0 1";
-    let mut game = BitBoard::deserialize(fen);
+    let mut game = GameState::deserialize(fen);
 
 
     c.bench_function("move generation", |b| b.iter(|| {

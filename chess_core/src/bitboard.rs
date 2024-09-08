@@ -15,7 +15,7 @@ use crate::{
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
-pub struct BitBoard {
+pub struct GameState {
     pub bitboard: [u64; 12],
 
     pub turn: Color,
@@ -40,11 +40,11 @@ pub struct Castling {
 }
 
 pub trait FenParser {
-    fn deserialize(fen: &str) -> BitBoard;
+    fn deserialize(fen: &str) -> GameState;
     fn serialize(&self) -> String;
 }
 
-impl BitBoard {
+impl GameState {
     pub fn id(&self) -> usize {
         let mut id = self
             .bitboard
@@ -57,7 +57,7 @@ impl BitBoard {
         }
         return id as usize;
     }
-    pub fn empty() -> BitBoard {
+    pub fn empty() -> GameState {
         Default::default()
     }
 
@@ -119,42 +119,26 @@ impl BitBoard {
                 if piece_move.piece.piece_type == PieceType::Pawn {
                     self.reset_half_moves();
                 }
-                // if piece_move.piece.piece_type == PieceType::King {
-                //     if self.turn == Color::White && piece_move.from == FileRank::E1 {
-                //         if self.castling.w_king_side || self.castling.w_queen_side {
-                //             self.reset_half_moves();
-                //         }
-                //     }
-                //     if self.turn == Color::Black && piece_move.from == FileRank::E8 {
-                //         if self.castling.b_king_side || self.castling.b_queen_side {
-                //             self.reset_half_moves();
-                //         }
-                //     }
-                // }
                 if piece_move.piece.piece_type == PieceType::Rook {
                     match piece_move.piece.color {
                         Color::White => {
                             if piece_move.from == FileRank::A1 && self.castling.w_queen_side == true
                             {
                                 self.castling.w_queen_side = false;
-                                // self.reset_half_moves();
                             }
                             if piece_move.from == FileRank::H1 && self.castling.w_king_side == true
                             {
                                 self.castling.w_king_side = false;
-                                // self.reset_half_moves();
                             }
                         }
                         Color::Black => {
                             if piece_move.from == FileRank::A8 && self.castling.b_queen_side == true
                             {
                                 self.castling.b_queen_side = false;
-                                // self.reset_half_moves();
                             }
                             if piece_move.from == FileRank::H8 && self.castling.b_king_side == true
                             {
                                 self.castling.b_king_side = false;
-                                // self.reset_half_moves();
                             }
                         }
                     }
@@ -315,7 +299,7 @@ impl BitBoard {
         let valid_attacks: Vec<&PieceMove> = moves
             .iter()
             .map(|piece_move: &PieceMove| {
-                let mut game: BitBoard = self.clone();
+                let mut game: GameState = self.clone();
                 game.apply(piece_move);
                 game.calculate_pseudolegal_moves();
                 let BoardSide {
@@ -526,8 +510,8 @@ impl BitBoard {
         return None;
     }
 
-    pub fn new_game() -> BitBoard {
-        BitBoard::deserialize("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    pub fn new_game() -> GameState {
+        GameState::deserialize("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
 
     pub fn set_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
@@ -609,12 +593,12 @@ impl BitBoard {
         println!("|1");
         println!(" +----------------+");
         println!("  a b c d e f g h");
-        println!("fen: {}", BitBoard::serialize(&self))
+        println!("fen: {}", GameState::serialize(&self))
     }
 
     pub fn get_piece_at(&self, file_rank: &FileRank) -> Option<Piece> {
         for piece in PIECES_ARRAY {
-            if BitBoard::has(self.bitboard[piece.bitboard_index()], file_rank) {
+            if GameState::has(self.bitboard[piece.bitboard_index()], file_rank) {
                 return Some(piece);
             }
         }
@@ -690,8 +674,8 @@ impl Castling {
     }
 }
 
-impl FenParser for BitBoard {
-    fn deserialize(fen: &str) -> BitBoard {
+impl FenParser for GameState {
+    fn deserialize(fen: &str) -> GameState {
         let mut parts = fen.split_whitespace();
         let piece_placement = parts.next().unwrap_or("");
         let active_color = parts.next().unwrap_or("");
@@ -700,7 +684,7 @@ impl FenParser for BitBoard {
         let halfmove_clock = parts.next().unwrap_or("");
         let fullmove_number = parts.next().unwrap_or("");
 
-        let mut game = BitBoard::empty();
+        let mut game = GameState::empty();
         let mut row: u8 = 0;
         let mut col: u8 = 0;
 
@@ -818,7 +802,7 @@ impl FenParser for BitBoard {
     }
 }
 
-impl Default for BitBoard {
+impl Default for GameState {
     fn default() -> Self {
         let move_lookup_table = Arc::new(MoveLookupTable::init());
         Self {

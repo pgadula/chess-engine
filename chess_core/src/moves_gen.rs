@@ -1,6 +1,6 @@
 use std::iter::zip;
 
-use crate::{bitboard::BitBoard, file_rank::{
+use crate::{bitboard::GameState, file_rank::{
     self, FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_1, RANK_3, RANK_6, RANK_8
 }, types::{Color, FileRank, MoveType, Piece, PieceMove, PieceType, PROMOTION_PIECES}, utility::{get_file_ranks, pop_bit, pop_lsb, print_as_board, set_bit_by_index}};
 
@@ -134,7 +134,7 @@ pub fn _gen_rook_move_fly(file_rank: FileRank, bit_board: u64) -> u64 {
     for f in (tf + 1)..8 {
         let shift = tr * 8 + f;
         let index: u64 = 1u64 << shift;
-        let is_occupied: bool = BitBoard::get_by_index(bit_board, shift as u8);
+        let is_occupied: bool = GameState::get_by_index(bit_board, shift as u8);
         attacks |= index;
         if is_occupied {
             break;
@@ -143,7 +143,7 @@ pub fn _gen_rook_move_fly(file_rank: FileRank, bit_board: u64) -> u64 {
     for f in (0..tf).rev() {
         let shift = tr * 8 + f;
         let index: u64 = 1u64 << shift;
-        let is_occupied = BitBoard::get_by_index(bit_board, shift as u8);
+        let is_occupied = GameState::get_by_index(bit_board, shift as u8);
         attacks |= index;
         if is_occupied {
             break;
@@ -152,7 +152,7 @@ pub fn _gen_rook_move_fly(file_rank: FileRank, bit_board: u64) -> u64 {
     for r in (tr + 1)..8 {
         let shift = r * 8 + tf;
         let index = 1u64 << shift;
-        let is_occupied: bool = BitBoard::get_by_index(bit_board, shift as u8);
+        let is_occupied: bool = GameState::get_by_index(bit_board, shift as u8);
         attacks |= index;
         if is_occupied {
             break;
@@ -161,7 +161,7 @@ pub fn _gen_rook_move_fly(file_rank: FileRank, bit_board: u64) -> u64 {
     for r in (0..(tr)).rev() {
         let shift = r * 8 + tf;
         let index = 1u64 << shift;
-        let is_occupied: bool = BitBoard::get_by_index(bit_board, shift as u8);
+        let is_occupied: bool = GameState::get_by_index(bit_board, shift as u8);
         attacks |= index;
         if is_occupied {
             break;
@@ -198,7 +198,7 @@ pub fn _gen_bishop_attacks_on_the_fly(file_rank: FileRank, bit_board: u64) -> u6
     for (r, f) in zip((tr + 1)..8, (tf + 1)..8) {
         let shift = r * 8 + f;
         attacks |= 1u64 << shift;
-        let oc = BitBoard::get_by_index(bit_board, shift);
+        let oc = GameState::get_by_index(bit_board, shift);
         if oc {
             break;
         }
@@ -206,7 +206,7 @@ pub fn _gen_bishop_attacks_on_the_fly(file_rank: FileRank, bit_board: u64) -> u6
     for (r, f) in zip((0..tr).rev(), (0..(tf)).rev()) {
         let shift = r * 8 + f;
         attacks |= 1u64 << shift;
-        let oc = BitBoard::get_by_index(bit_board, shift);
+        let oc = GameState::get_by_index(bit_board, shift);
         if oc {
             break;
         }
@@ -215,7 +215,7 @@ pub fn _gen_bishop_attacks_on_the_fly(file_rank: FileRank, bit_board: u64) -> u6
     for (r, f) in zip((0..tr).rev(), (tf + 1)..8) {
         let shift = r * 8 + f;
         attacks |= 1u64 << shift;
-        let oc = BitBoard::get_by_index(bit_board, shift);
+        let oc = GameState::get_by_index(bit_board, shift);
         if oc {
             break;
         }
@@ -224,7 +224,7 @@ pub fn _gen_bishop_attacks_on_the_fly(file_rank: FileRank, bit_board: u64) -> u6
     for (r, f) in zip((tr + 1)..8, (0..(tf)).rev()) {
         let shift = r * 8 + f;
         attacks |= 1u64 << shift;
-        let oc = BitBoard::get_by_index(bit_board, shift);
+        let oc = GameState::get_by_index(bit_board, shift);
         if oc {
             break;
         }

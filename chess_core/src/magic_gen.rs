@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::bitboard::BitBoard;
+use crate::bitboard::GameState;
 
 use super::{
     moves_gen::{_gen_bishop_attacks_on_the_fly, _gen_rook_move_fly},
@@ -67,7 +67,7 @@ impl MoveLookupTable {
         }
     }
 
-    pub fn get_rook_attack(&self, file_rank: FileRank, bit_board: &BitBoard) -> u64 {
+    pub fn get_rook_attack(&self, file_rank: FileRank, bit_board: &GameState) -> u64 {
         let fr_index = file_rank.index();
 
         let attack_mask = ROOK_ATTACK_MASK[fr_index];
@@ -79,7 +79,7 @@ impl MoveLookupTable {
         attacks
     }
 
-    pub fn get_bishop_attack(&self, file_rank: FileRank, bit_board: &BitBoard) -> u64 {
+    pub fn get_bishop_attack(&self, file_rank: FileRank, bit_board: &GameState) -> u64 {
         let fr_index = file_rank.index();
 
         let attack_mask = BISHOP_ATTACK_MASK[fr_index];
