@@ -24,8 +24,8 @@ fn main() {
     // let mut game = BitBoard::new_game();
 
 
-    for ele in TEST_POSITIONS2 {
-        let mut calc = CalculationObject::new(&ele.fen, 2 as usize);
+    for ele in TEST_CASES {
+        let mut calc = CalculationObject::new(&ele.fen, ele.depth as usize);
         calc.debug_move_generator();
     }
 
@@ -202,10 +202,8 @@ impl CalculationObject {
         for valid_move in valid_attacks.iter() {
             // Apply the move and calculate the result
             let mut clone_game = game.clone();
-            let move_uci = valid_move.uci();
             let before = clone_game.serialize();
             clone_game.apply(valid_move);
-            let after = clone_game.serialize();
 
             let move_nodes = self.get_total_nodes(&mut clone_game.clone(), depth - 1);
             nodes += move_nodes;

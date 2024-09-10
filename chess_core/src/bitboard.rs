@@ -23,8 +23,9 @@ pub struct GameState {
     pub halfmove_clock: u8,
     pub fullmove_number: u8,
     pub en_passant: Option<FileRank>,
-    pub move_lookup_table: Arc<MoveLookupTable>,
 
+    //move gen
+    pub move_lookup_table: Arc<MoveLookupTable>,
     pub flat_white_moves: Vec<PieceMove>,
     pub flat_black_moves: Vec<PieceMove>,
     pub w_moves_mask: u64,
@@ -63,51 +64,47 @@ impl GameState {
 
     pub fn apply(&mut self, piece_move: &PieceMove) {
         self.halfmove_clock += 1;
-        if self.turn == Color::Black {
-            self.fullmove_number += 1;
-        }
         let mut en_passant_is_updated = false;
+        self.increment_full_move();
+
         match piece_move.move_type {
             MoveType::Capture => {
                 self.handle_capture(piece_move);
                 self.move_piece(piece_move);
             }
-            MoveType::Promotion(piece) => self.promotion(piece_move, &piece),
-            MoveType::CaptureWithPromotion(piece) => {
-                self.capture_with_promotion(piece_move, &piece);
-            }
+            MoveType::Promotion(piece) => self.promote(piece_move, &piece),
+            MoveType::CaptureWithPromotion(piece) => self.capture_with_promotion(piece_move, &piece),
             MoveType::CastleKingSide => {
-                self.clear_piece(&piece_move.piece, &piece_move.from);
-                self.set_piece(&piece_move.piece, &piece_move.target);
-                if piece_move.piece.color == Color::White {
-                    self.clear_piece(&WHITE_ROOK, &FileRank::H1);
-                    self.set_piece(&WHITE_ROOK, &FileRank::F1);
-                    self.castling.w_king_side = false;
-                    self.castling.w_queen_side = false;
-                } else {
-                    self.clear_piece(&BLACK_ROOK, &FileRank::H8);
-                    self.set_piece(&BLACK_ROOK, &FileRank::F8);
-                    self.castling.b_king_side = false;
-                    self.castling.b_queen_side = false;
+                self.set_and_clear(&piece_move);
+                match piece_move.piece.color {
+                    Color::White => {
+                        self.clear_piece(&WHITE_ROOK, &FileRank::H1);
+                        self.set_piece(&WHITE_ROOK, &FileRank::F1);
+                        self.disable_white_castling_rights();
+                    }
+                    Color::Black => {
+                        self.clear_piece(&BLACK_ROOK, &FileRank::H8);
+                        self.set_piece(&BLACK_ROOK, &FileRank::F8);
+                        self.disable_black_castling_rights();
+                    }
                 }
             }
             MoveType::CastleQueenSide => {
-                self.clear_piece(&piece_move.piece, &piece_move.from);
-                self.set_piece(&piece_move.piece, &piece_move.target);
-                if piece_move.piece.color == Color::White {
-                    self.clear_piece(&WHITE_ROOK, &FileRank::A1);
-                    self.set_piece(&WHITE_ROOK, &FileRank::D1);
-                    self.castling.w_king_side = false;
-                    self.castling.w_queen_side = false;
-                } else {
-                    self.clear_piece(&BLACK_ROOK, &FileRank::A8);
-                    self.set_piece(&BLACK_ROOK, &FileRank::D8);
-                    self.castling.b_king_side = false;
-                    self.castling.b_queen_side = false;
+                self.set_and_clear(&piece_move);
+                match piece_move.piece.color {
+                    Color::White => {
+                        self.clear_piece(&WHITE_ROOK, &FileRank::A1);
+                        self.set_piece(&WHITE_ROOK, &FileRank::D1);
+                        self.disable_white_castling_rights();
+                    }
+                    Color::Black => {
+                        self.clear_piece(&BLACK_ROOK, &FileRank::A8);
+                        self.set_piece(&BLACK_ROOK, &FileRank::D8);
+                        self.disable_black_castling_rights();
+                    }
                 }
             }
             MoveType::DoublePush(en_passant_option) => {
-                // Debug print
                 self.move_piece(piece_move);
                 self.en_passant = en_passant_option;
                 if en_passant_option.is_some() {
@@ -119,52 +116,74 @@ impl GameState {
                 if piece_move.piece.piece_type == PieceType::Pawn {
                     self.reset_half_moves();
                 }
-                if piece_move.piece.piece_type == PieceType::Rook {
-                    match piece_move.piece.color {
-                        Color::White => {
-                            if piece_move.from == FileRank::A1 && self.castling.w_queen_side == true
-                            {
-                                self.castling.w_queen_side = false;
-                            }
-                            if piece_move.from == FileRank::H1 && self.castling.w_king_side == true
-                            {
-                                self.castling.w_king_side = false;
-                            }
-                        }
-                        Color::Black => {
-                            if piece_move.from == FileRank::A8 && self.castling.b_queen_side == true
-                            {
-                                self.castling.b_queen_side = false;
-                            }
-                            if piece_move.from == FileRank::H8 && self.castling.b_king_side == true
-                            {
-                                self.castling.b_king_side = false;
-                            }
-                        }
-                    }
-                }
-
+                self.check_rook_move(piece_move);
                 self.move_piece(piece_move)
             }
             _ => {
-                print!("Unrecognized move {:?}", piece_move)
+                eprint!("Unrecognized move {:?}", piece_move)
             }
         }
         if !en_passant_is_updated {
             self.en_passant = None;
         }
+
+        self.change_current_turn();
+    }
+
+    fn change_current_turn(&mut self) {
         self.turn = self.turn.opposite();
+    }
+    
+    fn check_rook_move(&mut self, piece_move: &PieceMove) {
+        if piece_move.piece.piece_type == PieceType::Rook {
+            match piece_move.piece.color {
+                Color::White => {
+                    if piece_move.from == FileRank::A1 && self.castling.w_queen_side == true
+                    {
+                        self.castling.w_queen_side = false;
+                    }
+                    if piece_move.from == FileRank::H1 && self.castling.w_king_side == true
+                    {
+                        self.castling.w_king_side = false;
+                    }
+                }
+                Color::Black => {
+                    if piece_move.from == FileRank::A8 && self.castling.b_queen_side == true
+                    {
+                        self.castling.b_queen_side = false;
+                    }
+                    if piece_move.from == FileRank::H8 && self.castling.b_king_side == true
+                    {
+                        self.castling.b_king_side = false;
+                    }
+                }
+            }
+        }
+    }
+    
+    fn disable_black_castling_rights(&mut self) {
+        self.castling.b_king_side = false;
+        self.castling.b_queen_side = false;
+    }
+
+    fn disable_white_castling_rights(&mut self) {
+        self.castling.w_king_side = false;
+        self.castling.w_queen_side = false;
+    }
+
+    fn increment_full_move(&mut self) {
+        if self.turn == Color::Black {
+            self.fullmove_number += 1;
+        }
     }
 
     fn move_piece(&mut self, piece_move: &PieceMove) {
         match (piece_move.piece.color, piece_move.piece.piece_type) {
             (Color::White, PieceType::King) => {
-                self.castling.w_king_side = false;
-                self.castling.w_queen_side = false;
+                self.disable_white_castling_rights()
             }
             (Color::Black, PieceType::King) => {
-                self.castling.b_king_side = false;
-                self.castling.b_queen_side = false;
+                self.disable_black_castling_rights()
             }
             (Color::White, PieceType::Rook) => match piece_move.from {
                 FileRank::A1 => {
@@ -187,16 +206,20 @@ impl GameState {
             _ => {}
         }
 
+        self.set_and_clear(piece_move);
+    }
+
+    fn set_and_clear(&mut self, piece_move: &PieceMove) {
         self.clear_piece(&piece_move.piece, &piece_move.from);
         self.set_piece(&piece_move.piece, &piece_move.target);
     }
 
     fn capture_with_promotion(&mut self, piece_move: &PieceMove, promotion: &PieceType) {
         self.handle_capture(piece_move);
-        self.promotion(piece_move, promotion);
+        self.promote(piece_move, promotion);
     }
 
-    fn promotion(&mut self, piece_move: &PieceMove, promotion: &PieceType) {
+    fn promote(&mut self, piece_move: &PieceMove, promotion: &PieceType) {
         self.reset_half_moves();
         let new_piece = &Piece {
             piece_type: *promotion,
@@ -208,25 +231,9 @@ impl GameState {
 
     fn handle_capture(&mut self, piece_move: &PieceMove) {
         self.reset_half_moves();
+
         if let Some(target_piece) = self.get_piece_at(&piece_move.target) {
             self.clear_piece(&target_piece, &piece_move.target);
-            if target_piece.piece_type == PieceType::Rook {
-                match (piece_move.target, piece_move.piece.color.opposite()) {
-                    (FileRank::A1, Color::White) => {
-                        self.castling.w_queen_side = false;
-                    }
-                    (FileRank::H1, Color::White) => {
-                        self.castling.w_king_side = false;
-                    }
-                    (FileRank::A8, Color::Black) => {
-                        self.castling.b_queen_side = false;
-                    }
-                    (FileRank::H8, Color::Black) => {
-                        self.castling.b_king_side = false;
-                    }
-                    _ => {}
-                }
-            }
         } else {
             if piece_move.piece.piece_type == PieceType::Pawn {
                 if let Some(en_passant_file_rank) = self.en_passant {
@@ -246,9 +253,6 @@ impl GameState {
                         )
                     }
                 }
-            } else {
-                println!("Cannot capture empty square {:?}", piece_move);
-                self.print();
             }
         }
     }
@@ -258,8 +262,8 @@ impl GameState {
 
     pub fn calculate_pseudolegal_moves(&mut self) {
         let db = &self.move_lookup_table;
-        let white = self.get_player_info(&Color::White);
-        let black = self.get_player_info(&Color::Black);
+        let white = self.get_board_side_info(&Color::White);
+        let black = self.get_board_side_info(&Color::Black);
 
         let (w_mask, w_flat_moves) = self.get_pseudolegal_moves(&white);
         let (b_mask, b_flat_moves) = self.get_pseudolegal_moves(&black);
@@ -270,7 +274,7 @@ impl GameState {
         self.flat_white_moves = w_flat_moves;
         self.flat_black_moves = b_flat_moves;
 
-        let side = &self.get_player_info(&self.turn);
+        let side = &self.get_board_side_info(&self.turn);
 
         if let Some(castlings) = self.get_castling_moves(side) {
             for ele in castlings {
@@ -289,6 +293,7 @@ impl GameState {
         let mask = king_mask & attacks_mask;
         mask > 0
     }
+
     pub fn get_valid_moves(&self) -> Vec<&PieceMove> {
         let moves = if self.turn == Color::White {
             &self.flat_white_moves
@@ -306,7 +311,7 @@ impl GameState {
                     king,
                     opposite_attacks,
                     ..
-                } = game.get_player_info(&game.turn.opposite());
+                } = game.get_board_side_info(&game.turn.opposite());
 
                 let check = game.detect_check(&king, &opposite_attacks);
                 (check, piece_move)
@@ -317,7 +322,7 @@ impl GameState {
         valid_attacks
     }
 
-    fn get_pseudolegal_moves(&self, side: &BoardSide) -> (u64, Vec<PieceMove>) {
+    pub fn get_pseudolegal_moves(&self, side: &BoardSide) -> (u64, Vec<PieceMove>) {
         //TODO it's really bad that has flat_moves before assigned, must be refactored
         let BoardSide {
             mut bishops,
@@ -482,10 +487,12 @@ impl GameState {
                 }
             })
         }
-        
-        let required_space_mask = if *color == Color::White  {
+
+        let required_space_mask = if *color == Color::White {
             queen_mask_castling | (1u64 << 57)
-        } else {queen_mask_castling |  (1u64 << 1 )};
+        } else {
+            queen_mask_castling | (1u64 << 1)
+        };
         let queen_side_free_from_attack = (opposite_attacks & queen_mask_castling) == 0;
         let has_space_queen_side = (blockers_without_king & required_space_mask) == 0;
         if *castling_queen_side
@@ -605,7 +612,7 @@ impl GameState {
         None
     }
 
-    pub fn get_player_info(&self, color: &Color) -> BoardSide {
+    pub fn get_board_side_info(&self, color: &Color) -> BoardSide {
         if *color == Color::White {
             BoardSide {
                 bishops: self.bitboard[PieceIndex::B.idx()],
@@ -673,6 +680,7 @@ impl Castling {
         }
     }
 }
+
 
 impl FenParser for GameState {
     fn deserialize(fen: &str) -> GameState {
