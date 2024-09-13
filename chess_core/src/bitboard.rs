@@ -1,4 +1,5 @@
-use crate::utility::print_as_board;
+use crate::types::{Castling, Clock};
+use crate::zobrist_hashing::ZobristHashing;
 use crate::{
     file_rank::{
         BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, RANK_3, WHITE_KING_CASTLE_MASK,
@@ -20,24 +21,18 @@ pub struct GameState {
 
     pub turn: Color,
     pub castling: Castling,
-    pub halfmove_clock: u8,
-    pub fullmove_number: u8,
+    pub halfmove_clock: Clock,
+    pub fullmove_number: Clock,
     pub en_passant: Option<FileRank>,
 
-    //move gen
+    //moves
     pub move_lookup_table: Arc<MoveLookupTable>,
     pub flat_white_moves: Vec<PieceMove>,
     pub flat_black_moves: Vec<PieceMove>,
     pub w_moves_mask: u64,
     pub b_moves_mask: u64,
-}
 
-#[derive(Debug, Clone, Copy)]
-pub struct Castling {
-    pub w_king_side: bool,
-    pub w_queen_side: bool,
-    pub b_king_side: bool,
-    pub b_queen_side: bool,
+    pub zobrssist_hashing: Arc<ZobristHashing>
 }
 
 pub trait FenParser {
@@ -73,19 +68,21 @@ impl GameState {
                 self.move_piece(piece_move);
             }
             MoveType::Promotion(piece) => self.promote(piece_move, &piece),
-            MoveType::CaptureWithPromotion(piece) => self.capture_with_promotion(piece_move, &piece),
+            MoveType::CaptureWithPromotion(piece) => {
+                self.capture_with_promotion(piece_move, &piece)
+            }
             MoveType::CastleKingSide => {
                 self.set_and_clear(&piece_move);
                 match piece_move.piece.color {
                     Color::White => {
                         self.clear_piece(&WHITE_ROOK, &FileRank::H1);
                         self.set_piece(&WHITE_ROOK, &FileRank::F1);
-                        self.disable_white_castling_rights();
+                        self.castling.disable_white_castling_rights();
                     }
                     Color::Black => {
                         self.clear_piece(&BLACK_ROOK, &FileRank::H8);
                         self.set_piece(&BLACK_ROOK, &FileRank::F8);
-                        self.disable_black_castling_rights();
+                        self.castling.disable_black_castling_rights();
                     }
                 }
             }
@@ -95,12 +92,12 @@ impl GameState {
                     Color::White => {
                         self.clear_piece(&WHITE_ROOK, &FileRank::A1);
                         self.set_piece(&WHITE_ROOK, &FileRank::D1);
-                        self.disable_white_castling_rights();
+                        self.castling.disable_white_castling_rights();
                     }
                     Color::Black => {
                         self.clear_piece(&BLACK_ROOK, &FileRank::A8);
                         self.set_piece(&BLACK_ROOK, &FileRank::D8);
-                        self.disable_black_castling_rights();
+                        self.castling.disable_black_castling_rights();
                     }
                 }
             }
@@ -110,11 +107,11 @@ impl GameState {
                 if en_passant_option.is_some() {
                     en_passant_is_updated = true;
                 }
-                self.reset_half_moves();
+                self.halfmove_clock.reset()
             }
             MoveType::Quite => {
                 if piece_move.piece.piece_type == PieceType::Pawn {
-                    self.reset_half_moves();
+                    self.halfmove_clock.reset()
                 }
                 self.check_rook_move(piece_move);
                 self.move_piece(piece_move)
@@ -131,60 +128,42 @@ impl GameState {
     }
 
     fn change_current_turn(&mut self) {
-        self.turn = self.turn.opposite();
+        self.turn = self.turn.flip();
     }
-    
+
     fn check_rook_move(&mut self, piece_move: &PieceMove) {
         if piece_move.piece.piece_type == PieceType::Rook {
             match piece_move.piece.color {
                 Color::White => {
-                    if piece_move.from == FileRank::A1 && self.castling.w_queen_side == true
-                    {
+                    if piece_move.from == FileRank::A1 && self.castling.w_queen_side == true {
                         self.castling.w_queen_side = false;
                     }
-                    if piece_move.from == FileRank::H1 && self.castling.w_king_side == true
-                    {
+                    if piece_move.from == FileRank::H1 && self.castling.w_king_side == true {
                         self.castling.w_king_side = false;
                     }
                 }
                 Color::Black => {
-                    if piece_move.from == FileRank::A8 && self.castling.b_queen_side == true
-                    {
+                    if piece_move.from == FileRank::A8 && self.castling.b_queen_side == true {
                         self.castling.b_queen_side = false;
                     }
-                    if piece_move.from == FileRank::H8 && self.castling.b_king_side == true
-                    {
+                    if piece_move.from == FileRank::H8 && self.castling.b_king_side == true {
                         self.castling.b_king_side = false;
                     }
                 }
             }
         }
     }
-    
-    fn disable_black_castling_rights(&mut self) {
-        self.castling.b_king_side = false;
-        self.castling.b_queen_side = false;
-    }
-
-    fn disable_white_castling_rights(&mut self) {
-        self.castling.w_king_side = false;
-        self.castling.w_queen_side = false;
-    }
 
     fn increment_full_move(&mut self) {
         if self.turn == Color::Black {
-            self.fullmove_number += 1;
+            self.fullmove_number.tick();
         }
     }
 
     fn move_piece(&mut self, piece_move: &PieceMove) {
         match (piece_move.piece.color, piece_move.piece.piece_type) {
-            (Color::White, PieceType::King) => {
-                self.disable_white_castling_rights()
-            }
-            (Color::Black, PieceType::King) => {
-                self.disable_black_castling_rights()
-            }
+            (Color::White, PieceType::King) => self.castling.disable_white_castling_rights(),
+            (Color::Black, PieceType::King) => self.castling.disable_black_castling_rights(),
             (Color::White, PieceType::Rook) => match piece_move.from {
                 FileRank::A1 => {
                     self.castling.w_queen_side = false;
@@ -220,7 +199,7 @@ impl GameState {
     }
 
     fn promote(&mut self, piece_move: &PieceMove, promotion: &PieceType) {
-        self.reset_half_moves();
+        self.halfmove_clock.reset();
         let new_piece = &Piece {
             piece_type: *promotion,
             color: piece_move.piece.color.clone(),
@@ -230,7 +209,7 @@ impl GameState {
     }
 
     fn handle_capture(&mut self, piece_move: &PieceMove) {
-        self.reset_half_moves();
+        self.halfmove_clock.reset();
 
         if let Some(target_piece) = self.get_piece_at(&piece_move.target) {
             self.clear_piece(&target_piece, &piece_move.target);
@@ -246,7 +225,7 @@ impl GameState {
                         };
                         self.clear_piece(
                             &Piece {
-                                color: self.turn.opposite(),
+                                color: self.turn.flip(),
                                 piece_type: PieceType::Pawn,
                             },
                             &target_file_rank,
@@ -255,9 +234,6 @@ impl GameState {
                 }
             }
         }
-    }
-    pub fn reset_half_moves(&mut self) {
-        self.halfmove_clock = 0;
     }
 
     pub fn calculate_pseudolegal_moves(&mut self) {
@@ -311,7 +287,7 @@ impl GameState {
                     king,
                     opposite_attacks,
                     ..
-                } = game.get_board_side_info(&game.turn.opposite());
+                } = game.get_board_side_info(&game.turn.flip());
 
                 let check = game.detect_check(&king, &opposite_attacks);
                 (check, piece_move)
@@ -323,7 +299,6 @@ impl GameState {
     }
 
     pub fn get_pseudolegal_moves(&self, side: &BoardSide) -> (u64, Vec<PieceMove>) {
-        //TODO it's really bad that has flat_moves before assigned, must be refactored
         let BoardSide {
             mut bishops,
             mut friendly_blockers,
@@ -540,6 +515,7 @@ impl GameState {
     pub fn get_all_pieces(&self) -> u64 {
         return (self.get_white_pieces()) | (self.get_black_pieces());
     }
+
     pub fn get_white_pieces(&self) -> u64 {
         let result = self.bitboard[0..6]
             .iter()
@@ -670,18 +646,6 @@ impl GameState {
     }
 }
 
-impl Castling {
-    pub fn new() -> Castling {
-        Castling {
-            b_king_side: false,
-            b_queen_side: false,
-            w_king_side: false,
-            w_queen_side: false,
-        }
-    }
-}
-
-
 impl FenParser for GameState {
     fn deserialize(fen: &str) -> GameState {
         let mut parts = fen.split_whitespace();
@@ -736,8 +700,8 @@ impl FenParser for GameState {
             }
         }
 
-        game.halfmove_clock = halfmove_clock.parse().unwrap_or(0);
-        game.fullmove_number = fullmove_number.parse().unwrap_or(1);
+        game.halfmove_clock = Clock::from_string(halfmove_clock);
+        game.fullmove_number = Clock::from_string(fullmove_number);
         game.castling = castling;
         game.en_passant = FileRank::from_string(en_passant);
 
@@ -813,6 +777,7 @@ impl FenParser for GameState {
 impl Default for GameState {
     fn default() -> Self {
         let move_lookup_table = Arc::new(MoveLookupTable::init());
+        let zobrist_hashing = ZobristHashing::new();
         Self {
             move_lookup_table,
             bitboard: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -824,12 +789,13 @@ impl Default for GameState {
                 w_queen_side: false,
             },
             en_passant: None,
-            halfmove_clock: 0u8,
-            fullmove_number: 0u8,
+            halfmove_clock: Clock::new(),
+            fullmove_number: Clock::new(),
             flat_black_moves: Vec::new(),
             flat_white_moves: Vec::new(),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
+            zobrssist_hashing: Arc::new(zobrist_hashing)
         }
     }
 }

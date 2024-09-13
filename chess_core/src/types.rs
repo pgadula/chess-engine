@@ -1,4 +1,4 @@
-    use std::{fmt::Display, slice::Iter};
+    use std::{fmt::Display, ops::AddAssign, slice::Iter};
 
     use self::FileRank::*;
 
@@ -55,11 +55,11 @@
         Black,
     }
     impl Color {
-        pub fn opposite(&self)->Color{
-            if (*self) == Color::White{
-                return Color::Black;
+        pub fn flip(&self)->Color{
+            match self {
+                Color::White => Color::Black,
+                Color::Black => Color::White,
             }
-            return Color::White;
         }
     }
 
@@ -341,3 +341,63 @@
         CastleKingSide,
         CastleQueenSide
     }
+
+    #[derive(Debug, Clone, Copy)]
+pub struct Castling {
+    pub w_king_side: bool,
+    pub w_queen_side: bool,
+    pub b_king_side: bool,
+    pub b_queen_side: bool,
+}
+
+ impl Castling {
+     pub fn new() -> Castling {
+         Castling {
+             b_king_side: false,
+             b_queen_side: false,
+             w_king_side: false,
+             w_queen_side: false,
+         }
+     }
+ 
+     pub fn disable_white_castling_rights(&mut self) {
+         self.w_king_side = false;
+         self.w_queen_side = false;
+     }
+ 
+     pub fn disable_black_castling_rights(&mut self) {
+         self.b_king_side = false;
+         self.b_queen_side = false;
+     }
+ }
+
+ #[derive(Clone, Debug)]
+ pub struct Clock(u8);
+ impl Clock {
+        pub fn new() -> Self {
+            Clock(0)
+        }
+        pub fn tick(&mut self){
+            self.0 = self.0 + 1;
+        }
+
+        pub fn from_string(value:&str)->Clock{
+            return Clock(value.parse().unwrap_or(0));
+        } 
+        
+        pub fn reset(&mut self){
+            self.0 = 0;
+        }
+    }
+
+impl Display for Clock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = self.0;
+        write!(f, "{value}")    }
+}
+
+impl AddAssign<u8> for Clock{
+    fn add_assign(&mut self, rhs: u8) {
+        self.0+= rhs;
+    }
+}

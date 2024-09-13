@@ -9,4 +9,3 @@ chess_core = { path = "../chess_core" }
 rayon = "1.5"
 
 rand = "0.8.5"
-

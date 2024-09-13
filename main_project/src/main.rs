@@ -192,11 +192,11 @@ impl CalculationObject {
         if depth == 0 {
             return 1;
         }
+
         game.calculate_pseudolegal_moves();
         let valid_attacks = game.get_valid_moves();
         let mut nodes = 0;
         let fen = GameState::serialize(&game);
-
         // log_diff(&fen, &valid_attacks);
 
         for valid_move in valid_attacks.iter() {

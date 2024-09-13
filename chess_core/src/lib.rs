@@ -7,3 +7,4 @@ pub mod moves_gen;
 pub mod types;
 pub mod utility;
 mod precalculated;
+pub mod zobrist_hashing;
