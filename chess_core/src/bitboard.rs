@@ -135,19 +135,19 @@ impl GameState {
         if piece_move.piece.piece_type == PieceType::Rook {
             match piece_move.piece.color {
                 Color::White => {
-                    if piece_move.from == FileRank::A1 && self.castling.w_queen_side == true {
-                        self.castling.w_queen_side = false;
+                    if piece_move.from == FileRank::A1 && self.castling.get_queen_side(&Color::White) == true {
+                        self.castling.disable_queen_side(&Color::White)
                     }
-                    if piece_move.from == FileRank::H1 && self.castling.w_king_side == true {
-                        self.castling.w_king_side = false;
+                    if piece_move.from == FileRank::H1 && self.castling.get_king_side(&Color::White) == true {
+                        self.castling.disable_king_side(&Color::White)
                     }
                 }
                 Color::Black => {
-                    if piece_move.from == FileRank::A8 && self.castling.b_queen_side == true {
-                        self.castling.b_queen_side = false;
+                    if piece_move.from == FileRank::A8 && self.castling.get_queen_side(&Color::Black) == true {
+                        self.castling.disable_queen_side(&Color::Black)
                     }
-                    if piece_move.from == FileRank::H8 && self.castling.b_king_side == true {
-                        self.castling.b_king_side = false;
+                    if piece_move.from == FileRank::H8 && self.castling.get_king_side(&Color::Black) == true {
+                        self.castling.disable_king_side(&Color::Black);
                     }
                 }
             }
@@ -166,19 +166,19 @@ impl GameState {
             (Color::Black, PieceType::King) => self.castling.disable_black_castling_rights(),
             (Color::White, PieceType::Rook) => match piece_move.from {
                 FileRank::A1 => {
-                    self.castling.w_queen_side = false;
+                    self.castling.disable_queen_side(&Color::White)
                 }
                 FileRank::H1 => {
-                    self.castling.w_king_side = false;
+                    self.castling.disable_king_side(&Color::White)
                 }
                 _ => {}
             },
             (Color::Black, PieceType::Rook) => match piece_move.from {
                 FileRank::A8 => {
-                    self.castling.b_queen_side = false;
+                    self.castling.disable_queen_side(&Color::Black)
                 }
                 FileRank::H8 => {
-                    self.castling.b_king_side = false;
+                    self.castling.disable_king_side(&Color::Black)
                 }
                 _ => {}
             },
@@ -609,8 +609,8 @@ impl GameState {
                 opposite_blockers: self.get_black_pieces(),
                 friendly_blockers: self.get_white_pieces(),
 
-                castling_king_side: self.castling.w_king_side,
-                castling_queen_side: self.castling.w_queen_side,
+                castling_king_side: self.castling.get_king_side(&Color::White),
+                castling_queen_side: self.castling.get_queen_side(&Color::White),
                 king_mask_castling: WHITE_KING_CASTLE_MASK,
                 queen_mask_castling: WHITE_QUEEN_CASTLE_MASK,
                 color: Color::White,
@@ -635,8 +635,8 @@ impl GameState {
                 opposite_blockers: self.get_white_pieces(),
                 friendly_blockers: self.get_black_pieces(),
 
-                castling_king_side: self.castling.b_king_side,
-                castling_queen_side: self.castling.b_queen_side,
+                castling_king_side: self.castling.get_king_side(&Color::Black),
+                castling_queen_side: self.castling.get_queen_side(&Color::Black),
 
                 king_mask_castling: BLACK_KING_CASTLE_MASK,
                 queen_mask_castling: BLACK_QUEEN_CASTLE_MASK,
@@ -692,10 +692,10 @@ impl FenParser for GameState {
         let mut castling = Castling::new();
         for char in castling_rights.chars() {
             match char {
-                'K' => castling.w_king_side = true,
-                'Q' => castling.w_queen_side = true,
-                'k' => castling.b_king_side = true,
-                'q' => castling.b_queen_side = true,
+                'K' => castling.mask |= WHITE_KING_CASTLE_MASK,
+                'Q' => castling.mask |= WHITE_QUEEN_CASTLE_MASK,
+                'k' => castling.mask |= BLACK_KING_CASTLE_MASK,
+                'q' => castling.mask |= BLACK_QUEEN_CASTLE_MASK,
                 _ => {}
             }
         }
@@ -740,16 +740,16 @@ impl FenParser for GameState {
             }
         }
 
-        if self.castling.w_king_side {
+        if self.castling.get_king_side(&Color::White) {
             castling_rights.push('K');
         }
-        if self.castling.w_queen_side {
+        if self.castling.get_queen_side(&Color::White) {
             castling_rights.push('Q');
         }
-        if self.castling.b_king_side {
+        if self.castling.get_king_side(&Color::Black) {
             castling_rights.push('k');
         }
-        if self.castling.b_queen_side {
+        if self.castling.get_queen_side(&Color::Black) {
             castling_rights.push('q');
         }
         if castling_rights.is_empty() {
@@ -782,12 +782,7 @@ impl Default for GameState {
             move_lookup_table,
             bitboard: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             turn: Color::White,
-            castling: Castling {
-                b_king_side: false,
-                b_queen_side: false,
-                w_king_side: false,
-                w_queen_side: false,
-            },
+            castling: Castling::new(),
             en_passant: None,
             halfmove_clock: Clock::new(),
             fullmove_number: Clock::new(),

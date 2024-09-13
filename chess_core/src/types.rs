@@ -342,33 +342,74 @@
         CastleQueenSide
     }
 
+const WHITE_CASTLING_RIGHTS_MASK: u64 = 0b1100;
+const BLACK_CASTLING_RIGHTS_MASK: u64 = 0b0011;
+
+const WHITE_CASTLING_KING_MASK: u64 = 0b1000;
+const WHITE_CASTLING_QUEEN_MASK: u64 = 0b0100;
+
+const BLACK_CASTLING_KING_MASK: u64 = 0b0010;
+const BLACK_CASTLING_QUEEN_MASK: u64 = 0b0001;
     #[derive(Debug, Clone, Copy)]
 pub struct Castling {
-    pub w_king_side: bool,
-    pub w_queen_side: bool,
-    pub b_king_side: bool,
-    pub b_queen_side: bool,
+    pub mask: u64
 }
 
  impl Castling {
      pub fn new() -> Castling {
          Castling {
-             b_king_side: false,
-             b_queen_side: false,
-             w_king_side: false,
-             w_queen_side: false,
-         }
+            mask: WHITE_CASTLING_RIGHTS_MASK | BLACK_CASTLING_RIGHTS_MASK, // Full rights by default
+        }
      }
  
      pub fn disable_white_castling_rights(&mut self) {
-         self.w_king_side = false;
-         self.w_queen_side = false;
+         self.mask &= !WHITE_CASTLING_RIGHTS_MASK;  
      }
  
      pub fn disable_black_castling_rights(&mut self) {
-         self.b_king_side = false;
-         self.b_queen_side = false;
+        self.mask &= !BLACK_CASTLING_RIGHTS_MASK;  
      }
+
+     pub fn disable_king_side(&mut self, color: &Color) {
+        match color {
+            Color::White => {
+                self.mask &= !WHITE_CASTLING_KING_MASK;
+            },
+            Color::Black => {
+                self.mask &= !BLACK_CASTLING_KING_MASK;
+            },
+        }
+    }
+    
+    pub fn disable_queen_side(&mut self, color: &Color) {
+        match color {
+            Color::White => {
+                self.mask &= !WHITE_CASTLING_QUEEN_MASK;
+            },
+            Color::Black => {
+                self.mask &= !BLACK_CASTLING_QUEEN_MASK;
+            },
+        }
+    }
+
+    pub fn get_king_side(&self, color: &Color) -> bool {
+        match color {
+            Color::White => self.mask & WHITE_CASTLING_KING_MASK != 0,
+            Color::Black => self.mask & BLACK_CASTLING_KING_MASK != 0,
+        }
+    }
+    
+    pub fn get_queen_side(&self, color: &Color) -> bool {
+        match color {
+            Color::White => self.mask & WHITE_CASTLING_QUEEN_MASK != 0,
+            Color::Black => self.mask & BLACK_CASTLING_QUEEN_MASK != 0,
+        }
+    }
+
+     pub fn is_empty(&self)->bool{
+        self.mask == 0
+     }
+
  }
 
  #[derive(Clone, Debug)]
