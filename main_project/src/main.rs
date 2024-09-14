@@ -13,7 +13,7 @@ use chess_core::{
     bitboard::{GameState, FenParser},
     types::PieceMove,
 };
-use test_cases::{TestPosition, TEST_CASE, TEST_CASES, TEST_POSITIONS2};
+use test_cases::TEST_CASES;
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
@@ -28,6 +28,8 @@ fn main() {
         let mut calc = CalculationObject::new(&ele.fen, ele.depth as usize);
         calc.debug_move_generator();
     }
+        // let mut calc = CalculationObject::new("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 3);
+        // calc.debug_move_generator();
 
 
 }
@@ -158,6 +160,7 @@ struct CalculationObject {
 impl CalculationObject {
     fn new(fen: &str, depth: usize) -> Self {
         let stock_fish_output = stock_fish_perft(fen, depth).unwrap();
+        println!("Stock fish output");
         CalculationObject {
             stock_fish_output,
             fen: fen.clone().to_owned(),
@@ -167,9 +170,9 @@ impl CalculationObject {
 
     fn debug_move_generator(&mut self) {
         let mut game: GameState = GameState::deserialize(&self.fen);
-        let nodes = self.get_total_nodes(&mut game, self.max_depth);
+        let (nodes, moves) = game.perft(self.max_depth);
 
-        if nodes != self.stock_fish_output.total_nodes {
+        if (nodes as usize) != self.stock_fish_output.total_nodes {
             println!(
                 "{}ERROR {}fen:{} depth:{}{}",
                 RED, RESET, self.fen, self.max_depth, RESET
@@ -203,7 +206,7 @@ impl CalculationObject {
             // Apply the move and calculate the result
             let mut clone_game = game.clone();
             let before = clone_game.serialize();
-            clone_game.apply(valid_move);
+            clone_game.apply_move(valid_move);
 
             let move_nodes = self.get_total_nodes(&mut clone_game.clone(), depth - 1);
             nodes += move_nodes;

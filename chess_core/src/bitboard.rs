@@ -19,7 +19,7 @@ use std::sync::Arc;
 pub struct GameState {
     pub bitboard: [u64; 12],
 
-    pub turn: Color,
+    pub move_turn: Color,
     pub castling: Castling,
     pub halfmove_clock: Clock,
     pub fullmove_number: Clock,
@@ -32,7 +32,7 @@ pub struct GameState {
     pub w_moves_mask: u64,
     pub b_moves_mask: u64,
 
-    pub zobrssist_hashing: Arc<ZobristHashing>
+    pub zobrist_hashing: Arc<ZobristHashing>,
 }
 
 pub trait FenParser {
@@ -57,7 +57,7 @@ impl GameState {
         Default::default()
     }
 
-    pub fn apply(&mut self, piece_move: &PieceMove) {
+    pub fn apply_move(&mut self, piece_move: &PieceMove) {
         self.halfmove_clock += 1;
         let mut en_passant_is_updated = false;
         self.increment_full_move();
@@ -116,9 +116,6 @@ impl GameState {
                 self.check_rook_move(piece_move);
                 self.move_piece(piece_move)
             }
-            _ => {
-                eprint!("Unrecognized move {:?}", piece_move)
-            }
         }
         if !en_passant_is_updated {
             self.en_passant = None;
@@ -128,25 +125,33 @@ impl GameState {
     }
 
     fn change_current_turn(&mut self) {
-        self.turn = self.turn.flip();
+        self.move_turn = self.move_turn.flip();
     }
 
     fn check_rook_move(&mut self, piece_move: &PieceMove) {
         if piece_move.piece.piece_type == PieceType::Rook {
             match piece_move.piece.color {
                 Color::White => {
-                    if piece_move.from == FileRank::A1 && self.castling.get_queen_side(&Color::White) == true {
+                    if piece_move.from == FileRank::A1
+                        && self.castling.get_queen_side(&Color::White) == true
+                    {
                         self.castling.disable_queen_side(&Color::White)
                     }
-                    if piece_move.from == FileRank::H1 && self.castling.get_king_side(&Color::White) == true {
+                    if piece_move.from == FileRank::H1
+                        && self.castling.get_king_side(&Color::White) == true
+                    {
                         self.castling.disable_king_side(&Color::White)
                     }
                 }
                 Color::Black => {
-                    if piece_move.from == FileRank::A8 && self.castling.get_queen_side(&Color::Black) == true {
+                    if piece_move.from == FileRank::A8
+                        && self.castling.get_queen_side(&Color::Black) == true
+                    {
                         self.castling.disable_queen_side(&Color::Black)
                     }
-                    if piece_move.from == FileRank::H8 && self.castling.get_king_side(&Color::Black) == true {
+                    if piece_move.from == FileRank::H8
+                        && self.castling.get_king_side(&Color::Black) == true
+                    {
                         self.castling.disable_king_side(&Color::Black);
                     }
                 }
@@ -155,7 +160,7 @@ impl GameState {
     }
 
     fn increment_full_move(&mut self) {
-        if self.turn == Color::Black {
+        if self.move_turn == Color::Black {
             self.fullmove_number.tick();
         }
     }
@@ -165,21 +170,13 @@ impl GameState {
             (Color::White, PieceType::King) => self.castling.disable_white_castling_rights(),
             (Color::Black, PieceType::King) => self.castling.disable_black_castling_rights(),
             (Color::White, PieceType::Rook) => match piece_move.from {
-                FileRank::A1 => {
-                    self.castling.disable_queen_side(&Color::White)
-                }
-                FileRank::H1 => {
-                    self.castling.disable_king_side(&Color::White)
-                }
+                FileRank::A1 => self.castling.disable_queen_side(&Color::White),
+                FileRank::H1 => self.castling.disable_king_side(&Color::White),
                 _ => {}
             },
             (Color::Black, PieceType::Rook) => match piece_move.from {
-                FileRank::A8 => {
-                    self.castling.disable_queen_side(&Color::Black)
-                }
-                FileRank::H8 => {
-                    self.castling.disable_king_side(&Color::Black)
-                }
+                FileRank::A8 => self.castling.disable_queen_side(&Color::Black),
+                FileRank::H8 => self.castling.disable_king_side(&Color::Black),
                 _ => {}
             },
             _ => {}
@@ -225,7 +222,7 @@ impl GameState {
                         };
                         self.clear_piece(
                             &Piece {
-                                color: self.turn.flip(),
+                                color: self.move_turn.flip(),
                                 piece_type: PieceType::Pawn,
                             },
                             &target_file_rank,
@@ -237,7 +234,6 @@ impl GameState {
     }
 
     pub fn calculate_pseudolegal_moves(&mut self) {
-        let db = &self.move_lookup_table;
         let white = self.get_board_side_info(&Color::White);
         let black = self.get_board_side_info(&Color::Black);
 
@@ -250,11 +246,11 @@ impl GameState {
         self.flat_white_moves = w_flat_moves;
         self.flat_black_moves = b_flat_moves;
 
-        let side = &self.get_board_side_info(&self.turn);
+        let side = &self.get_board_side_info(&self.move_turn);
 
         if let Some(castlings) = self.get_castling_moves(side) {
             for ele in castlings {
-                if Color::White == self.turn {
+                if Color::White == self.move_turn {
                     self.flat_white_moves.push(ele);
                     self.w_moves_mask |= ele.target.mask();
                 } else {
@@ -271,7 +267,7 @@ impl GameState {
     }
 
     pub fn get_valid_moves(&self) -> Vec<&PieceMove> {
-        let moves = if self.turn == Color::White {
+        let moves = if self.move_turn == Color::White {
             &self.flat_white_moves
         } else {
             &self.flat_black_moves
@@ -281,13 +277,13 @@ impl GameState {
             .iter()
             .map(|piece_move: &PieceMove| {
                 let mut game: GameState = self.clone();
-                game.apply(piece_move);
+                game.apply_move(piece_move);
                 game.calculate_pseudolegal_moves();
                 let BoardSide {
                     king,
                     opposite_attacks,
                     ..
-                } = game.get_board_side_info(&game.turn.flip());
+                } = game.get_board_side_info(&game.move_turn.flip());
 
                 let check = game.detect_check(&king, &opposite_attacks);
                 (check, piece_move)
@@ -296,6 +292,45 @@ impl GameState {
             .map(|tuple| tuple.1)
             .collect();
         valid_attacks
+    }
+
+    pub fn perft(self, depth: usize) -> (usize, Vec<(String, usize)>) {
+        let mut game = self.clone();
+        let mut total_nodes = 0;
+    
+        game.calculate_pseudolegal_moves();
+    
+        let valid_attacks = game.get_valid_moves();
+        let mut result: Vec<(String, usize)> = Vec::with_capacity(valid_attacks.len());
+    
+        for piece_move in &valid_attacks {
+            let mut clone_game = game.clone();            
+            clone_game.apply_move(&piece_move);            
+            let inner_nodes = clone_game.inner_perft(depth - 1);
+            result.push((piece_move.uci(), inner_nodes));
+            total_nodes += inner_nodes;
+        }
+    
+        (total_nodes, result)
+    }
+    
+    fn inner_perft(&mut self, depth: usize) -> usize {
+        if depth == 0 {
+            return 1;
+        }
+    
+        let mut result = 0;
+        self.calculate_pseudolegal_moves();
+        let valid_attacks = self.get_valid_moves();
+    
+        for piece_move in &valid_attacks {
+            let mut clone_game = self.clone();
+
+            clone_game.apply_move(&piece_move);
+            result += clone_game.inner_perft(depth - 1);
+        }
+    
+        result
     }
 
     pub fn get_pseudolegal_moves(&self, side: &BoardSide) -> (u64, Vec<PieceMove>) {
@@ -683,10 +718,10 @@ impl FenParser for GameState {
             }
         }
 
-        game.turn = match active_color {
+        game.move_turn = match active_color {
             "w" => Color::White,
             "b" => Color::Black,
-            _ => game.turn, // default value
+            _ => game.move_turn, // default value
         };
 
         let mut castling = Castling::new();
@@ -711,7 +746,11 @@ impl FenParser for GameState {
     fn serialize(&self) -> String {
         let mut piece_placement = String::new();
         let mut row_pieces = vec![0u8; 8];
-        let mut active_color = if self.turn == Color::White { "w" } else { "b" };
+        let mut active_color = if self.move_turn == Color::White {
+            "w"
+        } else {
+            "b"
+        };
         let mut castling_rights = String::new();
         let mut en_passant = String::from("-");
         let halfmove_clock = self.halfmove_clock.to_string();
@@ -777,11 +816,11 @@ impl FenParser for GameState {
 impl Default for GameState {
     fn default() -> Self {
         let move_lookup_table = Arc::new(MoveLookupTable::init());
-        let zobrist_hashing = ZobristHashing::new();
+        let zobrist_hashing = ZobristHashing::init();
         Self {
             move_lookup_table,
             bitboard: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            turn: Color::White,
+            move_turn: Color::White,
             castling: Castling::new(),
             en_passant: None,
             halfmove_clock: Clock::new(),
@@ -790,7 +829,7 @@ impl Default for GameState {
             flat_white_moves: Vec::new(),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
-            zobrssist_hashing: Arc::new(zobrist_hashing)
+            zobrist_hashing: Arc::new(zobrist_hashing),
         }
     }
 }
