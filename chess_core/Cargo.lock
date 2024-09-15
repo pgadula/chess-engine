@@ -65,6 +65,7 @@ dependencies = [
  "criterion",
  "rand",
  "rand_pcg",
+ "rayon",
 ]
 
 [[package]]

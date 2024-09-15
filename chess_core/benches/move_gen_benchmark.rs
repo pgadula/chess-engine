@@ -5,7 +5,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 
 pub fn perft_benchmark(c: &mut Criterion) {
     let game = GameState::new_game();
-    let depth = 3;
+    let depth = 4;
 
     // Create a custom configuration with 10 samples
     let mut criterion = Criterion::default().sample_size(10);

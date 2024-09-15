@@ -13,6 +13,7 @@ use crate::{
     },
     utility::{clear_bit, get_file_ranks, set_bit},
 };
+use rayon::prelude::*;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -296,40 +297,44 @@ impl GameState {
 
     pub fn perft(self, depth: usize) -> (usize, Vec<(String, usize)>) {
         let mut game = self.clone();
-        let mut total_nodes = 0;
-    
+
         game.calculate_pseudolegal_moves();
-    
+
         let valid_attacks = game.get_valid_moves();
-        let mut result: Vec<(String, usize)> = Vec::with_capacity(valid_attacks.len());
-    
-        for piece_move in &valid_attacks {
-            let mut clone_game = game.clone();            
-            clone_game.apply_move(&piece_move);            
-            let inner_nodes = clone_game.inner_perft(depth - 1);
-            result.push((piece_move.uci(), inner_nodes));
-            total_nodes += inner_nodes;
-        }
-    
-        (total_nodes, result)
+
+        let results: &Vec<(String, usize)> = &valid_attacks
+            .par_iter()
+            .map(|piece_move| {
+                let mut clone_game = game.clone();
+                clone_game.apply_move(&piece_move);
+                let inner_nodes = clone_game.inner_perft(depth - 1);
+                return (piece_move.uci(), inner_nodes); // Return the result as a tuple
+            })
+            .collect();
+        let total_nodes = &results
+            .into_iter()
+            .map(|el| el.1)
+            .reduce(|acc, el| acc + el)
+            .unwrap_or(0);
+        return (*total_nodes, results.to_vec());
     }
-    
+
     fn inner_perft(&mut self, depth: usize) -> usize {
         if depth == 0 {
             return 1;
         }
-    
+
         let mut result = 0;
         self.calculate_pseudolegal_moves();
         let valid_attacks = self.get_valid_moves();
-    
+
         for piece_move in &valid_attacks {
             let mut clone_game = self.clone();
 
             clone_game.apply_move(&piece_move);
             result += clone_game.inner_perft(depth - 1);
         }
-    
+
         result
     }
 
