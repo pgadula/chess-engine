@@ -70,6 +70,7 @@
         pub piece_type: PieceType,
         pub color: Color
     }
+
     impl Piece {
         pub fn from(piece_type: &PieceType, color: &Color) -> Self {
             Piece { 
@@ -130,7 +131,6 @@
     pub const BLACK_QUEEN: Piece = Piece { piece_type: PieceType::Queen, color: Color::Black };
     pub const BLACK_KING: Piece = Piece { piece_type: PieceType::King, color: Color::Black };
 
-    // Create an array of all pieces
     pub(crate) const PIECES_ARRAY: [Piece; 12] = [
         WHITE_PAWN,    // 'P'
         WHITE_BISHOP,  // 'B'
@@ -233,7 +233,6 @@
     ];
 
     impl FileRank {
-        /// get iterator with order starting from A8 to H1
          pub fn iter() -> Iter<'static, FileRank> {
             FILE_RANK.iter()
          }
@@ -406,10 +405,6 @@ pub struct Castling {
         }
     }
 
-     pub fn is_empty(&self)->bool{
-        self.mask == 0
-     }
-
  }
 
  #[derive(Clone, Debug)]
@@ -419,7 +414,7 @@ pub struct Castling {
             Clock(0)
         }
         pub fn tick(&mut self){
-            self.0 = self.0 + 1;
+            self.0 +=  1;
         }
 
         pub fn from_string(value:&str)->Clock{

@@ -26,7 +26,6 @@ pub struct GameState {
     pub fullmove_number: Clock,
     pub en_passant: Option<FileRank>,
 
-    //moves
     pub move_lookup_table: Arc<MoveLookupTable>,
     pub flat_white_moves: Vec<PieceMove>,
     pub flat_black_moves: Vec<PieceMove>,
@@ -830,8 +829,8 @@ impl Default for GameState {
             en_passant: None,
             halfmove_clock: Clock::new(),
             fullmove_number: Clock::new(),
-            flat_black_moves: Vec::new(),
-            flat_white_moves: Vec::new(),
+            flat_black_moves: Vec::with_capacity(50),
+            flat_white_moves: Vec::with_capacity(50),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
             zobrist_hashing: Arc::new(zobrist_hashing),

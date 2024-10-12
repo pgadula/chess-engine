@@ -8,6 +8,7 @@ use std::str::Utf8Error;
 use std::{collections::HashSet, io::Write};
 
 use chess_core::file_rank::{BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, WHITE_KING_CASTLE_MASK, WHITE_QUEEN_CASTLE_MASK};
+use chess_core::types::FileRank;
 use chess_core::utility::print_as_board;
 use chess_core::{
     bitboard::{GameState, FenParser},
@@ -19,19 +20,8 @@ const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
 
 fn main() {
-    // let fen = "rnb1kbnr/pp1pq1pp/4p3/5p2/2PpP1P1/2NQB3/PP3P1P/R3KBNR w KQkq - 1 8";
-
-    // let mut game = BitBoard::new_game();
-
-
-    for ele in TEST_CASES {
-        let mut calc = CalculationObject::new(&ele.fen, ele.depth as usize);
-        calc.debug_move_generator();
-    }
-        // let mut calc = CalculationObject::new("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 3);
-        // calc.debug_move_generator();
-
-
+    
+    println!("{}", FileRank::H6.index());
 }
 #[derive(Debug)]
 enum Error {

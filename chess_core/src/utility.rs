@@ -1,7 +1,6 @@
 use crate::types::FileRank;
 
 pub fn print_as_board(number: u64) {
-    // Convert the number to a 64-bit binary string, padded with zeros if necessary
     let binary_string = format!("{:064b}", number);
     println!("   a b c d e f g h");
     for row in (0..8).rev() {
