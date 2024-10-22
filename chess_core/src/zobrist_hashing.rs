@@ -38,7 +38,7 @@ impl ZobristHashing {
                 hash ^= self.pieces[hash_index];
             }
         }
-        hash ^= self.castling_rights[game.castling.mask as usize];
+        hash ^= self.castling_rights[game.castling.mask as usize % 16];
         if let Some(file_rank) = game.en_passant {
             hash ^= self.en_passant[file_rank.index()];
         }

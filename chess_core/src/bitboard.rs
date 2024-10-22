@@ -32,7 +32,9 @@ pub struct GameState {
     pub w_moves_mask: u64,
     pub b_moves_mask: u64,
 
+    pub game_history_state: Vec<u64>,
     pub zobrist_hashing: Arc<ZobristHashing>,
+    pub hash:u64
 }
 
 pub trait FenParser {
@@ -58,7 +60,7 @@ impl GameState {
     }
 
     pub fn apply_move(&mut self, piece_move: &PieceMove) {
-        self.halfmove_clock += 1;
+        self.halfmove_clock.tick();
         let mut en_passant_is_updated = false;
         self.increment_full_move();
 
@@ -110,53 +112,15 @@ impl GameState {
                 self.halfmove_clock.reset()
             }
             MoveType::Quite => {
-                if piece_move.piece.piece_type == PieceType::Pawn {
-                    self.halfmove_clock.reset()
-                }
-                self.check_rook_move(piece_move);
                 self.move_piece(piece_move)
             }
         }
         if !en_passant_is_updated {
             self.en_passant = None;
         }
+        self.hash = self.zobrist_hashing.get_hash(&self);
 
-        self.change_current_turn();
-    }
-
-    fn change_current_turn(&mut self) {
         self.move_turn = self.move_turn.flip();
-    }
-
-    fn check_rook_move(&mut self, piece_move: &PieceMove) {
-        if piece_move.piece.piece_type == PieceType::Rook {
-            match piece_move.piece.color {
-                Color::White => {
-                    if piece_move.from == FileRank::A1
-                        && self.castling.get_queen_side(&Color::White) == true
-                    {
-                        self.castling.disable_queen_side(&Color::White)
-                    }
-                    if piece_move.from == FileRank::H1
-                        && self.castling.get_king_side(&Color::White) == true
-                    {
-                        self.castling.disable_king_side(&Color::White)
-                    }
-                }
-                Color::Black => {
-                    if piece_move.from == FileRank::A8
-                        && self.castling.get_queen_side(&Color::Black) == true
-                    {
-                        self.castling.disable_queen_side(&Color::Black)
-                    }
-                    if piece_move.from == FileRank::H8
-                        && self.castling.get_king_side(&Color::Black) == true
-                    {
-                        self.castling.disable_king_side(&Color::Black);
-                    }
-                }
-            }
-        }
     }
 
     fn increment_full_move(&mut self) {
@@ -179,6 +143,7 @@ impl GameState {
                 FileRank::H8 => self.castling.disable_king_side(&Color::Black),
                 _ => {}
             },
+            (_, PieceType::Pawn) => self.halfmove_clock.reset(),
             _ => {}
         }
 
@@ -262,8 +227,7 @@ impl GameState {
     }
 
     pub fn detect_check(&self, king_mask: &u64, attacks_mask: &u64) -> bool {
-        let mask = king_mask & attacks_mask;
-        mask > 0
+         king_mask & attacks_mask > 0
     }
 
     pub fn get_valid_moves(&self) -> Vec<&PieceMove> {
@@ -744,6 +708,7 @@ impl FenParser for GameState {
         game.castling = castling;
         game.en_passant = FileRank::from_string(en_passant);
 
+        game.hash = game.zobrist_hashing.get_hash(&game);
         game
     }
 
@@ -833,7 +798,9 @@ impl Default for GameState {
             flat_white_moves: Vec::with_capacity(50),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
+            game_history_state: Vec::with_capacity(1024),
             zobrist_hashing: Arc::new(zobrist_hashing),
+            hash: 0
         }
     }
 }

@@ -7,11 +7,14 @@ use std::process::{Command, Stdio};
 use std::str::Utf8Error;
 use std::{collections::HashSet, io::Write};
 
-use chess_core::file_rank::{BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, WHITE_KING_CASTLE_MASK, WHITE_QUEEN_CASTLE_MASK};
+use chess_core::file_rank::{
+    BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, WHITE_KING_CASTLE_MASK,
+    WHITE_QUEEN_CASTLE_MASK,
+};
 use chess_core::types::FileRank;
 use chess_core::utility::print_as_board;
 use chess_core::{
-    bitboard::{GameState, FenParser},
+    bitboard::{FenParser, GameState},
     types::PieceMove,
 };
 use test_cases::TEST_CASES;
@@ -20,8 +23,8 @@ const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
 
 fn main() {
-    
-    println!("{}", FileRank::H6.index());
+    let chess = GameState::new_game();
+    println!("Hash:{}", chess.hash)
 }
 #[derive(Debug)]
 enum Error {
@@ -218,7 +221,6 @@ impl CalculationObject {
             //     );
             //     panic!("Invalid postion ")
             // }
-
         }
 
         nodes
