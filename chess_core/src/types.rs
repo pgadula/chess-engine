@@ -360,6 +360,11 @@ pub struct Castling {
             mask: WHITE_CASTLING_RIGHTS_MASK | BLACK_CASTLING_RIGHTS_MASK, // Full rights by default
         }
      }
+     pub fn from_mask(mask: u64) -> Castling {
+        Castling {
+           mask
+       }
+    }
  
      pub fn disable_white_castling_rights(&mut self) {
          self.mask &= !WHITE_CASTLING_RIGHTS_MASK;  
@@ -410,6 +415,9 @@ pub struct Castling {
  #[derive(Clone, Debug)]
  pub struct Clock(u8);
  impl Clock {
+        pub fn counter(&self)-> u8{
+            return self.0
+        }
         pub fn new() -> Self {
             Clock(0)
         }

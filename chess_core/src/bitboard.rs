@@ -34,7 +34,9 @@ pub struct GameState {
 
     pub game_history_state: Vec<u64>,
     pub zobrist_hashing: Arc<ZobristHashing>,
-    pub hash:u64
+    pub hash:u64,
+
+    pub history: Vec<UnmakeInfo>
 }
 
 pub trait FenParser {
@@ -60,6 +62,14 @@ impl GameState {
     }
 
     pub fn apply_move(&mut self, piece_move: &PieceMove) {
+        let mut state = UnmakeInfo{
+            piece_move: piece_move.clone(),
+            previous_hash: self.hash,
+            captured_piece: None,
+            previous_castling_rights: self.castling.mask,
+            half_moves: self.halfmove_clock.counter()
+        };
+
         self.halfmove_clock.tick();
         let mut en_passant_is_updated = false;
         self.increment_full_move();
@@ -121,6 +131,31 @@ impl GameState {
         self.hash = self.zobrist_hashing.get_hash(&self);
 
         self.move_turn = self.move_turn.flip();
+        state.half_moves = self.halfmove_clock.counter();
+        self.history.push(state);
+
+    }
+    pub fn unmake_move(&mut self){
+        if let Some(last_move) = self.history.pop(){
+            self.hash = last_move.previous_hash;
+            self.castling = Castling::from_mask(last_move.previous_castling_rights);
+            match last_move.piece_move.move_type {
+                MoveType::Quite => {
+                    self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
+                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
+                },
+                MoveType::DoublePush(file_rank) => todo!(),
+                MoveType::Capture => todo!(),
+                MoveType::Promotion(piece_type) => todo!(),
+                MoveType::CaptureWithPromotion(piece_type) => todo!(),
+                MoveType::CastleKingSide => todo!(),
+                MoveType::CastleQueenSide => todo!(),
+            }
+
+        }else{
+            eprintln!("Error: History stack is empty!")
+        }
+
     }
 
     fn increment_full_move(&mut self) {
@@ -800,7 +835,17 @@ impl Default for GameState {
             b_moves_mask: 0u64,
             game_history_state: Vec::with_capacity(1024),
             zobrist_hashing: Arc::new(zobrist_hashing),
-            hash: 0
+            hash: 0,
+            history: Vec::with_capacity(1024)
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct UnmakeInfo{
+    piece_move:PieceMove,
+    captured_piece: Option<Piece>,
+    previous_hash:u64,
+    previous_castling_rights: u64,
+    half_moves: u8, 
 }

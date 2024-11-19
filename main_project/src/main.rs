@@ -11,7 +11,7 @@ use chess_core::file_rank::{
     BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, WHITE_KING_CASTLE_MASK,
     WHITE_QUEEN_CASTLE_MASK,
 };
-use chess_core::types::FileRank;
+use chess_core::types::{FileRank, WHITE_PAWN};
 use chess_core::utility::print_as_board;
 use chess_core::{
     bitboard::{FenParser, GameState},
@@ -23,9 +23,22 @@ const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
 
 fn main() {
-    let chess = GameState::new_game();
-    println!("Hash:{}", chess.hash)
+    let mut chess = GameState::new_game();
+    println!("Hash:{}", chess.hash);
+    chess.print();
+    chess.apply_move(&PieceMove{
+        from:FileRank::E2,
+        move_type:chess_core::types::MoveType::Quite,
+        piece: WHITE_PAWN,
+        target: FileRank::E4,
+    });
+    println!("Hash:{}", chess.hash);
+    println!("{:?}",chess.history);
+    chess.unmake_move();
+
+    chess.print();
 }
+
 #[derive(Debug)]
 enum Error {
     CommandError(std::io::Error),
