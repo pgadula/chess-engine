@@ -20,6 +20,27 @@ mod tests {
         }
     }
 
+    // Test function that will run `perft` against all positions in `TEST_CASES`
+    #[test]
+    fn test_unmake_fn() {
+        for test_case in TEST_CASES {
+            // Create a new game state from the FEN string of the test case
+            let mut game = GameState::deserialize(test_case.fen);
+            println!("current fen:{}", test_case.fen);
+            game.calculate_pseudolegal_moves();
+            for mv in game.get_valid_moves() {
+                let mut cloned_game = game.clone();
+                cloned_game.make_move(&mv);
+                cloned_game.unmake_move();
+                assert_eq!(
+                    game.hash, cloned_game.hash,
+                    "Failed at starting FEN: {} after move {} {:?} {:?} and unmake expected hash: {}, but got: {}",
+                    test_case.fen, mv.uci(), mv.move_type, mv.piece,  game.hash, cloned_game.hash
+                );
+            }
+        }
+    }
+
     #[derive(Debug, Clone)]
     pub struct TestPosition {
         pub depth: u8,

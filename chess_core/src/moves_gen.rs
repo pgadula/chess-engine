@@ -25,14 +25,14 @@ pub fn get_pawn_moves(
     while pawns > 0 {
         let index = pawns.trailing_zeros();
         let pawn_file_rank = FileRank::get_file_rank(index as u8).unwrap();
-        let en_passant_mask = if let Some(e) = en_passant  {
+        let en_passant_mask = if let Some(file_rank) = en_passant  {
             let mut mask = 0u64;
-            set_bit_by_index(&mut mask, e.index() as u8);
+            set_bit_by_index(&mut mask, file_rank.index() as u8);
             mask
         }else{
             0u64
         };
-        let mut attack_pattern = get_pawn_pattern_attacks(color, pawn_file_rank) & (opposite_blockers | en_passant_mask);
+        let attack_pattern = get_pawn_pattern_attacks(color, pawn_file_rank) & (opposite_blockers | en_passant_mask);
 
         let isolated_pawn = 1u64 << index as u64;
         let single_push: u64 = if color == Color::White {

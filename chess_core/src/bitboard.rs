@@ -19,13 +19,12 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub struct GameState {
     pub bitboard: [u64; 12],
-
     pub move_turn: Color,
     pub castling: Castling,
     pub halfmove_clock: Clock,
     pub fullmove_number: Clock,
-    pub en_passant: Option<FileRank>,
 
+    pub en_passant: Option<FileRank>,
     pub move_lookup_table: Arc<MoveLookupTable>,
     pub flat_white_moves: Vec<PieceMove>,
     pub flat_black_moves: Vec<PieceMove>,
@@ -45,27 +44,18 @@ pub trait FenParser {
 }
 
 impl GameState {
-    pub fn id(&self) -> usize {
-        let mut id = self
-            .bitboard
-            .iter()
-            .copied()
-            .reduce(|acc, b| acc ^ b)
-            .unwrap_or(0u64);
-        if let Some(en_passant) = self.en_passant {
-            id ^= en_passant.mask()
-        }
-        return id as usize;
-    }
+
     pub fn empty() -> GameState {
         Default::default()
     }
 
-    pub fn apply_move(&mut self, piece_move: &PieceMove) {
+    pub fn make_move(&mut self, piece_move: &PieceMove) {
         let mut state = UnmakeInfo{
             piece_move: piece_move.clone(),
             previous_hash: self.hash,
+            en_passant: self.en_passant,
             captured_piece: None,
+            captured_piece_position: None,
             previous_castling_rights: self.castling.mask,
             half_moves: self.halfmove_clock.counter()
         };
@@ -76,12 +66,12 @@ impl GameState {
 
         match piece_move.move_type {
             MoveType::Capture => {
-                self.handle_capture(piece_move);
+                self.handle_capture(piece_move, &mut state);
                 self.move_piece(piece_move);
             }
             MoveType::Promotion(piece) => self.promote(piece_move, &piece),
             MoveType::CaptureWithPromotion(piece) => {
-                self.capture_with_promotion(piece_move, &piece)
+                self.capture_with_promotion(piece_move, &piece, &mut state);
             }
             MoveType::CastleKingSide => {
                 self.set_and_clear(&piece_move);
@@ -131,26 +121,40 @@ impl GameState {
         self.hash = self.zobrist_hashing.get_hash(&self);
 
         self.move_turn = self.move_turn.flip();
-        state.half_moves = self.halfmove_clock.counter();
         self.history.push(state);
 
     }
+
     pub fn unmake_move(&mut self){
         if let Some(last_move) = self.history.pop(){
-            self.hash = last_move.previous_hash;
+            self.halfmove_clock = Clock::from(last_move.half_moves);
             self.castling = Castling::from_mask(last_move.previous_castling_rights);
             match last_move.piece_move.move_type {
                 MoveType::Quite => {
                     self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
                     self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
                 },
-                MoveType::DoublePush(file_rank) => todo!(),
-                MoveType::Capture => todo!(),
-                MoveType::Promotion(piece_type) => todo!(),
-                MoveType::CaptureWithPromotion(piece_type) => todo!(),
-                MoveType::CastleKingSide => todo!(),
-                MoveType::CastleQueenSide => todo!(),
+                MoveType::DoublePush(_) =>{
+                    self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
+                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
+                }
+                MoveType::Capture | MoveType::CaptureWithPromotion(_) => {
+                   self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
+                   self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
+                   self.set_piece(&last_move.captured_piece.unwrap(), &last_move.captured_piece_position.unwrap_or(last_move.piece_move.target));
+                }
+                MoveType::Promotion(_) => {
+                    self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
+                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
+                },
+                MoveType::CastleKingSide => {}
+                MoveType::CastleQueenSide => {}
             }
+            self.fullmove_number = Clock::from(self.fullmove_number.counter());
+            self.move_turn = self.move_turn.flip();
+            self.en_passant = last_move.en_passant;
+            
+            self.hash = self.zobrist_hashing.get_hash(self)
 
         }else{
             eprintln!("Error: History stack is empty!")
@@ -190,8 +194,8 @@ impl GameState {
         self.set_piece(&piece_move.piece, &piece_move.target);
     }
 
-    fn capture_with_promotion(&mut self, piece_move: &PieceMove, promotion: &PieceType) {
-        self.handle_capture(piece_move);
+    fn capture_with_promotion(&mut self, piece_move: &PieceMove, promotion: &PieceType, state:  &mut UnmakeInfo) {
+        self.handle_capture(piece_move, state);
         self.promote(piece_move, promotion);
     }
 
@@ -205,11 +209,12 @@ impl GameState {
         self.set_piece(new_piece, &piece_move.target);
     }
 
-    fn handle_capture(&mut self, piece_move: &PieceMove) {
+    fn handle_capture(&mut self, piece_move: &PieceMove, state:  &mut UnmakeInfo) {
         self.halfmove_clock.reset();
 
         if let Some(target_piece) = self.get_piece_at(&piece_move.target) {
             self.clear_piece(&target_piece, &piece_move.target);
+            state.captured_piece = Some(target_piece);
         } else {
             if piece_move.piece.piece_type == PieceType::Pawn {
                 if let Some(en_passant_file_rank) = self.en_passant {
@@ -220,11 +225,15 @@ impl GameState {
                         } else {
                             FileRank::get_from_mask(file_rank_mask << 8).unwrap()
                         };
-                        self.clear_piece(
-                            &Piece {
-                                color: self.move_turn.flip(),
+
+                        let captured_piece = &Piece {
+                                color: piece_move.piece.color.flip(),
                                 piece_type: PieceType::Pawn,
-                            },
+                            };
+                        state.captured_piece = Some(captured_piece.clone());
+                        state.captured_piece_position = Some(target_file_rank);
+                        self.clear_piece(
+                            captured_piece,
                             &target_file_rank,
                         )
                     }
@@ -276,7 +285,7 @@ impl GameState {
             .iter()
             .map(|piece_move: &PieceMove| {
                 let mut game: GameState = self.clone();
-                game.apply_move(piece_move);
+                game.make_move(piece_move);
                 game.calculate_pseudolegal_moves();
                 let BoardSide {
                     king,
@@ -304,7 +313,7 @@ impl GameState {
             .par_iter()
             .map(|piece_move| {
                 let mut clone_game = game.clone();
-                clone_game.apply_move(&piece_move);
+                clone_game.make_move(&piece_move);
                 let inner_nodes = clone_game.inner_perft(depth - 1);
                 return (piece_move.uci(), inner_nodes); // Return the result as a tuple
             })
@@ -329,7 +338,7 @@ impl GameState {
         for piece_move in &valid_attacks {
             let mut clone_game = self.clone();
 
-            clone_game.apply_move(&piece_move);
+            clone_game.make_move(&piece_move);
             result += clone_game.inner_perft(depth - 1);
         }
 
@@ -616,6 +625,10 @@ impl GameState {
         println!("  a b c d e f g h");
         println!("fen: {}", GameState::serialize(&self))
     }
+    pub fn println(&self){
+        self.print();
+        println!();
+    }
 
     pub fn get_piece_at(&self, file_rank: &FileRank) -> Option<Piece> {
         for piece in PIECES_ARRAY {
@@ -845,7 +858,9 @@ impl Default for GameState {
 pub struct UnmakeInfo{
     piece_move:PieceMove,
     captured_piece: Option<Piece>,
+    captured_piece_position: Option<FileRank>,
     previous_hash:u64,
     previous_castling_rights: u64,
-    half_moves: u8, 
+    half_moves: u8,
+    en_passant: Option<FileRank>
 }

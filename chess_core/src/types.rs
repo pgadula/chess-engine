@@ -428,6 +428,9 @@ pub struct Castling {
         pub fn from_string(value:&str)->Clock{
             return Clock(value.parse().unwrap_or(0));
         } 
+        pub fn from(value: u8)->Clock{
+            return Clock(value);
+        } 
         
         pub fn reset(&mut self){
             self.0 = 0;

@@ -11,7 +11,7 @@ use chess_core::file_rank::{
     BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, WHITE_KING_CASTLE_MASK,
     WHITE_QUEEN_CASTLE_MASK,
 };
-use chess_core::types::{FileRank, WHITE_PAWN};
+use chess_core::types::{FileRank, BLACK_BISHOP, BLACK_KING, BLACK_PAWN, BLACK_QUEEN, WHITE_PAWN};
 use chess_core::utility::print_as_board;
 use chess_core::{
     bitboard::{FenParser, GameState},
@@ -23,20 +23,32 @@ const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
 
 fn main() {
-    let mut chess = GameState::new_game();
+    let mut chess = GameState::deserialize("rnb2k1r/pp1Pbppp/2p5/q7/2B5/8/PPPQNnPP/RNB1K2R w KQ - 3 9");
     println!("Hash:{}", chess.hash);
-    chess.print();
-    chess.apply_move(&PieceMove{
-        from:FileRank::E2,
-        move_type:chess_core::types::MoveType::Quite,
-        piece: WHITE_PAWN,
-        target: FileRank::E4,
-    });
-    println!("Hash:{}", chess.hash);
-    println!("{:?}",chess.history);
-    chess.unmake_move();
 
-    chess.print();
+
+    chess.println();
+    
+    chess.make_move(&PieceMove{
+        from:FileRank::D7,
+        target: FileRank::C8,
+        move_type:chess_core::types::MoveType::CaptureWithPromotion(chess_core::types::PieceType::Bishop),
+        piece: WHITE_PAWN,
+    });
+    chess.println();
+    println!("Hash:{}", chess.hash);
+    println!("{:?}", chess.history);
+    chess.unmake_move();
+    chess.println();
+    println!("Hash:{}", chess.hash);
+
+
+
+
+
+    //r6r/1b2k1bq/8/8/7B/8/8/R3K2R b KQkq - 3 2
+    //r6r/1b2k1bq/8/8/7B/8/8/R3K2R b KQkq - 3 2
+
 }
 
 #[derive(Debug)]
@@ -138,9 +150,9 @@ fn python_get_moves(fen: &str) -> Option<Vec<String>> {
         }
     }
 }
-fn apply_move(fen: &str, move_uci: &str) -> Option<String> {
+fn make_move(fen: &str, move_uci: &str) -> Option<String> {
     let result = Command::new("python")
-        .args(["../../python_position_checker/apply_move.py", fen, move_uci])
+        .args(["../../python_position_checker/make_move.py", fen, move_uci])
         .output();
 
     match result {
@@ -212,12 +224,12 @@ impl CalculationObject {
             // Apply the move and calculate the result
             let mut clone_game = game.clone();
             let before = clone_game.serialize();
-            clone_game.apply_move(valid_move);
+            clone_game.make_move(valid_move);
 
             let move_nodes = self.get_total_nodes(&mut clone_game.clone(), depth - 1);
             nodes += move_nodes;
 
-            // let calc_fen = apply_move(&before, &move_uci).unwrap();
+            // let calc_fen = make_move(&before, &move_uci).unwrap();
             // if after != calc_fen {
             //     println!();
             //     clone_game.print();

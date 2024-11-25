@@ -15,15 +15,15 @@ pub struct ZobristHashing {
     pub side: u64,
 }
 
+const SEED:u64 = 29426028;
 impl ZobristHashing {
     pub fn init() -> ZobristHashing {
-        let seed = 29426028;
-        let mut rng = Pcg32::seed_from_u64(seed);
+        let mut rng = Pcg32::seed_from_u64(SEED);
 
         let zobrist_hashing = ZobristHashing {
-            pieces: core::array::from_fn(|i| rng.gen()),
-            castling_rights: core::array::from_fn(|i| rng.gen()),
-            en_passant: core::array::from_fn(|i| rng.gen()),
+            pieces: core::array::from_fn(|_| rng.gen()),
+            castling_rights: core::array::from_fn(|_| rng.gen()),
+            en_passant: core::array::from_fn(|_| rng.gen()),
             side: rng.gen(),
         };
         return zobrist_hashing;
@@ -38,6 +38,7 @@ impl ZobristHashing {
                 hash ^= self.pieces[hash_index];
             }
         }
+
         hash ^= self.castling_rights[game.castling.mask as usize % 16];
         if let Some(file_rank) = game.en_passant {
             hash ^= self.en_passant[file_rank.index()];
