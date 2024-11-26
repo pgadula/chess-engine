@@ -1,4 +1,4 @@
-use crate::types::{Castling, Clock};
+use crate::types::{Castling, Clock, BLACK_KING, WHITE_KING};
 use crate::zobrist_hashing::ZobristHashing;
 use crate::{
     file_rank::{
@@ -129,6 +129,7 @@ impl GameState {
         if let Some(last_move) = self.history.pop(){
             self.halfmove_clock = Clock::from(last_move.half_moves);
             self.castling = Castling::from_mask(last_move.previous_castling_rights);
+
             match last_move.piece_move.move_type {
                 MoveType::Quite => {
                     self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
@@ -138,17 +139,53 @@ impl GameState {
                     self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
                     self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
                 }
-                MoveType::Capture | MoveType::CaptureWithPromotion(_) => {
+                MoveType::Capture => {
                    self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
-                   self.set_piece(&last_move.captured_piece.unwrap(), &last_move.captured_piece_position.unwrap_or(last_move.piece_move.target));
+                   self.set_piece(&last_move.captured_piece.unwrap(),&last_move.captured_piece_position.unwrap_or(last_move.piece_move.target) );
                 }
-                MoveType::Promotion(_) => {
-                    self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
+                MoveType::CaptureWithPromotion(piece_type) => {
+                    self.clear_piece(&Piece{piece_type, color: last_move.piece_move.piece.color }, &last_move.piece_move.target);
+                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
+                    self.set_piece(&last_move.captured_piece.unwrap(),&last_move.captured_piece_position.unwrap_or(last_move.piece_move.target) );
+                },
+                MoveType::Promotion(piece_type) => {
+                    self.clear_piece(&Piece{piece_type, color: last_move.piece_move.piece.color }, &last_move.piece_move.target);
                     self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
                 },
-                MoveType::CastleKingSide => {}
-                MoveType::CastleQueenSide => {}
+                 MoveType::CastleQueenSide => {
+                    match last_move.piece_move.piece.color {
+                        Color::White => {
+                            self.clear_piece(&WHITE_KING, &FileRank::C1);
+                            self.clear_piece(&WHITE_ROOK, &FileRank::D1);
+                            self.set_piece(&WHITE_KING, &FileRank::E1);
+                            self.set_piece(&WHITE_ROOK, &FileRank::A1);
+                        }
+                        Color::Black => {
+                            self.clear_piece(&BLACK_KING, &FileRank::G1);
+                            self.clear_piece(&BLACK_ROOK, &FileRank::F1);
+                            self.set_piece(&BLACK_KING, &FileRank::E8);
+                            self.set_piece(&BLACK_ROOK, &FileRank::H1);
+                        }
+                    }
+                }
+                MoveType::CastleKingSide => {
+                 match last_move.piece_move.piece.color {
+                        Color::White => {
+                            self.clear_piece(&WHITE_KING, &FileRank::G1);
+                            self.clear_piece(&WHITE_ROOK, &FileRank::F1);
+                            self.set_piece(&WHITE_KING, &FileRank::E1);
+                            self.set_piece(&WHITE_ROOK, &FileRank::H1);
+
+                        }
+                        Color::Black => {
+                            self.clear_piece(&BLACK_KING, &FileRank::G1);
+                            self.clear_piece(&BLACK_ROOK, &FileRank::F1);
+                            self.set_piece(&BLACK_KING, &FileRank::E8);
+                            self.set_piece(&BLACK_ROOK, &FileRank::H1);
+                        }
+                    }
+                },
             }
             self.fullmove_number = Clock::from(self.fullmove_number.counter());
             self.move_turn = self.move_turn.flip();

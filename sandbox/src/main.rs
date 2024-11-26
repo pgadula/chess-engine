@@ -11,33 +11,29 @@ use chess_core::file_rank::{
     BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, WHITE_KING_CASTLE_MASK,
     WHITE_QUEEN_CASTLE_MASK,
 };
-use chess_core::types::{FileRank, BLACK_BISHOP, BLACK_KING, BLACK_PAWN, BLACK_QUEEN, WHITE_PAWN};
-use chess_core::utility::print_as_board;
+use chess_core::types::{FileRank, BLACK_BISHOP, BLACK_KING, BLACK_PAWN, BLACK_QUEEN, WHITE_KING, WHITE_PAWN, WHITE_ROOK};
 use chess_core::{
     bitboard::{FenParser, GameState},
     types::PieceMove,
 };
-use test_cases::TEST_CASES;
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
 
 fn main() {
-    let mut chess = GameState::deserialize("rnb2k1r/pp1Pbppp/2p5/q7/2B5/8/PPPQNnPP/RNB1K2R w KQ - 3 9");
+    let mut chess = GameState::deserialize("r6r/1b2k2q/5b2/8/7B/8/8/R3K2R w KQkq - 4 3");
     println!("Hash:{}", chess.hash);
-
-
     chess.println();
     
     chess.make_move(&PieceMove{
-        from:FileRank::D7,
-        target: FileRank::C8,
-        move_type:chess_core::types::MoveType::CaptureWithPromotion(chess_core::types::PieceType::Bishop),
-        piece: WHITE_PAWN,
+        from:FileRank::A1,
+        target: FileRank::A8,
+        move_type:chess_core::types::MoveType::Capture,
+        piece: WHITE_ROOK,
     });
     chess.println();
     println!("Hash:{}", chess.hash);
-    println!("{:?}", chess.history);
+
     chess.unmake_move();
     chess.println();
     println!("Hash:{}", chess.hash);

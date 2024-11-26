@@ -26,21 +26,37 @@ mod tests {
         for test_case in TEST_CASES {
             // Create a new game state from the FEN string of the test case
             let mut game = GameState::deserialize(test_case.fen);
-            println!("current fen:{}", test_case.fen);
-            game.calculate_pseudolegal_moves();
-            for mv in game.get_valid_moves() {
-                let mut cloned_game = game.clone();
-                cloned_game.make_move(&mv);
-                cloned_game.unmake_move();
-                assert_eq!(
-                    game.hash, cloned_game.hash,
-                    "Failed at starting FEN: {} after move {} {:?} {:?} and unmake expected hash: {}, but got: {}",
-                    test_case.fen, mv.uci(), mv.move_type, mv.piece,  game.hash, cloned_game.hash
-                );
-            }
+            println!();
+            println!();
+            println!("[starting fen]:{}", test_case.fen);
+            inner_nodes(game, 1);
         }
     }
 
+    fn inner_nodes(mut original_game: GameState, max_depth: usize) {
+        let expected_hash = original_game.hash;
+        let fen = GameState::serialize(&original_game);
+        println!("------------------------------");
+        println!("current fen:{} hash: {}", fen, expected_hash);
+
+        original_game.calculate_pseudolegal_moves();
+        for mv in original_game.get_valid_moves() {
+            let mut cloned_game = original_game.clone();
+            cloned_game.make_move(&mv);
+            cloned_game.unmake_move();
+            assert_eq!(
+                expected_hash, cloned_game.hash,
+                "Failed at starting FEN: {} after move {} {:?} {:?} and unmake expected hash: {}, but got: {}, depth: {}",
+                fen, mv.uci(), mv.move_type, mv.piece,  expected_hash, cloned_game.hash, max_depth
+            );
+            if max_depth > 0 {
+                let mut inner_game = original_game.clone();
+                inner_game.make_move(&mv);
+                inner_nodes(GameState::deserialize(&GameState::serialize(&inner_game)), max_depth-1);
+            }
+        }
+    }
+    
     #[derive(Debug, Clone)]
     pub struct TestPosition {
         pub depth: u8,
