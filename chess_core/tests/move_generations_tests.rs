@@ -29,7 +29,7 @@ mod tests {
             println!();
             println!();
             println!("[starting fen]:{}", test_case.fen);
-            inner_nodes(game, 1);
+            inner_nodes(game, 3);
         }
     }
 
@@ -44,19 +44,22 @@ mod tests {
             let mut cloned_game = original_game.clone();
             cloned_game.make_move(&mv);
             cloned_game.unmake_move();
+
             assert_eq!(
-                expected_hash, cloned_game.hash,
-                "Failed at starting FEN: {} after move {} {:?} {:?} and unmake expected hash: {}, but got: {}, depth: {}",
-                fen, mv.uci(), mv.move_type, mv.piece,  expected_hash, cloned_game.hash, max_depth
-            );
+                    expected_hash, cloned_game.hash,
+                    "Failed at starting FEN: {} after move {} {:?} {:?} and unmake expected hash: {}, but got: {}, depth: {}",
+                    fen, mv.uci(), mv.move_type, mv.piece,  expected_hash, cloned_game.hash, max_depth
+                );
+
             if max_depth > 0 {
                 let mut inner_game = original_game.clone();
                 inner_game.make_move(&mv);
-                inner_nodes(GameState::deserialize(&GameState::serialize(&inner_game)), max_depth-1);
+                inner_game.history.clear();
+                inner_nodes(inner_game, max_depth - 1);
             }
         }
     }
-    
+
     #[derive(Debug, Clone)]
     pub struct TestPosition {
         pub depth: u8,

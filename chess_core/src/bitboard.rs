@@ -1,9 +1,9 @@
-use crate::types::{Castling, Clock, BLACK_KING, WHITE_KING};
+use crate::types::{Castling, Clock, BLACK_CASTLING_KING_MASK, BLACK_CASTLING_QUEEN_MASK, BLACK_KING, WHITE_CASTLING_KING_MASK, WHITE_CASTLING_QUEEN_MASK, WHITE_KING};
 use crate::zobrist_hashing::ZobristHashing;
 use crate::{
     file_rank::{
-        BLACK_KING_CASTLE_MASK, BLACK_QUEEN_CASTLE_MASK, RANK_3, WHITE_KING_CASTLE_MASK,
-        WHITE_QUEEN_CASTLE_MASK,
+        BLACK_KING_CASTLE_BOARD_MASK, BLACK_QUEEN_CASTLE_BOARD_MASK, RANK_3, WHITE_KING_CASTLE_BOARD_MASK,
+        WHITE_QUEEN_CASTLE_BOARD_MASK,
     },
     magic_gen::MoveLookupTable,
     moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves},
@@ -31,7 +31,6 @@ pub struct GameState {
     pub w_moves_mask: u64,
     pub b_moves_mask: u64,
 
-    pub game_history_state: Vec<u64>,
     pub zobrist_hashing: Arc<ZobristHashing>,
     pub hash:u64,
 
@@ -118,11 +117,10 @@ impl GameState {
         if !en_passant_is_updated {
             self.en_passant = None;
         }
-        self.hash = self.zobrist_hashing.get_hash(&self);
-
         self.move_turn = self.move_turn.flip();
+        self.hash = self.zobrist_hashing.get_hash(&self);
+        
         self.history.push(state);
-
     }
 
     pub fn unmake_move(&mut self){
@@ -162,10 +160,10 @@ impl GameState {
                             self.set_piece(&WHITE_ROOK, &FileRank::A1);
                         }
                         Color::Black => {
-                            self.clear_piece(&BLACK_KING, &FileRank::G1);
-                            self.clear_piece(&BLACK_ROOK, &FileRank::F1);
+                            self.clear_piece(&BLACK_KING, &FileRank::C8);
+                            self.clear_piece(&BLACK_ROOK, &FileRank::D8);
                             self.set_piece(&BLACK_KING, &FileRank::E8);
-                            self.set_piece(&BLACK_ROOK, &FileRank::H1);
+                            self.set_piece(&BLACK_ROOK, &FileRank::A8);
                         }
                     }
                 }
@@ -179,10 +177,10 @@ impl GameState {
 
                         }
                         Color::Black => {
-                            self.clear_piece(&BLACK_KING, &FileRank::G1);
-                            self.clear_piece(&BLACK_ROOK, &FileRank::F1);
+                            self.clear_piece(&BLACK_KING, &FileRank::G8);
+                            self.clear_piece(&BLACK_ROOK, &FileRank::F8);
                             self.set_piece(&BLACK_KING, &FileRank::E8);
-                            self.set_piece(&BLACK_ROOK, &FileRank::H1);
+                            self.set_piece(&BLACK_ROOK, &FileRank::H8);
                         }
                     }
                 },
@@ -192,7 +190,6 @@ impl GameState {
             self.en_passant = last_move.en_passant;
             
             self.hash = self.zobrist_hashing.get_hash(self)
-
         }else{
             eprintln!("Error: History stack is empty!")
         }
@@ -317,11 +314,11 @@ impl GameState {
         } else {
             &self.flat_black_moves
         };
+        let mut game: GameState = self.clone();
 
         let valid_attacks: Vec<&PieceMove> = moves
             .iter()
             .map(|piece_move: &PieceMove| {
-                let mut game: GameState = self.clone();
                 game.make_move(piece_move);
                 game.calculate_pseudolegal_moves();
                 let BoardSide {
@@ -331,6 +328,7 @@ impl GameState {
                 } = game.get_board_side_info(&game.move_turn.flip());
 
                 let check = game.detect_check(&king, &opposite_attacks);
+                game.unmake_move();
                 (check, piece_move)
             })
             .filter(|attack| attack.0 == false)
@@ -699,8 +697,8 @@ impl GameState {
 
                 castling_king_side: self.castling.get_king_side(&Color::White),
                 castling_queen_side: self.castling.get_queen_side(&Color::White),
-                king_mask_castling: WHITE_KING_CASTLE_MASK,
-                queen_mask_castling: WHITE_QUEEN_CASTLE_MASK,
+                king_mask_castling: WHITE_KING_CASTLE_BOARD_MASK,
+                queen_mask_castling: WHITE_QUEEN_CASTLE_BOARD_MASK,
                 color: Color::White,
             }
         } else {
@@ -726,8 +724,8 @@ impl GameState {
                 castling_king_side: self.castling.get_king_side(&Color::Black),
                 castling_queen_side: self.castling.get_queen_side(&Color::Black),
 
-                king_mask_castling: BLACK_KING_CASTLE_MASK,
-                queen_mask_castling: BLACK_QUEEN_CASTLE_MASK,
+                king_mask_castling: BLACK_KING_CASTLE_BOARD_MASK,
+                queen_mask_castling: BLACK_QUEEN_CASTLE_BOARD_MASK,
                 color: Color::Black,
             }
         }
@@ -780,10 +778,10 @@ impl FenParser for GameState {
         let mut castling = Castling::new();
         for char in castling_rights.chars() {
             match char {
-                'K' => castling.mask |= WHITE_KING_CASTLE_MASK,
-                'Q' => castling.mask |= WHITE_QUEEN_CASTLE_MASK,
-                'k' => castling.mask |= BLACK_KING_CASTLE_MASK,
-                'q' => castling.mask |= BLACK_QUEEN_CASTLE_MASK,
+                'K' => castling.mask |= WHITE_CASTLING_KING_MASK,
+                'Q' => castling.mask |= WHITE_CASTLING_QUEEN_MASK,
+                'k' => castling.mask |= BLACK_CASTLING_KING_MASK,
+                'q' => castling.mask |= BLACK_CASTLING_QUEEN_MASK,
                 _ => {}
             }
         }
@@ -799,8 +797,7 @@ impl FenParser for GameState {
 
     fn serialize(&self) -> String {
         let mut piece_placement = String::new();
-        let mut row_pieces = vec![0u8; 8];
-        let mut active_color = if self.move_turn == Color::White {
+        let active_color = if self.move_turn == Color::White {
             "w"
         } else {
             "b"
@@ -883,7 +880,6 @@ impl Default for GameState {
             flat_white_moves: Vec::with_capacity(50),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
-            game_history_state: Vec::with_capacity(1024),
             zobrist_hashing: Arc::new(zobrist_hashing),
             hash: 0,
             history: Vec::with_capacity(1024)
