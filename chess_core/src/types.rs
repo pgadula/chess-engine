@@ -1,5 +1,7 @@
     use std::{fmt::Display, ops::AddAssign, slice::Iter};
 
+    use crate::bitboard::GameState;
+
     use self::FileRank::*;
 
     #[derive(Debug, PartialEq, Clone, Copy)]
@@ -327,6 +329,27 @@
                     return format!("{0}{1}", self.from, self.target);
                 }
             }   
+        }
+
+        pub fn from_uci(uci: &str, game: &GameState)->PieceMove{
+            let mut tokens = Vec::new();
+            let n = 0;
+            let mut chars = &uci.chars();
+            while let Some(token) = chars.into_iter().next() { 
+                if token.is_alphanumeric(){
+                    let token = &chars[0..n];
+                    tokens.push(token);
+                    chars = &chars[n..].to_vec();
+                }else{
+                    n=n+1;
+                }
+            }
+            PieceMove{
+                piece: todo!(),
+                from: todo!(),
+                target: todo!(),
+                move_type: todo!(),
+            } 
         }
     }
 

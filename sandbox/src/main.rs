@@ -18,16 +18,6 @@ const RESET: &str = "\x1b[0m";
 
 fn main() {
     let mut chess = GameState::deserialize("r6r/1b2k2q/5b2/8/7B/8/8/R3K2R w KQkq - 4 3");
-    println!("Hash:{}", chess.hash);
-    chess.println();
-    println!("{:?}", chess.castling);
-    println!("{:?}", chess.bitboard);
-    println!("{:?}", chess.en_passant);
-    println!("{:?}", chess.move_turn);
-    println!("{:?}", chess.zobrist_hashing);
-
-
-    print_as_board(chess.castling.mask);
 
     
     // chess.make_move(&PieceMove{

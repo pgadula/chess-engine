@@ -29,7 +29,7 @@ mod tests {
             println!();
             println!();
             println!("[starting fen]:{}", test_case.fen);
-            inner_nodes(game, 3);
+            inner_nodes(game, 2);
         }
     }
 

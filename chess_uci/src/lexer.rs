@@ -1,4 +1,5 @@
 
+#[derive(Debug)]
 pub struct Lexer<'a> {
     content: &'a [char],
 }
@@ -14,14 +15,7 @@ impl<'a> Lexer<'a> {
         return token.iter().collect();
     }
 
-    fn starts_with_predicate<Predicate>(&mut self, mut predicate: Predicate) -> bool
-    where
-        Predicate: FnMut(&char) -> bool,
-    {
-        return predicate(&self.content[0]);
-    }
-
-    fn chop_fn<Predicate>(&mut self, mut predicate: Predicate) -> String
+    pub fn chop_fn<Predicate>(&mut self, mut predicate: Predicate) -> String
     where
         Predicate: FnMut(&char) -> bool,
     {
@@ -29,6 +23,10 @@ impl<'a> Lexer<'a> {
         while n < self.content.len() && predicate(&self.content[n]) {
             n += 1;
         }
+        if n == 0{
+            n+=1;
+        }
+
         self.chop(n)
     }
 
@@ -37,6 +35,7 @@ impl<'a> Lexer<'a> {
             self.content = &self.content[1..]
         }
     }
+    
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -44,8 +43,9 @@ impl<'a> Iterator for Lexer<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.trim_left();
-        while !self.content.is_empty() {
-            return Some(self.chop_fn(|c| c.is_alphabetic() || c.is_alphanumeric()));
+        while !self.content.is_empty() && self.content.len() > 0 {
+            self.trim_left();
+            return Some(self.chop_fn(|c| c.is_alphabetic() && c.is_alphanumeric() && *c != '\n'));
         }
 
         return None;

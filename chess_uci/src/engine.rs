@@ -1,4 +1,4 @@
-use std::thread::Thread;
+use std::{intrinsics::mir::Move, thread::Thread};
 
 use chess_core::bitboard::{FenParser, GameState};
 
@@ -18,6 +18,7 @@ impl Engine {
             thread: None,
         };
     }
+
     pub fn new_game(&mut self){
         self.board = Some(GameState::new_game());
     }
@@ -32,5 +33,15 @@ impl Engine {
 
     pub fn stop(&mut self) {
         self.is_searching = false;
+    }
+
+    pub fn print(&self){
+        if let Some(board) = &self.board{
+            board.print();
+        }
+    } 
+
+    pub fn apply_move(uci_moves: Vec<String>){
+        
     }
 }
