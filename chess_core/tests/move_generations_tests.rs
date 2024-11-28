@@ -7,7 +7,7 @@ mod tests {
     fn test_perft_positions() {
         for test_case in TEST_CASES {
             // Create a new game state from the FEN string of the test case
-            let mut game = GameState::deserialize(test_case.fen);
+            let game = GameState::deserialize(test_case.fen);
             println!("current fen:{}", test_case.fen);
             let (total_nodes, _) = game.perft(test_case.depth as usize);
 
