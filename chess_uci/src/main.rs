@@ -9,7 +9,7 @@ use lexer::Lexer;
 fn main() {
     let mut engine = Engine::new();
 
-    while engine.is_running  {
+    while engine.is_running {
         let mut buf = String::from("");
         let _ = io::stdin().read_line(&mut buf);
         let chars = &buf.chars().collect::<Vec<char>>();
@@ -26,41 +26,48 @@ fn main() {
                 }
                 "position" => {
                     if let Some(next_token) = lexer.next() {
-                        println!("next token {}", next_token);
                         match next_token.as_str() {
                             "startpos" => {
-                                if let Some(move_uci) = lexer.next(){
-                                    let mut uci_moves = Vec::new();
-                                    uci_moves.push(move_uci);
-                                    while let Some(another_uci) = lexer.next() {
-                                        uci_moves.push(another_uci);
-                                    }
-                                    engine.apply_move(uci_moves)
-                                }else{
-                                    engine.new_game();
+                                let mut tokens = Vec::new(); // Buffer to collect tokens
+
+                                // Collect tokens until we reach the end or a condition
+                                while let Some(token) = lexer.next() {
+                                    tokens.push(token);
                                 }
 
-                            },
+                                let uci_moves: Vec<String> = tokens
+                                .join(" ")
+                                .split_whitespace() 
+                                .map(|s| s.to_string()) 
+                                .collect(); 
+
+                                println!("{:?}", uci_moves);
+                                if uci_moves.len() > 0 {
+                                    engine.apply_move(uci_moves);
+                                } else {
+                                    engine.new_game();
+                                }
+                            }
                             "fen" => {
                                 let mut positon = Vec::new();
-                                while let Some(position_token) = lexer.next()  {
+                                while let Some(position_token) = lexer.next() {
                                     positon.push(position_token);
                                 }
                                 let fen = positon.concat();
                                 println!("fen, {}", fen);
                                 engine.from(&fen);
                                 engine.print();
-                            },
-                            _=>{
+                            }
+                            _ => {
                                 println!("
-                                Invalid usage of positon \n 
+                                Invalid usage of position command \n 
                                     position startpos: Sets the starting position.
                                     position fen [FEN]: Sets the position using a FEN string.
                                     position startpos moves [moves]: Sets the position from the starting position and the list of moves.
                                 ")
                             }
                         }
-                    }else{
+                    } else {
                         println!("
                         Invalid usage of positon \n 
                             position startpos: Sets the starting position.
@@ -68,7 +75,6 @@ fn main() {
                             position startpos moves [moves]: Sets the position from the starting position and the list of moves.
                         ")
                     }
-                
                 }
                 "go" => {
                     println!("UciGo");
@@ -87,7 +93,5 @@ fn main() {
                 }
             }
         }
-
     }
 }
-

@@ -1,5 +1,4 @@
-
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Lexer<'a> {
     content: &'a [char],
 }
@@ -23,8 +22,8 @@ impl<'a> Lexer<'a> {
         while n < self.content.len() && predicate(&self.content[n]) {
             n += 1;
         }
-        if n == 0{
-            n+=1;
+        if n == 0 {
+            n += 1;
         }
 
         self.chop(n)
@@ -35,7 +34,6 @@ impl<'a> Lexer<'a> {
             self.content = &self.content[1..]
         }
     }
-    
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -45,7 +43,9 @@ impl<'a> Iterator for Lexer<'a> {
         self.trim_left();
         while !self.content.is_empty() && self.content.len() > 0 {
             self.trim_left();
-            return Some(self.chop_fn(|c| c.is_alphabetic() && c.is_alphanumeric() && *c != '\n'));
+            return Some(
+                self.chop_fn(|c| (c.is_alphabetic() || c.is_alphanumeric() || *c == '-') && *c != '\n'),
+            );
         }
 
         return None;

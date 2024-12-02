@@ -333,17 +333,35 @@
 
         pub fn from_uci(uci: &str, game: &GameState)->PieceMove{
             let mut tokens = Vec::new();
-            let n = 0;
-            let mut chars = &uci.chars();
-            while let Some(token) = chars.into_iter().next() { 
-                if token.is_alphanumeric(){
-                    let token = &chars[0..n];
-                    tokens.push(token);
-                    chars = &chars[n..].to_vec();
-                }else{
-                    n=n+1;
+            println!("uci {uci}");
+            match uci {
+                "O-O-O" =>{
+                    println!("Castling")
+                },
+                "o-o-o" =>{
+                    println!("Castling")
+                },
+                "o-o" =>{
+                    println!("Castling")
+                },
+                "O-O" =>{
+                    println!("Castling")
+                },
+                _=>{
+                    let mut n = 0;
+                    let mut chars: &[char] = &uci.chars().collect::<Vec<char>>();
+                    while let Some(token) = chars.into_iter().next() { 
+                        if token.is_alphanumeric(){
+                            let token = &chars[0..n];
+                            tokens.push(token);
+                            chars = &chars[n..];
+                        }else{
+                            n=n+1;
+                        }
+                    }
                 }
             }
+
             PieceMove{
                 piece: todo!(),
                 from: todo!(),

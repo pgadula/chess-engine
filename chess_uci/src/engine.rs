@@ -1,6 +1,9 @@
-use std::{intrinsics::mir::Move, thread::Thread};
+use std::thread::Thread;
 
-use chess_core::bitboard::{FenParser, GameState};
+use chess_core::{
+    bitboard::{FenParser, GameState},
+    types::PieceMove,
+};
 
 pub struct Engine {
     pub is_running: bool,
@@ -19,7 +22,7 @@ impl Engine {
         };
     }
 
-    pub fn new_game(&mut self){
+    pub fn new_game(&mut self) {
         self.board = Some(GameState::new_game());
     }
 
@@ -35,13 +38,19 @@ impl Engine {
         self.is_searching = false;
     }
 
-    pub fn print(&self){
-        if let Some(board) = &self.board{
+    pub fn print(&self) {
+        if let Some(board) = &self.board {
             board.print();
         }
-    } 
+    }
 
-    pub fn apply_move(uci_moves: Vec<String>){
-        
+    pub fn apply_move(&mut self, uci_moves: Vec<String>) {
+        self.new_game();
+        if let Some(game_board) = &mut self.board {  
+            for uci in uci_moves {
+                let piece_move = PieceMove::from_uci(&uci, game_board);
+                game_board.make_move(&piece_move); 
+            }
+        }
     }
 }
