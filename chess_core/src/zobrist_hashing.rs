@@ -3,8 +3,8 @@ use rand_pcg::Pcg32;
 
 use crate::{
     bitboard::GameState,
-    types::{Color, PIECES_ARRAY},
-    utility::{get_file_ranks, pop_lsb},
+    types::PIECES_ARRAY,
+    utility::get_file_ranks,
 };
 
 #[derive(Debug)]

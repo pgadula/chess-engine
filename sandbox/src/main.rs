@@ -19,7 +19,7 @@ const RESET: &str = "\x1b[0m";
 fn main() {
     let mut chess = GameState::deserialize("r6r/1b2k2q/5b2/8/7B/8/8/R3K2R w KQkq - 4 3");
 
-    
+    chess.println();
     // chess.make_move(&PieceMove{
     //     from:FileRank::A1,
     //     target: FileRank::A8,

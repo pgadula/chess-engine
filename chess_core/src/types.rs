@@ -101,6 +101,24 @@
             }
         }
 
+        pub fn from_character(character: char)-> Option<Piece>{
+            match character {
+                'P' =>   Some(Piece::from(&PieceType::Pawn, &Color::White)),
+                'p' =>   Some(Piece::from(&PieceType::Pawn, &Color::Black)),
+                'N' =>   Some(Piece::from(&PieceType::Knight, &Color::White)),
+                'n' =>   Some(Piece::from(&PieceType::Knight, &Color::Black)),
+                'B' =>   Some(Piece::from(&PieceType::Bishop, &Color::White)),
+                'b' =>   Some(Piece::from(&PieceType::Bishop, &Color::Black)),
+                'R' =>   Some(Piece::from(&PieceType::Rook, &Color::White)),
+                'r' =>   Some(Piece::from(&PieceType::Rook, &Color::Black)),
+                'Q' =>   Some(Piece::from(&PieceType::Queen, &Color::White)),
+                'q' =>   Some(Piece::from(&PieceType::Queen, &Color::Black)),
+                'K' =>   Some(Piece::from(&PieceType::King, &Color::White)),
+                'k' =>   Some(Piece::from(&PieceType::King, &Color::Black)),
+                _=> None
+            }
+        }
+
         pub fn piece_symbol(&self) -> char {
             match (self.piece_type, self.color) {
                 (PieceType::Pawn, Color::White) => '♙',
@@ -330,44 +348,113 @@
                 }
             }   
         }
-
-        pub fn from_uci(uci: &str, game: &GameState)->PieceMove{
-            let mut tokens = Vec::new();
-            println!("uci {uci}");
+        
+        pub fn from_uci(uci: &str, game: &GameState) -> PieceMove {        
             match uci {
-                "O-O-O" =>{
-                    println!("Castling")
+                // White castling queenside
+                "O-O-O" => {
+                    PieceMove {
+                        piece: WHITE_KING,               // The piece being moved (white king)
+                        from: E1,                        // From e1 (standard position for white king)
+                        target: C1,                      // To c1 (after castling queenside)
+                        move_type: MoveType::CastleQueenSide,  // Type of move (castling)
+                    }
                 },
-                "o-o-o" =>{
-                    println!("Castling")
+                // White castling kingside
+                "O-O" => {
+                    PieceMove {
+                        piece: WHITE_KING,               // The piece being moved (white king)
+                        from: E1,                        // From e1 (standard position for white king)
+                        target: G1,                      // To g1 (after castling kingside)
+                        move_type: MoveType::CastleKingSide,   // Type of move (castling)
+                    }
                 },
-                "o-o" =>{
-                    println!("Castling")
+                // Black castling queenside
+                "o-o-o" => {
+                    PieceMove {
+                        piece: BLACK_KING,               // The piece being moved (black king)
+                        from: E8,                        // From e8 (standard position for black king)
+                        target: C8,                      // To c8 (after castling queenside)
+                        move_type: MoveType::CastleQueenSide,  // Type of move (castling)
+                    }
                 },
-                "O-O" =>{
-                    println!("Castling")
+                // Black castling kingside
+                "o-o" => {
+                    PieceMove {
+                        piece: BLACK_KING,               // The piece being moved (black king)
+                        from: E8,                        // From e8 (standard position for black king)
+                        target: G8,                      // To g8 (after castling kingside)
+                        move_type: MoveType::CastleKingSide,   // Type of move (castling)
+                    }
                 },
-                _=>{
-                    let mut n = 0;
-                    let mut chars: &[char] = &uci.chars().collect::<Vec<char>>();
-                    while let Some(token) = chars.into_iter().next() { 
-                        if token.is_alphanumeric(){
-                            let token = &chars[0..n];
-                            tokens.push(token);
-                            chars = &chars[n..];
-                        }else{
-                            n=n+1;
+                _ => {
+                    let chars = &mut uci.chars().collect::<Vec<char>>();
+                    let from = FileRank::from_string(&chars[0..2].iter().collect::<String>()).unwrap();
+                    let target = FileRank::from_string(&chars[2..4].iter().collect::<String>()).unwrap();
+                    let mut promotion = None;
+        
+                    // Check for promotion (if there's a 5th character)
+                    if chars.len() == 5 {
+                        promotion = Piece::from_character(chars[4]);
+                    }
+        
+                    // Get the piece at the starting position
+                    let piece = game.get_piece_at(&from).unwrap();
+                    let target_piece = game.get_piece_at(&target);
+        
+                    // Determine move type (Capture, Quiet, or Promotion)
+                    let move_type = match target_piece {
+                        Some(_) => {
+                            // If there's a piece at the target square, it's a capture
+                            if let Some(promotion_piece) = promotion {
+                                // Capture and promotion
+                                MoveType::CaptureWithPromotion(promotion_piece.piece_type)
+                            } else {
+                                // Normal capture
+                                MoveType::Capture
+                            }
                         }
+                        None => {
+                            // No piece at the target square
+                            match piece.piece_type {
+                                PieceType::Pawn => {
+                                    // Handle pawn promotion if applicable
+                                    if let Some(promotion_piece) = promotion {
+                                        MoveType::Promotion(promotion_piece.piece_type)
+                                    } else {
+                                        // Handle double pawn push (special move)
+                                        if (from.rank() == 2 && target.rank() == 4) || (from.rank() == 7 && target.rank() == 5) {
+                                            // Double push condition (White pawns from 2 to 4, Black pawns from 7 to 5)
+                                            MoveType::DoublePush(Some(target))
+                                        } else {
+                                            // Normal quiet pawn move or en passant if necessary
+                                            if let Some(en_passant_target) = game.en_passant {
+                                               if en_passant_target == target{
+                                                MoveType::Capture
+                                               }else{
+                                                MoveType::Quite
+                                               }
+                                            } else {
+                                                MoveType::Quite
+                                            }
+                                        }
+                                    }
+                                },
+                                // Handle other piece types (Knight, Bishop, Rook, Queen, King)
+                                _ => MoveType::Quite,
+                            }
+                        }
+                    };
+        
+                    // Return the resulting PieceMove
+                    PieceMove {
+                        piece,
+                        from,
+                        target,
+                        move_type,
                     }
                 }
             }
-
-            PieceMove{
-                piece: todo!(),
-                from: todo!(),
-                target: todo!(),
-                move_type: todo!(),
-            } 
         }
     }
 

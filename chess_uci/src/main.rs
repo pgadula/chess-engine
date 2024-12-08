@@ -28,25 +28,26 @@ fn main() {
                     if let Some(next_token) = lexer.next() {
                         match next_token.as_str() {
                             "startpos" => {
-                                let mut tokens = Vec::new(); // Buffer to collect tokens
+                                    let mut tokens = Vec::new(); // Buffer to collect tokens
 
-                                // Collect tokens until we reach the end or a condition
-                                while let Some(token) = lexer.next() {
-                                    tokens.push(token);
-                                }
+                                    while let Some(token) = lexer.next() {
+                                        if token == "moves" {
+                                            continue;
+                                        }
+                                        tokens.push(token);
+                                    }
 
-                                let uci_moves: Vec<String> = tokens
-                                .join(" ")
-                                .split_whitespace() 
-                                .map(|s| s.to_string()) 
-                                .collect(); 
+                                    let uci_moves: Vec<String> = tokens
+                                    .join(" ")
+                                    .split_whitespace() 
+                                    .map(|s| s.to_string()) 
+                                    .collect(); 
 
-                                println!("{:?}", uci_moves);
-                                if uci_moves.len() > 0 {
-                                    engine.apply_move(uci_moves);
-                                } else {
-                                    engine.new_game();
-                                }
+                                    if uci_moves.len() > 0 {
+                                        engine.apply_move(uci_moves);
+                                    } else {
+                                        engine.new_game();
+                                    }
                             }
                             "fen" => {
                                 let mut positon = Vec::new();
@@ -56,15 +57,14 @@ fn main() {
                                 let fen = positon.concat();
                                 println!("fen, {}", fen);
                                 engine.from(&fen);
-                                engine.print();
                             }
                             _ => {
                                 println!("
-                                Invalid usage of position command \n 
-                                    position startpos: Sets the starting position.
-                                    position fen [FEN]: Sets the position using a FEN string.
-                                    position startpos moves [moves]: Sets the position from the starting position and the list of moves.
-                                ")
+                                Invalid usage of position command:
+                                  position startpos       : Sets the starting position.
+                                  position fen [FEN]      : Sets the position using a FEN string.
+                                  position startpos moves [moves] : Sets the position from the starting position and the list of moves.
+                                ");
                             }
                         }
                     } else {
@@ -78,6 +78,7 @@ fn main() {
                 }
                 "go" => {
                     println!("UciGo");
+                    engine.go()
                 }
                 "ucinewgame" => {
                     engine.new_game();
@@ -87,6 +88,9 @@ fn main() {
                 }
                 "quit" => {
                     engine.quit();
+                }
+                "d" =>{
+                    engine.print();
                 }
                 _ => {
                     eprintln!("Unknown command: {:?}", token);
