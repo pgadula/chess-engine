@@ -308,17 +308,17 @@ impl GameState {
          king_mask & attacks_mask > 0
     }
 
-    pub fn get_valid_moves(&self) -> Vec<&PieceMove> {
+    pub fn get_valid_moves(&self) -> Vec<PieceMove> {
         let moves = if self.move_turn == Color::White {
-            &self.flat_white_moves
+            self.flat_white_moves.clone()
         } else {
-            &self.flat_black_moves
+            self.flat_black_moves.clone()
         };
         let mut game: GameState = self.clone();
 
-        let valid_attacks: Vec<&PieceMove> = moves
+        let valid_attacks: Vec<PieceMove> = moves
             .iter()
-            .map(|piece_move: &PieceMove| {
+            .map(|piece_move:&PieceMove | {
                 game.make_move(piece_move);
                 game.calculate_pseudolegal_moves();
                 let BoardSide {
@@ -329,7 +329,7 @@ impl GameState {
 
                 let check = game.detect_check(&king, &opposite_attacks);
                 game.unmake_move();
-                (check, piece_move)
+                (check, *piece_move)
             })
             .filter(|attack| attack.0 == false)
             .map(|tuple| tuple.1)
@@ -344,7 +344,7 @@ impl GameState {
 
         let valid_attacks = game.get_valid_moves();
 
-        let results: &Vec<(String, usize)> = &valid_attacks
+        let results: Vec<(String, usize)> = valid_attacks
             .par_iter()
             .map(|piece_move| {
                 let mut clone_game = game.clone();
@@ -354,11 +354,11 @@ impl GameState {
             })
             .collect();
         let total_nodes = &results
-            .into_iter()
+            .iter()
             .map(|el| el.1)
             .reduce(|acc, el| acc + el)
             .unwrap_or(0);
-        return (*total_nodes, results.to_vec());
+        return (*total_nodes, results);
     }
 
     fn inner_perft(&mut self, depth: usize) -> usize {
@@ -370,11 +370,12 @@ impl GameState {
         self.calculate_pseudolegal_moves();
         let valid_attacks = self.get_valid_moves();
 
+        let mut clone_game = self;
         for piece_move in &valid_attacks {
-            let mut clone_game = self.clone();
 
             clone_game.make_move(&piece_move);
             result += clone_game.inner_perft(depth - 1);
+            clone_game.unmake_move();
         }
 
         result

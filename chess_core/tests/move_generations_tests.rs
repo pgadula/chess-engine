@@ -25,9 +25,7 @@ mod tests {
     fn test_unmake_fn() {
         for test_case in TEST_CASES {
             // Create a new game state from the FEN string of the test case
-            let mut game = GameState::deserialize(test_case.fen);
-            println!();
-            println!();
+            let game = GameState::deserialize(test_case.fen);
             println!("[starting fen]:{}", test_case.fen);
             inner_nodes(game, 2);
         }
@@ -40,8 +38,8 @@ mod tests {
         println!("current fen:{} hash: {}", fen, expected_hash);
 
         original_game.calculate_pseudolegal_moves();
+        let mut cloned_game = original_game.clone();
         for mv in original_game.get_valid_moves() {
-            let mut cloned_game = original_game.clone();
             cloned_game.make_move(&mv);
             cloned_game.unmake_move();
 

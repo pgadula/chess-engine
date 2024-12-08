@@ -1,5 +1,6 @@
 mod engine;
 mod lexer;
+mod search_engine;
 
 use std::io;
 
