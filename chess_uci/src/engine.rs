@@ -1,4 +1,4 @@
-use std::thread::JoinHandle;
+use std::{collections::HashMap, thread::JoinHandle};
 
 use chess_core::{
     bitboard::{FenParser, GameState},
@@ -24,6 +24,16 @@ impl Engine {
         };
     }
 
+    pub fn go(&mut self) {
+        let mut searcher = SearchEngine{
+            max_depth: 10,
+            board: self.board.clone(),
+            cache: HashMap::new()
+        };
+        let result = searcher.search();
+        println!("bestmove {}", result);
+    }
+
     pub fn new_game(&mut self) {
         self.board = GameState::new_game();
     }
@@ -32,7 +42,7 @@ impl Engine {
         self.board = GameState::deserialize(fen);
     }
 
-    pub fn quit(&mut self) {
+    pub fn quit(&mut self){
         self.is_running = false;
     }
 
@@ -47,16 +57,6 @@ impl Engine {
     pub fn stop_thinking() {
         todo!()
     }
-
-    pub fn go(&mut self) {
-        let searcher = SearchEngine{
-            max_depth: 40,
-            board: self.board.clone(),
-        };
-        let result = searcher.search();
-        println!("bestmove {}", result);
-    }
-
     pub fn apply_move(&mut self, uci_moves: Vec<String>) {
         self.new_game();
         for uci in uci_moves {

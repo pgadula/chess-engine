@@ -7,7 +7,6 @@ use std::process::{Command, Stdio};
 use std::str::Utf8Error;
 use std::{collections::HashSet, io::Write};
 
-use chess_core::utility::print_as_board;
 use chess_core::{
     bitboard::{FenParser, GameState},
     types::PieceMove,

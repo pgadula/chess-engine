@@ -458,29 +458,31 @@
         }
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[repr(u8)]
     pub enum MoveType{
         Quite,
         DoublePush(Option<FileRank>),
-        Capture,
-        Promotion(PieceType),
-        CaptureWithPromotion(PieceType),
         CastleKingSide,
-        CastleQueenSide
+        CastleQueenSide,
+        Promotion(PieceType),
+        Capture,
+        CaptureWithPromotion(PieceType),
     }
+    
 
-pub const WHITE_CASTLING_RIGHTS_MASK: u64 = 0b1100;
-pub const BLACK_CASTLING_RIGHTS_MASK: u64 = 0b0011;
- 
-pub const WHITE_CASTLING_KING_MASK: u64 = 0b1000;
-pub const WHITE_CASTLING_QUEEN_MASK: u64 = 0b0100;
- 
-pub const BLACK_CASTLING_KING_MASK: u64 = 0b0010;
-pub const BLACK_CASTLING_QUEEN_MASK: u64 = 0b0001;
-    #[derive(Debug, Clone, Copy)]
-pub struct Castling {
-    pub mask: u64
-}
+    pub const WHITE_CASTLING_RIGHTS_MASK: u64 = 0b1100;
+    pub const BLACK_CASTLING_RIGHTS_MASK: u64 = 0b0011;
+    
+    pub const WHITE_CASTLING_KING_MASK: u64 = 0b1000;
+    pub const WHITE_CASTLING_QUEEN_MASK: u64 = 0b0100;
+    
+    pub const BLACK_CASTLING_KING_MASK: u64 = 0b0010;
+    pub const BLACK_CASTLING_QUEEN_MASK: u64 = 0b0001;
+        #[derive(Debug, Clone, Copy)]
+    pub struct Castling {
+        pub mask: u64
+    }
 
  impl Castling {
      pub fn new() -> Castling {

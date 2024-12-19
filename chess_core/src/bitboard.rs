@@ -56,7 +56,8 @@ impl GameState {
             captured_piece: None,
             captured_piece_position: None,
             previous_castling_rights: self.castling.mask,
-            half_moves: self.halfmove_clock.counter()
+            half_moves: self.halfmove_clock.counter(),
+            full_moves: self.fullmove_number.counter()
         };
 
         self.halfmove_clock.tick();
@@ -126,6 +127,8 @@ impl GameState {
     pub fn unmake_move(&mut self){
         if let Some(last_move) = self.history.pop(){
             self.halfmove_clock = Clock::from(last_move.half_moves);
+            self.fullmove_number = Clock::from(last_move.full_moves);
+
             self.castling = Castling::from_mask(last_move.previous_castling_rights);
 
             match last_move.piece_move.move_type {
@@ -185,7 +188,6 @@ impl GameState {
                     }
                 },
             }
-            self.fullmove_number = Clock::from(self.fullmove_number.counter());
             self.move_turn = self.move_turn.flip();
             self.en_passant = last_move.en_passant;
             
@@ -334,6 +336,7 @@ impl GameState {
             .filter(|attack| attack.0 == false)
             .map(|tuple| tuple.1)
             .collect();
+
         valid_attacks
     }
 
@@ -890,11 +893,12 @@ impl Default for GameState {
 
 #[derive(Clone, Debug)]
 pub struct UnmakeInfo{
-    piece_move:PieceMove,
+    pub piece_move:PieceMove,
     captured_piece: Option<Piece>,
     captured_piece_position: Option<FileRank>,
     previous_hash:u64,
     previous_castling_rights: u64,
     half_moves: u8,
+    full_moves: u8,
     en_passant: Option<FileRank>
 }
