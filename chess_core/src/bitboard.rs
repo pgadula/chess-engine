@@ -1,9 +1,12 @@
-use crate::types::{Castling, Clock, BLACK_CASTLING_KING_MASK, BLACK_CASTLING_QUEEN_MASK, BLACK_KING, WHITE_CASTLING_KING_MASK, WHITE_CASTLING_QUEEN_MASK, WHITE_KING};
+use crate::types::{
+    Castling, Clock, BLACK_CASTLING_KING_MASK, BLACK_CASTLING_QUEEN_MASK, BLACK_KING,
+    WHITE_CASTLING_KING_MASK, WHITE_CASTLING_QUEEN_MASK, WHITE_KING,
+};
 use crate::zobrist_hashing::ZobristHashing;
 use crate::{
     file_rank::{
-        BLACK_KING_CASTLE_BOARD_MASK, BLACK_QUEEN_CASTLE_BOARD_MASK, RANK_3, WHITE_KING_CASTLE_BOARD_MASK,
-        WHITE_QUEEN_CASTLE_BOARD_MASK,
+        BLACK_KING_CASTLE_BOARD_MASK, BLACK_QUEEN_CASTLE_BOARD_MASK, RANK_3,
+        WHITE_KING_CASTLE_BOARD_MASK, WHITE_QUEEN_CASTLE_BOARD_MASK,
     },
     magic_gen::MoveLookupTable,
     moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves},
@@ -32,9 +35,9 @@ pub struct GameState {
     pub b_moves_mask: u64,
 
     pub zobrist_hashing: Arc<ZobristHashing>,
-    pub hash:u64,
+    pub hash: u64,
 
-    pub history: Vec<UnmakeInfo>
+    pub history: Vec<UnmakeInfo>,
 }
 
 pub trait FenParser {
@@ -43,13 +46,12 @@ pub trait FenParser {
 }
 
 impl GameState {
-
     pub fn empty() -> GameState {
         Default::default()
     }
 
     pub fn make_move(&mut self, piece_move: &PieceMove) {
-        let mut state = UnmakeInfo{
+        let mut state = UnmakeInfo {
             piece_move: piece_move.clone(),
             previous_hash: self.hash,
             en_passant: self.en_passant,
@@ -57,7 +59,7 @@ impl GameState {
             captured_piece_position: None,
             previous_castling_rights: self.castling.mask,
             half_moves: self.halfmove_clock.counter(),
-            full_moves: self.fullmove_number.counter()
+            full_moves: self.fullmove_number.counter(),
         };
 
         self.halfmove_clock.tick();
@@ -111,21 +113,19 @@ impl GameState {
                 }
                 self.halfmove_clock.reset()
             }
-            MoveType::Quite => {
-                self.move_piece(piece_move)
-            }
+            MoveType::Quite => self.move_piece(piece_move),
         }
         if !en_passant_is_updated {
             self.en_passant = None;
         }
         self.move_turn = self.move_turn.flip();
         self.hash = self.zobrist_hashing.get_hash(&self);
-        
+
         self.history.push(state);
     }
 
-    pub fn unmake_move(&mut self){
-        if let Some(last_move) = self.history.pop(){
+    pub fn unmake_move(&mut self) {
+        if let Some(last_move) = self.history.pop() {
             self.halfmove_clock = Clock::from(last_move.half_moves);
             self.fullmove_number = Clock::from(last_move.full_moves);
 
@@ -135,67 +135,83 @@ impl GameState {
                 MoveType::Quite => {
                     self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
                     self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
-                },
-                MoveType::DoublePush(_) =>{
+                }
+                MoveType::DoublePush(_) => {
                     self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
                     self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
                 }
                 MoveType::Capture => {
-                   self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
-                   self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
-                   self.set_piece(&last_move.captured_piece.unwrap(),&last_move.captured_piece_position.unwrap_or(last_move.piece_move.target) );
+                    self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
+                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
+                    self.set_piece(
+                        &last_move.captured_piece.unwrap(),
+                        &last_move
+                            .captured_piece_position
+                            .unwrap_or(last_move.piece_move.target),
+                    );
                 }
                 MoveType::CaptureWithPromotion(piece_type) => {
-                    self.clear_piece(&Piece{piece_type, color: last_move.piece_move.piece.color }, &last_move.piece_move.target);
+                    self.clear_piece(
+                        &Piece {
+                            piece_type,
+                            color: last_move.piece_move.piece.color,
+                        },
+                        &last_move.piece_move.target,
+                    );
                     self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
-                    self.set_piece(&last_move.captured_piece.unwrap(),&last_move.captured_piece_position.unwrap_or(last_move.piece_move.target) );
-                },
-                MoveType::Promotion(piece_type) => {
-                    self.clear_piece(&Piece{piece_type, color: last_move.piece_move.piece.color }, &last_move.piece_move.target);
-                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
-                },
-                 MoveType::CastleQueenSide => {
-                    match last_move.piece_move.piece.color {
-                        Color::White => {
-                            self.clear_piece(&WHITE_KING, &FileRank::C1);
-                            self.clear_piece(&WHITE_ROOK, &FileRank::D1);
-                            self.set_piece(&WHITE_KING, &FileRank::E1);
-                            self.set_piece(&WHITE_ROOK, &FileRank::A1);
-                        }
-                        Color::Black => {
-                            self.clear_piece(&BLACK_KING, &FileRank::C8);
-                            self.clear_piece(&BLACK_ROOK, &FileRank::D8);
-                            self.set_piece(&BLACK_KING, &FileRank::E8);
-                            self.set_piece(&BLACK_ROOK, &FileRank::A8);
-                        }
-                    }
+                    self.set_piece(
+                        &last_move.captured_piece.unwrap(),
+                        &last_move
+                            .captured_piece_position
+                            .unwrap_or(last_move.piece_move.target),
+                    );
                 }
-                MoveType::CastleKingSide => {
-                 match last_move.piece_move.piece.color {
-                        Color::White => {
-                            self.clear_piece(&WHITE_KING, &FileRank::G1);
-                            self.clear_piece(&WHITE_ROOK, &FileRank::F1);
-                            self.set_piece(&WHITE_KING, &FileRank::E1);
-                            self.set_piece(&WHITE_ROOK, &FileRank::H1);
-
-                        }
-                        Color::Black => {
-                            self.clear_piece(&BLACK_KING, &FileRank::G8);
-                            self.clear_piece(&BLACK_ROOK, &FileRank::F8);
-                            self.set_piece(&BLACK_KING, &FileRank::E8);
-                            self.set_piece(&BLACK_ROOK, &FileRank::H8);
-                        }
+                MoveType::Promotion(piece_type) => {
+                    self.clear_piece(
+                        &Piece {
+                            piece_type,
+                            color: last_move.piece_move.piece.color,
+                        },
+                        &last_move.piece_move.target,
+                    );
+                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
+                }
+                MoveType::CastleQueenSide => match last_move.piece_move.piece.color {
+                    Color::White => {
+                        self.clear_piece(&WHITE_KING, &FileRank::C1);
+                        self.clear_piece(&WHITE_ROOK, &FileRank::D1);
+                        self.set_piece(&WHITE_KING, &FileRank::E1);
+                        self.set_piece(&WHITE_ROOK, &FileRank::A1);
+                    }
+                    Color::Black => {
+                        self.clear_piece(&BLACK_KING, &FileRank::C8);
+                        self.clear_piece(&BLACK_ROOK, &FileRank::D8);
+                        self.set_piece(&BLACK_KING, &FileRank::E8);
+                        self.set_piece(&BLACK_ROOK, &FileRank::A8);
+                    }
+                },
+                MoveType::CastleKingSide => match last_move.piece_move.piece.color {
+                    Color::White => {
+                        self.clear_piece(&WHITE_KING, &FileRank::G1);
+                        self.clear_piece(&WHITE_ROOK, &FileRank::F1);
+                        self.set_piece(&WHITE_KING, &FileRank::E1);
+                        self.set_piece(&WHITE_ROOK, &FileRank::H1);
+                    }
+                    Color::Black => {
+                        self.clear_piece(&BLACK_KING, &FileRank::G8);
+                        self.clear_piece(&BLACK_ROOK, &FileRank::F8);
+                        self.set_piece(&BLACK_KING, &FileRank::E8);
+                        self.set_piece(&BLACK_ROOK, &FileRank::H8);
                     }
                 },
             }
             self.move_turn = self.move_turn.flip();
             self.en_passant = last_move.en_passant;
-            
+
             self.hash = self.zobrist_hashing.get_hash(self)
-        }else{
+        } else {
             eprintln!("Error: History stack is empty!")
         }
-
     }
 
     fn increment_full_move(&mut self) {
@@ -230,7 +246,12 @@ impl GameState {
         self.set_piece(&piece_move.piece, &piece_move.target);
     }
 
-    fn capture_with_promotion(&mut self, piece_move: &PieceMove, promotion: &PieceType, state:  &mut UnmakeInfo) {
+    fn capture_with_promotion(
+        &mut self,
+        piece_move: &PieceMove,
+        promotion: &PieceType,
+        state: &mut UnmakeInfo,
+    ) {
         self.handle_capture(piece_move, state);
         self.promote(piece_move, promotion);
     }
@@ -245,7 +266,7 @@ impl GameState {
         self.set_piece(new_piece, &piece_move.target);
     }
 
-    fn handle_capture(&mut self, piece_move: &PieceMove, state:  &mut UnmakeInfo) {
+    fn handle_capture(&mut self, piece_move: &PieceMove, state: &mut UnmakeInfo) {
         self.halfmove_clock.reset();
 
         if let Some(target_piece) = self.get_piece_at(&piece_move.target) {
@@ -263,15 +284,12 @@ impl GameState {
                         };
 
                         let captured_piece = &Piece {
-                                color: piece_move.piece.color.flip(),
-                                piece_type: PieceType::Pawn,
-                            };
+                            color: piece_move.piece.color.flip(),
+                            piece_type: PieceType::Pawn,
+                        };
                         state.captured_piece = Some(captured_piece.clone());
                         state.captured_piece_position = Some(target_file_rank);
-                        self.clear_piece(
-                            captured_piece,
-                            &target_file_rank,
-                        )
+                        self.clear_piece(captured_piece, &target_file_rank)
                     }
                 }
             }
@@ -279,17 +297,12 @@ impl GameState {
     }
 
     pub fn calculate_pseudolegal_moves(&mut self) {
+
         let white = self.get_board_side_info(&Color::White);
         let black = self.get_board_side_info(&Color::Black);
 
-        let (w_mask, w_flat_moves) = self.get_pseudolegal_moves(&white);
-        let (b_mask, b_flat_moves) = self.get_pseudolegal_moves(&black);
-
-        self.b_moves_mask = b_mask;
-        self.w_moves_mask = w_mask;
-
-        self.flat_white_moves = w_flat_moves;
-        self.flat_black_moves = b_flat_moves;
+        self.get_pseudolegal_moves(&white);
+        self.get_pseudolegal_moves(&black);
 
         let side = &self.get_board_side_info(&self.move_turn);
 
@@ -307,7 +320,7 @@ impl GameState {
     }
 
     pub fn detect_check(&self, king_mask: &u64, attacks_mask: &u64) -> bool {
-         king_mask & attacks_mask > 0
+        king_mask & attacks_mask > 0
     }
 
     pub fn get_valid_moves(&self) -> Vec<PieceMove> {
@@ -320,7 +333,7 @@ impl GameState {
 
         let valid_attacks: Vec<PieceMove> = moves
             .iter()
-            .map(|piece_move:&PieceMove | {
+            .map(|piece_move: &PieceMove| {
                 game.make_move(piece_move);
                 game.calculate_pseudolegal_moves();
                 let BoardSide {
@@ -375,7 +388,6 @@ impl GameState {
 
         let mut clone_game = self;
         for piece_move in &valid_attacks {
-
             clone_game.make_move(&piece_move);
             result += clone_game.inner_perft(depth - 1);
             clone_game.unmake_move();
@@ -384,7 +396,10 @@ impl GameState {
         result
     }
 
-    pub fn get_pseudolegal_moves(&self, side: &BoardSide) -> (u64, Vec<PieceMove>) {
+    pub fn get_pseudolegal_moves(
+        &mut self,
+        side: &BoardSide
+    ) {
         let BoardSide {
             mut bishops,
             mut friendly_blockers,
@@ -397,89 +412,98 @@ impl GameState {
             color,
             ..
         } = side;
+
+        let all_pieces: u64 = self.get_all_pieces();
+        
+        let (mut side_moves, mut move_mask): (&mut Vec<PieceMove>, &mut u64)  = if *color == Color::White {
+            (&mut self.flat_white_moves,&mut self.w_moves_mask)
+        }else{
+            (&mut self.flat_black_moves, &mut self.b_moves_mask)
+        };
+
+        //reset
+        side_moves.clear();
+        *move_mask = 0;
+
         let color = color.clone();
         let lookup_table = self.move_lookup_table.clone();
         let rev_friendly_blockers = !friendly_blockers;
 
-        let mut flat_moves: Vec<PieceMove> = Vec::with_capacity(50);
-        let mut move_mask = 0u64;
-
         for rook_position in get_file_ranks(rooks) {
             let mut rook_move: u64 =
-                lookup_table.get_rook_attack(rook_position, self) & rev_friendly_blockers;
-            move_mask |= rook_move;
+                lookup_table.get_rook_attack(rook_position, all_pieces) & rev_friendly_blockers;
+            *move_mask |= rook_move;
             fill_moves(
                 rook_position,
                 Piece::from(&PieceType::Rook, &color),
                 rook_move,
-                &mut flat_moves,
+                &mut side_moves,
                 opposite_blockers,
             );
         }
         for bishop_position in get_file_ranks(bishops) {
             let bishop_moves: u64 =
-                lookup_table.get_bishop_attack(bishop_position, self) & rev_friendly_blockers;
-            move_mask |= bishop_moves;
+                lookup_table.get_bishop_attack(bishop_position, all_pieces) & rev_friendly_blockers;
+            *move_mask |= bishop_moves;
 
             fill_moves(
                 bishop_position,
                 Piece::from(&PieceType::Bishop, &color),
                 bishop_moves,
-                &mut flat_moves,
+                &mut side_moves,
                 opposite_blockers,
             );
         }
 
         for queen_position in get_file_ranks(queens) {
-            let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, &self);
-            let rook_moves: u64 = lookup_table.get_rook_attack(queen_position, &self);
+            let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, all_pieces);
+            let rook_moves: u64 = lookup_table.get_rook_attack(queen_position,  all_pieces);
             let sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
-            move_mask |= sliding_moves;
+            *move_mask |= sliding_moves;
             fill_moves(
                 queen_position,
                 Piece::from(&PieceType::Queen, &color),
                 sliding_moves,
-                &mut flat_moves,
+                &mut side_moves,
                 opposite_blockers,
             );
         }
 
         for knight_position in get_file_ranks(knights) {
             let attacks = get_knight_attacks(knight_position) & rev_friendly_blockers;
-            move_mask |= attacks;
+            *move_mask |= attacks;
             fill_moves(
                 knight_position,
                 Piece::from(&PieceType::Knight, &color),
                 attacks,
-                &mut flat_moves,
+                &mut side_moves,
                 opposite_blockers,
             );
         }
-
+        let empty_squares = !all_pieces;
         get_pawn_moves(
             side.color,
             side.pawns,
-            self.empty_square(),
+            empty_squares,
             side.opposite_blockers,
             &self.en_passant,
             &mut move_mask,
-            &mut flat_moves,
+            &mut side_moves,
         );
 
         for king_position in get_file_ranks(king) {
-            let i = king_position.index();
             let attacks = get_king_attacks(king_position) & rev_friendly_blockers;
-            move_mask |= attacks;
+            *move_mask |= attacks;
             fill_moves(
                 king_position,
                 Piece::from(&PieceType::King, &color),
                 attacks,
-                &mut flat_moves,
+                &mut side_moves,
                 opposite_blockers,
             );
         }
 
-        (move_mask, flat_moves)
+
     }
 
     fn get_castling_moves(&self, side: &BoardSide) -> Option<Vec<PieceMove>> {
@@ -664,7 +688,7 @@ impl GameState {
         println!("  a b c d e f g h");
         println!("fen: {}", GameState::serialize(&self))
     }
-    pub fn println(&self){
+    pub fn println(&self) {
         self.print();
         println!();
     }
@@ -880,25 +904,25 @@ impl Default for GameState {
             en_passant: None,
             halfmove_clock: Clock::new(),
             fullmove_number: Clock::new(),
-            flat_black_moves: Vec::with_capacity(50),
-            flat_white_moves: Vec::with_capacity(50),
+            flat_black_moves: Vec::with_capacity(1024),
+            flat_white_moves: Vec::with_capacity(1024),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
             zobrist_hashing: Arc::new(zobrist_hashing),
             hash: 0,
-            history: Vec::with_capacity(1024)
+            history: Vec::with_capacity(1024),
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct UnmakeInfo{
-    pub piece_move:PieceMove,
+pub struct UnmakeInfo {
+    pub piece_move: PieceMove,
     captured_piece: Option<Piece>,
     captured_piece_position: Option<FileRank>,
-    previous_hash:u64,
+    previous_hash: u64,
     previous_castling_rights: u64,
     half_moves: u8,
     full_moves: u8,
-    en_passant: Option<FileRank>
+    en_passant: Option<FileRank>,
 }

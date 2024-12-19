@@ -67,25 +67,25 @@ impl MoveLookupTable {
         }
     }
 
-    pub fn get_rook_attack(&self, file_rank: FileRank, bit_board: &GameState) -> u64 {
+    pub fn get_rook_attack(&self, file_rank: FileRank, all_pieces:u64) -> u64 {
         let fr_index = file_rank.index();
 
         let attack_mask = ROOK_ATTACK_MASK[fr_index];
         let magic_number = ROOK_MAGIC_NUMBERS[fr_index];
         let shift = ROOK_SHIFTS[fr_index] as usize;
-        let blockers: u64 = attack_mask & bit_board.get_all_pieces();
+        let blockers: u64 = attack_mask & all_pieces;
         let magic_index = MagicHelper::get_magic_index(blockers, magic_number, shift);
         let attacks = self.rook_attacks[fr_index][magic_index];
         attacks
     }
 
-    pub fn get_bishop_attack(&self, file_rank: FileRank, bit_board: &GameState) -> u64 {
+    pub fn get_bishop_attack(&self, file_rank: FileRank, all_pieces:u64) -> u64 {
         let fr_index = file_rank.index();
 
         let attack_mask = BISHOP_ATTACK_MASK[fr_index];
         let magic_number = BISHOP_MAGIC_NUMBERS[fr_index];
         let shift = BISHOP_SHIFTS[fr_index] as usize;
-        let blockers: u64 = attack_mask & bit_board.get_all_pieces();
+        let blockers: u64 = attack_mask & all_pieces;
         let magic_index = MagicHelper::get_magic_index(blockers, magic_number, shift);
         let attacks = self.bishop_attacks[fr_index][magic_index];
         attacks
