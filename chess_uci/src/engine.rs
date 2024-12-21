@@ -23,7 +23,7 @@ impl Engine {
             is_running: true,
             is_searching: false,
             thread: None,
-            search_engine: SearchEngine::new(8),
+            search_engine: SearchEngine::new(8)
         };
     }
 

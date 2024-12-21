@@ -4,7 +4,6 @@ use chess_core::bitboard::GameState;
 
 pub struct SearchEngine {
     pub max_depth: u8,
-    pub board: GameState,
     pub cache: HashMap<u64, SearchResult>,
 }
 
@@ -25,8 +24,8 @@ pub enum NodeType {
 }
 
 impl SearchEngine {
-    pub fn search(&mut self) -> String {
-        let mut game = self.board.clone();
+    pub fn search(&mut self, board: &GameState) -> String {
+        let mut game = board.clone();
         game.calculate_pseudolegal_moves();
         let valid_moves = game.get_valid_moves();
         let mut result = Vec::new();
@@ -195,5 +194,16 @@ impl SearchEngine {
             node_type,
         };
         self.cache.insert(hash, search_result);
+    }
+
+    pub fn new(max_depth: u8)->SearchEngine{
+        SearchEngine{
+            max_depth,
+            cache: HashMap::new()
+        }
+    }
+
+    pub fn clear_lookup_table(& mut self){
+        self.cache.clear();
     }
 }
