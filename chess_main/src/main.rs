@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, time::Instant};
 
 use chess_uci::{engine::Engine, lexer::Lexer};
 fn main() {
@@ -73,7 +73,10 @@ fn main() {
                 }
                 "go" => {
                     println!("UciGo");
-                    engine.go()
+                    let now = Instant::now();
+                    engine.go();
+                    let elapsed = now.elapsed();
+                    println!("Thinking time: {:.2?}", elapsed);
                 }
                 "ucinewgame" => {
                     engine.new_game();
