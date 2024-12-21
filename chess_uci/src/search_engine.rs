@@ -1,13 +1,13 @@
-use std::{collections::HashMap, i32};
 
 use chess_core::bitboard::GameState;
+const LOOKUP_TABLE_SIZE: usize = 32768*32768;
 
 pub struct SearchEngine {
     pub max_depth: u8,
-    pub cache: HashMap<u64, SearchResult>,
+    pub lookup_table: Vec<SearchResult>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct SearchResult {
     depth: u8,
     hash: u64,
@@ -15,6 +15,18 @@ pub struct SearchResult {
     is_max: bool,
     node_type: NodeType,
 }
+impl SearchResult {
+    pub fn empty()->SearchResult{
+        SearchResult{
+            depth: 0,
+            hash: 0,
+            score: 0,
+            is_max: false,
+            node_type: NodeType::Exact,
+        }
+    }
+}
+static mut COLLISION_DETECTED:u64 = 0;
 
 #[derive(Debug, Clone, Copy)]
 pub enum NodeType {
@@ -24,8 +36,8 @@ pub enum NodeType {
 }
 
 impl SearchEngine {
-    pub fn search(&mut self, board: &GameState) -> String {
-        let mut game = board.clone();
+    pub fn search(&mut self, game:&GameState) -> String {
+        let mut game = game.clone();
         game.calculate_pseudolegal_moves();
         let valid_moves = game.get_valid_moves();
         let mut result = Vec::new();
@@ -44,6 +56,10 @@ impl SearchEngine {
         result.sort_by(|(_, a), (_, b)| b.cmp(a));
         println!("{:?}", result);
         println!();
+        unsafe {
+            println!("Warning: Number of hash collision: {}", COLLISION_DETECTED);
+        }
+
         println!("score: {}", result[0].1);
         return result[0].0.clone();
     }
@@ -58,17 +74,17 @@ impl SearchEngine {
     ) -> i32 {
         let original_alpha = alpha;
         let original_beta = beta;
-    
+
         if let Some(score) = self.try_get_from_cache(node.hash, depth, alpha, beta, is_max) {
             return score;
         }
 
         let mut alpha = alpha;
         let mut beta = beta;
-    
+
         node.calculate_pseudolegal_moves();
         let valid_moves = node.get_valid_moves();
-    
+
         if depth == self.max_depth || valid_moves.is_empty() {
             let score = self.score_board(&node);
             let search_result = SearchResult {
@@ -78,10 +94,11 @@ impl SearchEngine {
                 is_max,
                 node_type: NodeType::Exact,
             };
-            self.cache.insert(node.hash, search_result);
+            let index = self.get_index(node.hash);
+            self.lookup_table[index] = search_result;
             return score;
         }
-    
+
         let mut best_value;
         if is_max {
             best_value = i32::MIN;
@@ -89,7 +106,7 @@ impl SearchEngine {
                 node.make_move(&mv);
                 let eval = self.min_max(alpha, beta, depth + 1, false, node);
                 node.unmake_move();
-    
+
                 if eval > best_value {
                     best_value = eval;
                 }
@@ -106,7 +123,7 @@ impl SearchEngine {
                 node.make_move(&mv);
                 let eval = self.min_max(alpha, beta, depth + 1, true, node);
                 node.unmake_move();
-    
+
                 if eval < best_value {
                     best_value = eval;
                 }
@@ -118,7 +135,7 @@ impl SearchEngine {
                 }
             }
         }
-    
+
         let node_type = if best_value <= original_alpha {
             NodeType::UpperBound
         } else if best_value >= original_beta {
@@ -126,9 +143,9 @@ impl SearchEngine {
         } else {
             NodeType::Exact
         };
-    
+
         self.store_in_cache(node.hash, depth, best_value, is_max, node_type);
-    
+
         best_value
     }
 
@@ -140,8 +157,18 @@ impl SearchEngine {
         beta: i32,
         is_max: bool,
     ) -> Option<i32> {
-        if let Some(result) = self.cache.get(&hash) {
-            if result.depth >= current_depth && result.is_max == is_max {
+        let index = self.get_index(hash);
+        let result = self.lookup_table[index];
+        if result.hash == 0{
+            return None
+        }
+        if result.hash != hash {
+            unsafe {
+                COLLISION_DETECTED = COLLISION_DETECTED + 1;
+            }
+            return None;
+        }
+        else if result.depth >= current_depth && result.is_max == is_max {
                 match result.node_type {
                     NodeType::Exact => {
                         return Some(result.score);
@@ -158,7 +185,6 @@ impl SearchEngine {
                     }
                 }
             }
-        }
         None
     }
 
@@ -178,6 +204,10 @@ impl SearchEngine {
         white_sum - black_sum
     }
 
+    fn get_index(&self ,hash: u64)->usize{
+        return (hash as usize) % (self.lookup_table.len() - 1)
+    }
+
     fn store_in_cache(
         &mut self,
         hash: u64,
@@ -193,17 +223,26 @@ impl SearchEngine {
             is_max,
             node_type,
         };
-        self.cache.insert(hash, search_result);
+        let index = self.get_index(hash);
+        self.lookup_table[index] = search_result;
     }
 
-    pub fn new(max_depth: u8)->SearchEngine{
-        SearchEngine{
+    pub fn new(max_depth: u8) -> SearchEngine {
+        
+        let empty = SearchResult::empty();
+        return SearchEngine {
             max_depth,
-            cache: HashMap::new()
+            lookup_table:  vec![empty; LOOKUP_TABLE_SIZE],
+        };
+    }
+
+    pub fn clear_lookup_table(&mut self){
+        let empty =SearchResult::empty();
+        self.lookup_table =  vec![empty; LOOKUP_TABLE_SIZE];
+        unsafe {
+            COLLISION_DETECTED = 0;
         }
     }
 
-    pub fn clear_lookup_table(& mut self){
-        self.cache.clear();
-    }
+
 }
