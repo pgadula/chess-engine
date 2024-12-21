@@ -27,7 +27,7 @@ mod tests {
             // Create a new game state from the FEN string of the test case
             let game = GameState::deserialize(test_case.fen);
             println!("[starting fen]:{}", test_case.fen);
-            inner_nodes(game, 2);
+            inner_nodes(game, 3);
         }
     }
 
@@ -42,6 +42,7 @@ mod tests {
         for mv in original_game.get_valid_moves() {
             cloned_game.make_move(&mv);
             cloned_game.unmake_move();
+            cloned_game.hash = cloned_game.zobrist_hashing.get_hash(&cloned_game);
 
             assert_eq!(
                     expected_hash, cloned_game.hash,

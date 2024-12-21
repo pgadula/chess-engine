@@ -1,4 +1,4 @@
-use std::{collections::HashMap, thread::JoinHandle};
+use std::thread::JoinHandle;
 
 use chess_core::{
     bitboard::{FenParser, GameState},
@@ -12,25 +12,23 @@ pub struct Engine {
     is_searching: bool,
     board: GameState,
     thread: Option<JoinHandle<()>>,
+    search_engine: SearchEngine,
 }
 
 impl Engine {
     pub fn new() -> Self {
+        let board: GameState = GameState::new_game();
         return Engine {
-            board: GameState::new_game(),
+            board: board,
             is_running: true,
             is_searching: false,
             thread: None,
+            search_engine: SearchEngine::new(8),
         };
     }
 
     pub fn go(&mut self) {
-        let mut searcher = SearchEngine{
-            max_depth: 10,
-            board: self.board.clone(),
-            cache: HashMap::new()
-        };
-        let result = searcher.search();
+        let result = self.search_engine.search(&self.board);
         println!("bestmove {}", result);
     }
 
@@ -42,7 +40,7 @@ impl Engine {
         self.board = GameState::deserialize(fen);
     }
 
-    pub fn quit(&mut self){
+    pub fn quit(&mut self) {
         self.is_running = false;
     }
 

@@ -1,12 +1,6 @@
-mod engine;
-mod lexer;
-mod search_engine;
-
 use std::io;
 
-use engine::Engine;
-use lexer::Lexer;
-
+use chess_uci::{engine::Engine, lexer::Lexer};
 fn main() {
     let mut engine = Engine::new();
 

@@ -5,7 +5,8 @@ edition = "2021"
 
 
 [dependencies]
-chess_core = { path = "../chess_core" }
+chess_uci = { path = "../chess_uci" }
+
 rayon = "1.5"
 
 rand = "0.8.5"
