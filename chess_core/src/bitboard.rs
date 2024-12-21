@@ -208,7 +208,7 @@ impl GameState {
             self.move_turn = self.move_turn.flip();
             self.en_passant = last_move.en_passant;
 
-            self.hash = self.zobrist_hashing.get_hash(self)
+            self.hash = last_move.previous_hash;
         } else {
             eprintln!("Error: History stack is empty!")
         }
@@ -325,9 +325,9 @@ impl GameState {
 
     pub fn get_valid_moves(&self) -> Vec<PieceMove> {
         let moves = if self.move_turn == Color::White {
-            self.flat_white_moves.clone()
+            &self.flat_white_moves
         } else {
-            self.flat_black_moves.clone()
+            &self.flat_black_moves
         };
         let mut game: GameState = self.clone();
 
@@ -335,7 +335,8 @@ impl GameState {
             .iter()
             .map(|piece_move: &PieceMove| {
                 game.make_move(piece_move);
-                game.calculate_pseudolegal_moves();
+                let side = game.get_board_side_info(&game.move_turn) ;
+                game.get_pseudolegal_moves(&side);
                 let BoardSide {
                     king,
                     opposite_attacks,
