@@ -19,7 +19,7 @@ impl Engine {
     pub fn new() -> Self {
         let board: GameState = GameState::new_game();
         return Engine {
-            board: board,
+            board,
             is_running: true,
             is_searching: false,
             thread: None,
