@@ -19,7 +19,9 @@ use crate::{
 use rayon::prelude::*;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+const TEMP_CAPACITY: usize = 1024;
+
+#[derive(Debug)]
 pub struct GameState {
     pub bitboard: [u64; 12],
     pub move_turn: Color,
@@ -38,6 +40,26 @@ pub struct GameState {
     pub hash: u64,
 
     pub history: Vec<UnmakeInfo>,
+}
+impl Clone for GameState {
+    fn clone(&self) -> Self {
+        Self {
+            bitboard: self.bitboard.clone(),
+            move_turn: self.move_turn.clone(),
+            castling: self.castling.clone(),
+            halfmove_clock: self.halfmove_clock.clone(),
+            fullmove_number: self.fullmove_number.clone(),
+            en_passant: self.en_passant.clone(),
+            move_lookup_table: self.move_lookup_table.clone(),
+            flat_white_moves: Vec::with_capacity(TEMP_CAPACITY),
+            flat_black_moves: Vec::with_capacity(TEMP_CAPACITY),
+            w_moves_mask: self.w_moves_mask.clone(),
+            b_moves_mask: self.b_moves_mask.clone(),
+            zobrist_hashing: self.zobrist_hashing.clone(),
+            hash: self.hash.clone(),
+            history: self.history.clone(),
+        }
+    }
 }
 
 pub trait FenParser {
@@ -260,7 +282,7 @@ impl GameState {
         self.halfmove_clock.reset();
         let new_piece = &Piece {
             piece_type: *promotion,
-            color: piece_move.piece.color.clone(),
+            color: piece_move.piece.color,
         };
         self.clear_piece(&piece_move.piece, &piece_move.from);
         self.set_piece(new_piece, &piece_move.target);
@@ -297,7 +319,6 @@ impl GameState {
     }
 
     pub fn calculate_pseudolegal_moves(&mut self) {
-
         let white = self.get_board_side_info(&Color::White);
         let black = self.get_board_side_info(&Color::Black);
 
@@ -317,6 +338,12 @@ impl GameState {
                 }
             }
         }
+        // if self.move_turn == Color::White{
+        //     self.flat_white_moves.sort_by(|a, b| a.move_type.score().cmp(&b.move_type.score()));
+        // }else{
+        //     self.flat_black_moves.sort_by(|a, b| a.move_type.score().cmp(&b.move_type.score()));
+
+        // }
     }
 
     pub fn detect_check(&self, king_mask: &u64, attacks_mask: &u64) -> bool {
@@ -335,7 +362,7 @@ impl GameState {
             .iter()
             .map(|piece_move: &PieceMove| {
                 game.make_move(piece_move);
-                let side = game.get_board_side_info(&game.move_turn) ;
+                let side = game.get_board_side_info(&game.move_turn);
                 game.get_pseudolegal_moves(&side);
                 let BoardSide {
                     king,
@@ -387,20 +414,16 @@ impl GameState {
         self.calculate_pseudolegal_moves();
         let valid_attacks = self.get_valid_moves();
 
-        let mut clone_game = self;
         for piece_move in &valid_attacks {
-            clone_game.make_move(&piece_move);
-            result += clone_game.inner_perft(depth - 1);
-            clone_game.unmake_move();
+            self.make_move(&piece_move);
+            result += self.inner_perft(depth - 1);
+            self.unmake_move();
         }
 
         result
     }
 
-    pub fn get_pseudolegal_moves(
-        &mut self,
-        side: &BoardSide
-    ) {
+    pub fn get_pseudolegal_moves(&mut self, side: &BoardSide) {
         let BoardSide {
             mut bishops,
             mut friendly_blockers,
@@ -415,18 +438,18 @@ impl GameState {
         } = side;
 
         let all_pieces: u64 = self.get_all_pieces();
-        
-        let (mut side_moves, mut move_mask): (&mut Vec<PieceMove>, &mut u64)  = if *color == Color::White {
-            (&mut self.flat_white_moves,&mut self.w_moves_mask)
-        }else{
-            (&mut self.flat_black_moves, &mut self.b_moves_mask)
-        };
+
+        let (mut side_moves, mut move_mask): (&mut Vec<PieceMove>, &mut u64) =
+            if *color == Color::White {
+                (&mut self.flat_white_moves, &mut self.w_moves_mask)
+            } else {
+                (&mut self.flat_black_moves, &mut self.b_moves_mask)
+            };
 
         //reset
         side_moves.clear();
         *move_mask = 0;
 
-        let color = color.clone();
         let lookup_table = self.move_lookup_table.clone();
         let rev_friendly_blockers = !friendly_blockers;
 
@@ -458,7 +481,7 @@ impl GameState {
 
         for queen_position in get_file_ranks(queens) {
             let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, all_pieces);
-            let rook_moves: u64 = lookup_table.get_rook_attack(queen_position,  all_pieces);
+            let rook_moves: u64 = lookup_table.get_rook_attack(queen_position, all_pieces);
             let sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
             *move_mask |= sliding_moves;
             fill_moves(
@@ -503,8 +526,6 @@ impl GameState {
                 opposite_blockers,
             );
         }
-
-
     }
 
     fn get_castling_moves(&self, side: &BoardSide) -> Option<Vec<PieceMove>> {
@@ -905,13 +926,13 @@ impl Default for GameState {
             en_passant: None,
             halfmove_clock: Clock::new(),
             fullmove_number: Clock::new(),
-            flat_black_moves: Vec::with_capacity(1024),
-            flat_white_moves: Vec::with_capacity(1024),
+            flat_black_moves: Vec::with_capacity(TEMP_CAPACITY),
+            flat_white_moves: Vec::with_capacity(TEMP_CAPACITY),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
             zobrist_hashing: Arc::new(zobrist_hashing),
             hash: 0,
-            history: Vec::with_capacity(1024),
+            history: Vec::with_capacity(TEMP_CAPACITY),
         }
     }
 }

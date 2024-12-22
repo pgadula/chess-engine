@@ -469,6 +469,20 @@
         Capture,
         CaptureWithPromotion(PieceType),
     }
+
+    impl MoveType {
+        pub fn score(&self)->u8{
+            match self {
+                MoveType::Quite => 0,
+                MoveType::DoublePush(_) => 1,
+                MoveType::CastleKingSide => 2,
+                MoveType::CastleQueenSide => 2,
+                MoveType::Promotion(_) => 3,
+                MoveType::Capture => 4,
+                MoveType::CaptureWithPromotion(_) => 5,
+            }
+        }
+    }
     
 
     pub const WHITE_CASTLING_RIGHTS_MASK: u64 = 0b1100;

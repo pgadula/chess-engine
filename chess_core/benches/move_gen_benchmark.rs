@@ -1,6 +1,6 @@
 
 
-use chess_core::bitboard::{GameState, FenParser};
+use chess_core::bitboard::GameState;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 pub fn perft_benchmark(c: &mut Criterion) {

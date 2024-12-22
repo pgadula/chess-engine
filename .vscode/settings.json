@@ -5,6 +5,7 @@
         "fullmove",
         "halfmove",
         "perft",
+        "pseudolegal",
         "repr"
     ]
 }
