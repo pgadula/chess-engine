@@ -19,7 +19,10 @@ use crate::{
 use rayon::prelude::*;
 use std::sync::Arc;
 
-const TEMP_CAPACITY: usize = 1024;
+pub const TEMP_VALID_MOVE_SIZE: usize = 512;
+
+pub type ValidMoveBuffer = [PieceMove; TEMP_VALID_MOVE_SIZE];
+
 
 #[derive(Debug)]
 pub struct GameState {
@@ -51,8 +54,8 @@ impl Clone for GameState {
             fullmove_number: self.fullmove_number.clone(),
             en_passant: self.en_passant.clone(),
             move_lookup_table: self.move_lookup_table.clone(),
-            flat_white_moves: Vec::with_capacity(TEMP_CAPACITY),
-            flat_black_moves: Vec::with_capacity(TEMP_CAPACITY),
+            flat_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            flat_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
             w_moves_mask: self.w_moves_mask.clone(),
             b_moves_mask: self.b_moves_mask.clone(),
             zobrist_hashing: self.zobrist_hashing.clone(),
@@ -350,15 +353,15 @@ impl GameState {
         king_mask & attacks_mask > 0
     }
 
-    pub fn get_valid_moves(&self) -> Vec<PieceMove> {
+    pub fn fill_valid_moves(&self, buffer:& mut ValidMoveBuffer )->usize {
         let moves = if self.move_turn == Color::White {
             &self.flat_white_moves
         } else {
             &self.flat_black_moves
         };
         let mut game: GameState = self.clone();
-
-        let valid_attacks: Vec<PieceMove> = moves
+        let mut count = 0;
+        moves
             .iter()
             .map(|piece_move: &PieceMove| {
                 game.make_move(piece_move);
@@ -376,24 +379,29 @@ impl GameState {
             })
             .filter(|attack| attack.0 == false)
             .map(|tuple| tuple.1)
-            .collect();
+            .enumerate()
+            .for_each(|(i, mv)| {
+                buffer[i] = mv;
+                count = count + 1;
+            });
+            return count;
 
-        valid_attacks
     }
 
     pub fn perft(self, depth: usize) -> (usize, Vec<(String, usize)>) {
         let mut game = self.clone();
+        let mut valid_attacks: [PieceMove; TEMP_VALID_MOVE_SIZE]  = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
 
         game.calculate_pseudolegal_moves();
+        let count =  game.fill_valid_moves(&mut valid_attacks);
 
-        let valid_attacks = game.get_valid_moves();
-
-        let results: Vec<(String, usize)> = valid_attacks
+        let results: Vec<(String, usize)> = valid_attacks[..count]
             .par_iter()
             .map(|piece_move| {
                 let mut clone_game = game.clone();
                 clone_game.make_move(&piece_move);
-                let inner_nodes = clone_game.inner_perft(depth - 1);
+                let mut new_buffer = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+                let inner_nodes = clone_game.inner_perft(depth - 1, &mut new_buffer);
                 return (piece_move.uci(), inner_nodes); // Return the result as a tuple
             })
             .collect();
@@ -405,18 +413,18 @@ impl GameState {
         return (*total_nodes, results);
     }
 
-    fn inner_perft(&mut self, depth: usize) -> usize {
+    fn inner_perft(&mut self, depth: usize, buffer:& mut [PieceMove; TEMP_VALID_MOVE_SIZE]) -> usize {
         if depth == 0 {
             return 1;
         }
 
         let mut result = 0;
         self.calculate_pseudolegal_moves();
-        let valid_attacks = self.get_valid_moves();
+        let count = self.fill_valid_moves(buffer);
 
-        for piece_move in &valid_attacks {
+        for piece_move in &buffer[..count]{
             self.make_move(&piece_move);
-            result += self.inner_perft(depth - 1);
+            result += self.inner_perft(depth - 1, &mut buffer.clone());
             self.unmake_move();
         }
 
@@ -926,13 +934,13 @@ impl Default for GameState {
             en_passant: None,
             halfmove_clock: Clock::new(),
             fullmove_number: Clock::new(),
-            flat_black_moves: Vec::with_capacity(TEMP_CAPACITY),
-            flat_white_moves: Vec::with_capacity(TEMP_CAPACITY),
+            flat_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            flat_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
             zobrist_hashing: Arc::new(zobrist_hashing),
             hash: 0,
-            history: Vec::with_capacity(TEMP_CAPACITY),
+            history: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
         }
     }
 }

@@ -15,8 +15,9 @@ pub fn search_engine_benchmark_depth_5(c: &mut Criterion) {
             b.iter_batched(
                 /* setup closure: returns a fresh `SearchEngine` each time */
                 || {
-                    let mut engine = SearchEngine::new(max_depth);
+                    let mut engine = SearchEngine::new();
                     engine.clear_lookup_table();
+                    engine.max_depth = 6;
                     engine
                 },
                 /* measurement closure: uses the owned `engine` */

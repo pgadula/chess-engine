@@ -457,6 +457,11 @@
             }
         }
     }
+    impl Default for PieceMove {
+        fn default() -> Self {
+        Self { piece: WHITE_PAWN, from: A1, target: A1, move_type: MoveType::Quite }
+    }
+    }
 
     #[derive(Debug, Clone, Copy, PartialEq)]
     #[repr(u8)]

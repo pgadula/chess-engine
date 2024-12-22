@@ -1,7 +1,6 @@
 
-use chess_core::bitboard::GameState;
+use chess_core::{bitboard::{GameState, TEMP_VALID_MOVE_SIZE}, types::PieceMove};
 const LOOKUP_TABLE_SIZE: usize = 8*1024*1024;
-
 pub struct SearchEngine {
     pub max_depth: u8,
     pub lookup_table: Vec<SearchResult>,
@@ -40,14 +39,15 @@ impl SearchEngine {
     pub fn search(&mut self, game_state:&GameState) -> String {
         let mut game = game_state.clone();
         game.calculate_pseudolegal_moves();
-        let valid_moves = game.get_valid_moves();
+        let mut valid_moves = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+        let count = game.fill_valid_moves(&mut valid_moves);
         let mut result = Vec::new();
 
-        for valid_move in &valid_moves {
+        for valid_move in &valid_moves[..count] {
             let cloned_game = &mut game;
             cloned_game.make_move(&valid_move);
-
-            let score = self.min_max(i32::MIN, i32::MAX, 0, false, cloned_game);
+            let mut buffer = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+            let score = self.min_max(i32::MIN, i32::MAX, 0, false, cloned_game, &mut buffer);
             cloned_game.unmake_move();
             result.push((valid_move.uci(), score));
         }
@@ -72,6 +72,7 @@ impl SearchEngine {
         depth: u8,
         is_max: bool,
         node: &mut GameState,
+        mut buffer: &mut [PieceMove;TEMP_VALID_MOVE_SIZE]
     ) -> i32 {
         let original_alpha = alpha;
         let original_beta = beta;
@@ -84,9 +85,9 @@ impl SearchEngine {
         let mut beta = beta;
 
         node.calculate_pseudolegal_moves();
-        let valid_moves = node.get_valid_moves();
+        let count = node.fill_valid_moves(&mut buffer);
 
-        if depth == self.max_depth || valid_moves.is_empty() {
+        if depth == self.max_depth || count == 0 {
             let score = self.score_heuristic(&node);
             let search_result = SearchResult {
                 depth,
@@ -101,11 +102,13 @@ impl SearchEngine {
         }
 
         let mut best_value;
+        let new_buffer = &mut buffer.clone();
+
         if is_max {
             best_value = i32::MIN;
-            for mv in valid_moves {
+            for mv in &mut buffer[..count] {
                 node.make_move(&mv);
-                let eval = self.min_max(alpha, beta, depth + 1, false, node);
+                let eval = self.min_max(alpha, beta, depth + 1, false, node, new_buffer);
                 node.unmake_move();
 
                 if eval > best_value {
@@ -120,9 +123,9 @@ impl SearchEngine {
             }
         } else {
             best_value = i32::MAX;
-            for mv in valid_moves {
+            for mv in &buffer[..count] {
                 node.make_move(&mv);
-                let eval = self.min_max(alpha, beta, depth + 1, true, node);
+                let eval = self.min_max(alpha, beta, depth + 1, true, node, new_buffer);
                 node.unmake_move();
 
                 if eval < best_value {
@@ -228,11 +231,11 @@ impl SearchEngine {
         self.lookup_table[index] = search_result;
     }
 
-    pub fn new(max_depth: u8) -> SearchEngine {
+    pub fn new() -> SearchEngine {
         
         let empty = SearchResult::empty();
         return SearchEngine {
-            max_depth,
+            max_depth: 6,
             lookup_table:  vec![empty; LOOKUP_TABLE_SIZE],
         };
     }

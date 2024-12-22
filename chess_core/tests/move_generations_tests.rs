@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use chess_core::bitboard::{FenParser, GameState};
+    use chess_core::{bitboard::{FenParser, GameState, TEMP_VALID_MOVE_SIZE}, types::PieceMove};
 
     use crate::PERFT_TESTS;
 
@@ -55,8 +55,10 @@ mod tests {
         println!("current fen:{} hash: {}", fen, expected_hash);
 
         original_game.calculate_pseudolegal_moves();
+        let mut valid_moves = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+        let count = original_game.fill_valid_moves(&mut valid_moves);
         let mut cloned_game = original_game.clone();
-        for mv in original_game.get_valid_moves() {
+        for mv in &valid_moves[..count] {
             cloned_game.make_move(&mv);
             cloned_game.unmake_move();
             cloned_game.hash = cloned_game.zobrist_hashing.get_hash(&cloned_game);
