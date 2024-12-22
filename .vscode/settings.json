@@ -1,8 +1,10 @@
 {
     "cSpell.words": [
+        "bestmove",
         "bitboard",
         "fullmove",
         "halfmove",
+        "perft",
         "repr"
     ]
 }

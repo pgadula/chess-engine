@@ -1,6 +1,6 @@
 
 use chess_core::bitboard::GameState;
-const LOOKUP_TABLE_SIZE: usize = 32768*32768;
+const LOOKUP_TABLE_SIZE: usize = 8*1024*1024;
 
 pub struct SearchEngine {
     pub max_depth: u8,
@@ -28,6 +28,7 @@ impl SearchResult {
 }
 static mut COLLISION_DETECTED:u64 = 0;
 
+#[repr(u8)]
 #[derive(Debug, Clone, Copy)]
 pub enum NodeType {
     Exact,
@@ -36,8 +37,8 @@ pub enum NodeType {
 }
 
 impl SearchEngine {
-    pub fn search(&mut self, game:&GameState) -> String {
-        let mut game = game.clone();
+    pub fn search(&mut self, game_state:&GameState) -> String {
+        let mut game = game_state.clone();
         game.calculate_pseudolegal_moves();
         let valid_moves = game.get_valid_moves();
         let mut result = Vec::new();
@@ -86,7 +87,7 @@ impl SearchEngine {
         let valid_moves = node.get_valid_moves();
 
         if depth == self.max_depth || valid_moves.is_empty() {
-            let score = self.score_board(&node);
+            let score = self.score_heuristic(&node);
             let search_result = SearchResult {
                 depth,
                 hash: node.hash,
@@ -188,7 +189,7 @@ impl SearchEngine {
         None
     }
 
-    fn score_board(&self, game: &GameState) -> i32 {
+    fn score_heuristic(&self, game: &GameState) -> i32 {
         let scoring_board: [usize; 6] = [1, 3, 3, 5, 9, 0];
         let mut white_sum = 0;
         let mut black_sum = 0;
@@ -205,7 +206,7 @@ impl SearchEngine {
     }
 
     fn get_index(&self ,hash: u64)->usize{
-        return (hash as usize) % (self.lookup_table.len() - 1)
+        return (hash as usize)*321877 % (self.lookup_table.len())
     }
 
     fn store_in_cache(
@@ -237,7 +238,7 @@ impl SearchEngine {
     }
 
     pub fn clear_lookup_table(&mut self){
-        let empty =SearchResult::empty();
+        let empty = SearchResult::empty();
         self.lookup_table =  vec![empty; LOOKUP_TABLE_SIZE];
         unsafe {
             COLLISION_DETECTED = 0;
