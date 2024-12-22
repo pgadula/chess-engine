@@ -42,16 +42,18 @@ pub fn pop_lsb(b: &mut u64) -> u32 {
     return i;
 }
 
-pub fn get_file_ranks(bitboard: u64)->Vec<FileRank>{
-    let mut file_ranks:Vec<FileRank> = Vec::with_capacity(64);
+pub fn get_file_ranks(bitboard: u64) -> impl Iterator<Item = FileRank> {
     let mut copy = bitboard;
-    while copy > 0 {
-        let index = pop_lsb(&mut copy);
-        if let Some(fr) = FileRank::get_file_rank(index as u8) {
-            file_ranks.push(fr);
+
+    std::iter::from_fn(move ||{
+        while copy > 0 {
+            let index = pop_lsb(&mut copy);
+            if let Some(fr) = FileRank::get_file_rank(index as u8) {
+                return Some(fr)
+            }
         }
-    }
-    file_ranks
+        None
+    })
 }
 
 //Kernighan’s algorithm
