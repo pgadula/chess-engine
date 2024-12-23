@@ -209,7 +209,7 @@ struct PerftNewGame {
     depth: u8,
     total_nodes: usize,
 }
-pub const PERFT_TESTS: &[PerftNewGame] = &[
+const PERFT_TESTS: &[PerftNewGame] = &[
     PerftNewGame {
         depth: 0,
         total_nodes: 1,

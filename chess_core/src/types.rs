@@ -28,7 +28,8 @@
     }
 
     pub const PROMOTION_PIECES:[PieceType; 4] = [PieceType::Bishop, PieceType::Queen, PieceType::Knight, PieceType::Rook];
-
+    
+    #[allow(non_camel_case_types)]
     #[derive(Copy, Clone)]
     pub enum PieceIndex {
         P,

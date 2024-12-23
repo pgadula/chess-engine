@@ -433,14 +433,14 @@ impl GameState {
 
     pub fn get_pseudolegal_moves(&mut self, side: &BoardSide) {
         let BoardSide {
-            mut bishops,
-            mut friendly_blockers,
-            mut opposite_blockers,
-            mut king,
-            mut queens,
-            mut rooks,
-            mut pawns,
-            mut knights,
+            bishops,
+            friendly_blockers,
+            opposite_blockers,
+            king,
+            queens,
+            rooks,
+            pawns,
+            knights,
             color,
             ..
         } = side;
@@ -461,8 +461,8 @@ impl GameState {
         let lookup_table = self.move_lookup_table.clone();
         let rev_friendly_blockers = !friendly_blockers;
 
-        for rook_position in get_file_ranks(rooks) {
-            let mut rook_move: u64 =
+        for rook_position in get_file_ranks(*rooks) {
+            let rook_move: u64 =
                 lookup_table.get_rook_attack(rook_position, all_pieces) & rev_friendly_blockers;
             *move_mask |= rook_move;
             fill_moves(
@@ -470,10 +470,10 @@ impl GameState {
                 Piece::from(&PieceType::Rook, &color),
                 rook_move,
                 &mut side_moves,
-                opposite_blockers,
+                *opposite_blockers,
             );
         }
-        for bishop_position in get_file_ranks(bishops) {
+        for bishop_position in get_file_ranks(*bishops) {
             let bishop_moves: u64 =
                 lookup_table.get_bishop_attack(bishop_position, all_pieces) & rev_friendly_blockers;
             *move_mask |= bishop_moves;
@@ -483,11 +483,11 @@ impl GameState {
                 Piece::from(&PieceType::Bishop, &color),
                 bishop_moves,
                 &mut side_moves,
-                opposite_blockers,
+                *opposite_blockers,
             );
         }
 
-        for queen_position in get_file_ranks(queens) {
+        for queen_position in get_file_ranks(*queens) {
             let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, all_pieces);
             let rook_moves: u64 = lookup_table.get_rook_attack(queen_position, all_pieces);
             let sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
@@ -497,11 +497,11 @@ impl GameState {
                 Piece::from(&PieceType::Queen, &color),
                 sliding_moves,
                 &mut side_moves,
-                opposite_blockers,
+                *opposite_blockers,
             );
         }
 
-        for knight_position in get_file_ranks(knights) {
+        for knight_position in get_file_ranks(*knights) {
             let attacks = get_knight_attacks(knight_position) & rev_friendly_blockers;
             *move_mask |= attacks;
             fill_moves(
@@ -509,13 +509,13 @@ impl GameState {
                 Piece::from(&PieceType::Knight, &color),
                 attacks,
                 &mut side_moves,
-                opposite_blockers,
+                *opposite_blockers,
             );
         }
         let empty_squares = !all_pieces;
         get_pawn_moves(
             side.color,
-            side.pawns,
+            *pawns,
             empty_squares,
             side.opposite_blockers,
             &self.en_passant,
@@ -523,7 +523,7 @@ impl GameState {
             &mut side_moves,
         );
 
-        for king_position in get_file_ranks(king) {
+        for king_position in get_file_ranks(*king) {
             let attacks = get_king_attacks(king_position) & rev_friendly_blockers;
             *move_mask |= attacks;
             fill_moves(
@@ -531,7 +531,7 @@ impl GameState {
                 Piece::from(&PieceType::King, &color),
                 attacks,
                 &mut side_moves,
-                opposite_blockers,
+                *opposite_blockers,
             );
         }
     }
@@ -637,18 +637,18 @@ impl GameState {
     }
 
     pub fn set_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
-        let mut bitboard = self.get_piece_bitboard(piece, file_rank);
+        let mut bitboard = self.get_piece_bitboard(piece);
         set_bit(&mut bitboard, &file_rank);
     }
 
     pub fn clear_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
         {
-            let mut bitboard = self.get_piece_bitboard(piece, file_rank);
+            let mut bitboard = self.get_piece_bitboard(piece);
             clear_bit(&mut bitboard, file_rank);
         }
     }
 
-    fn get_piece_bitboard(&mut self, piece: &Piece, file_rank: &FileRank) -> &mut u64 {
+    fn get_piece_bitboard(&mut self, piece: &Piece) -> &mut u64 {
         return &mut self.bitboard[piece.bitboard_index()];
     }
 

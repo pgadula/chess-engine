@@ -1,7 +1,5 @@
 use rand::Rng;
 
-use crate::bitboard::GameState;
-
 use super::{
     moves_gen::{_gen_bishop_attacks_on_the_fly, _gen_rook_move_fly},
     precalculated::{
@@ -93,7 +91,10 @@ impl MoveLookupTable {
 }
 
 pub struct MagicHelper {
+    #[allow(dead_code)]
     pub(crate) magic_numbers: [u64; 64],
+
+    #[allow(dead_code)]
     pub(crate) shifts: [usize; 64],
 }
 
@@ -108,7 +109,7 @@ impl MagicHelper {
         n & n1 & n2
     }
 
-    pub(crate) fn generate_magics(mask_attacks: [u64; 64]) -> MagicHelper {
+    pub(crate) fn _generate_magics(mask_attacks: [u64; 64]) -> MagicHelper {
         let mut magic_numbers: [u64; 64] = [0; 64];
         let mut shifts = [0; 64];
 
