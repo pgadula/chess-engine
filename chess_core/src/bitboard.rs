@@ -19,7 +19,12 @@ use crate::{
 use rayon::prelude::*;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+pub const TEMP_VALID_MOVE_SIZE: usize = 512;
+
+pub type ValidMoveBuffer = [PieceMove; TEMP_VALID_MOVE_SIZE];
+
+
+#[derive(Debug)]
 pub struct GameState {
     pub bitboard: [u64; 12],
     pub move_turn: Color,
@@ -38,6 +43,26 @@ pub struct GameState {
     pub hash: u64,
 
     pub history: Vec<UnmakeInfo>,
+}
+impl Clone for GameState {
+    fn clone(&self) -> Self {
+        Self {
+            bitboard: self.bitboard.clone(),
+            move_turn: self.move_turn.clone(),
+            castling: self.castling.clone(),
+            halfmove_clock: self.halfmove_clock.clone(),
+            fullmove_number: self.fullmove_number.clone(),
+            en_passant: self.en_passant.clone(),
+            move_lookup_table: self.move_lookup_table.clone(),
+            flat_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            flat_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            w_moves_mask: self.w_moves_mask.clone(),
+            b_moves_mask: self.b_moves_mask.clone(),
+            zobrist_hashing: self.zobrist_hashing.clone(),
+            hash: self.hash.clone(),
+            history: self.history.clone(),
+        }
+    }
 }
 
 pub trait FenParser {
@@ -260,7 +285,7 @@ impl GameState {
         self.halfmove_clock.reset();
         let new_piece = &Piece {
             piece_type: *promotion,
-            color: piece_move.piece.color.clone(),
+            color: piece_move.piece.color,
         };
         self.clear_piece(&piece_move.piece, &piece_move.from);
         self.set_piece(new_piece, &piece_move.target);
@@ -297,7 +322,6 @@ impl GameState {
     }
 
     pub fn calculate_pseudolegal_moves(&mut self) {
-
         let white = self.get_board_side_info(&Color::White);
         let black = self.get_board_side_info(&Color::Black);
 
@@ -317,25 +341,31 @@ impl GameState {
                 }
             }
         }
+        // if self.move_turn == Color::White{
+        //     self.flat_white_moves.sort_by(|a, b| a.move_type.score().cmp(&b.move_type.score()));
+        // }else{
+        //     self.flat_black_moves.sort_by(|a, b| a.move_type.score().cmp(&b.move_type.score()));
+
+        // }
     }
 
     pub fn detect_check(&self, king_mask: &u64, attacks_mask: &u64) -> bool {
         king_mask & attacks_mask > 0
     }
 
-    pub fn get_valid_moves(&self) -> Vec<PieceMove> {
+    pub fn fill_valid_moves(&self, buffer:& mut ValidMoveBuffer )->usize {
         let moves = if self.move_turn == Color::White {
             &self.flat_white_moves
         } else {
             &self.flat_black_moves
         };
         let mut game: GameState = self.clone();
-
-        let valid_attacks: Vec<PieceMove> = moves
+        let mut count = 0;
+        moves
             .iter()
             .map(|piece_move: &PieceMove| {
                 game.make_move(piece_move);
-                let side = game.get_board_side_info(&game.move_turn) ;
+                let side = game.get_board_side_info(&game.move_turn);
                 game.get_pseudolegal_moves(&side);
                 let BoardSide {
                     king,
@@ -349,24 +379,29 @@ impl GameState {
             })
             .filter(|attack| attack.0 == false)
             .map(|tuple| tuple.1)
-            .collect();
+            .enumerate()
+            .for_each(|(i, mv)| {
+                buffer[i] = mv;
+                count = count + 1;
+            });
+            return count;
 
-        valid_attacks
     }
 
     pub fn perft(self, depth: usize) -> (usize, Vec<(String, usize)>) {
         let mut game = self.clone();
+        let mut valid_attacks: [PieceMove; TEMP_VALID_MOVE_SIZE]  = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
 
         game.calculate_pseudolegal_moves();
+        let count =  game.fill_valid_moves(&mut valid_attacks);
 
-        let valid_attacks = game.get_valid_moves();
-
-        let results: Vec<(String, usize)> = valid_attacks
+        let results: Vec<(String, usize)> = valid_attacks[..count]
             .par_iter()
             .map(|piece_move| {
                 let mut clone_game = game.clone();
                 clone_game.make_move(&piece_move);
-                let inner_nodes = clone_game.inner_perft(depth - 1);
+                let mut new_buffer = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+                let inner_nodes = clone_game.inner_perft(depth - 1, &mut new_buffer);
                 return (piece_move.uci(), inner_nodes); // Return the result as a tuple
             })
             .collect();
@@ -378,60 +413,56 @@ impl GameState {
         return (*total_nodes, results);
     }
 
-    fn inner_perft(&mut self, depth: usize) -> usize {
+    fn inner_perft(&mut self, depth: usize, buffer:& mut [PieceMove; TEMP_VALID_MOVE_SIZE]) -> usize {
         if depth == 0 {
             return 1;
         }
 
         let mut result = 0;
         self.calculate_pseudolegal_moves();
-        let valid_attacks = self.get_valid_moves();
+        let count = self.fill_valid_moves(buffer);
 
-        let mut clone_game = self;
-        for piece_move in &valid_attacks {
-            clone_game.make_move(&piece_move);
-            result += clone_game.inner_perft(depth - 1);
-            clone_game.unmake_move();
+        for piece_move in &buffer[..count]{
+            self.make_move(&piece_move);
+            result += self.inner_perft(depth - 1, &mut buffer.clone());
+            self.unmake_move();
         }
 
         result
     }
 
-    pub fn get_pseudolegal_moves(
-        &mut self,
-        side: &BoardSide
-    ) {
+    pub fn get_pseudolegal_moves(&mut self, side: &BoardSide) {
         let BoardSide {
-            mut bishops,
-            mut friendly_blockers,
-            mut opposite_blockers,
-            mut king,
-            mut queens,
-            mut rooks,
-            mut pawns,
-            mut knights,
+            bishops,
+            friendly_blockers,
+            opposite_blockers,
+            king,
+            queens,
+            rooks,
+            pawns,
+            knights,
             color,
             ..
         } = side;
 
         let all_pieces: u64 = self.get_all_pieces();
-        
-        let (mut side_moves, mut move_mask): (&mut Vec<PieceMove>, &mut u64)  = if *color == Color::White {
-            (&mut self.flat_white_moves,&mut self.w_moves_mask)
-        }else{
-            (&mut self.flat_black_moves, &mut self.b_moves_mask)
-        };
+
+        let (mut side_moves, mut move_mask): (&mut Vec<PieceMove>, &mut u64) =
+            if *color == Color::White {
+                (&mut self.flat_white_moves, &mut self.w_moves_mask)
+            } else {
+                (&mut self.flat_black_moves, &mut self.b_moves_mask)
+            };
 
         //reset
         side_moves.clear();
         *move_mask = 0;
 
-        let color = color.clone();
         let lookup_table = self.move_lookup_table.clone();
         let rev_friendly_blockers = !friendly_blockers;
 
-        for rook_position in get_file_ranks(rooks) {
-            let mut rook_move: u64 =
+        for rook_position in get_file_ranks(*rooks) {
+            let rook_move: u64 =
                 lookup_table.get_rook_attack(rook_position, all_pieces) & rev_friendly_blockers;
             *move_mask |= rook_move;
             fill_moves(
@@ -439,10 +470,10 @@ impl GameState {
                 Piece::from(&PieceType::Rook, &color),
                 rook_move,
                 &mut side_moves,
-                opposite_blockers,
+                *opposite_blockers,
             );
         }
-        for bishop_position in get_file_ranks(bishops) {
+        for bishop_position in get_file_ranks(*bishops) {
             let bishop_moves: u64 =
                 lookup_table.get_bishop_attack(bishop_position, all_pieces) & rev_friendly_blockers;
             *move_mask |= bishop_moves;
@@ -452,13 +483,13 @@ impl GameState {
                 Piece::from(&PieceType::Bishop, &color),
                 bishop_moves,
                 &mut side_moves,
-                opposite_blockers,
+                *opposite_blockers,
             );
         }
 
-        for queen_position in get_file_ranks(queens) {
+        for queen_position in get_file_ranks(*queens) {
             let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, all_pieces);
-            let rook_moves: u64 = lookup_table.get_rook_attack(queen_position,  all_pieces);
+            let rook_moves: u64 = lookup_table.get_rook_attack(queen_position, all_pieces);
             let sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
             *move_mask |= sliding_moves;
             fill_moves(
@@ -466,11 +497,11 @@ impl GameState {
                 Piece::from(&PieceType::Queen, &color),
                 sliding_moves,
                 &mut side_moves,
-                opposite_blockers,
+                *opposite_blockers,
             );
         }
 
-        for knight_position in get_file_ranks(knights) {
+        for knight_position in get_file_ranks(*knights) {
             let attacks = get_knight_attacks(knight_position) & rev_friendly_blockers;
             *move_mask |= attacks;
             fill_moves(
@@ -478,13 +509,13 @@ impl GameState {
                 Piece::from(&PieceType::Knight, &color),
                 attacks,
                 &mut side_moves,
-                opposite_blockers,
+                *opposite_blockers,
             );
         }
         let empty_squares = !all_pieces;
         get_pawn_moves(
             side.color,
-            side.pawns,
+            *pawns,
             empty_squares,
             side.opposite_blockers,
             &self.en_passant,
@@ -492,7 +523,7 @@ impl GameState {
             &mut side_moves,
         );
 
-        for king_position in get_file_ranks(king) {
+        for king_position in get_file_ranks(*king) {
             let attacks = get_king_attacks(king_position) & rev_friendly_blockers;
             *move_mask |= attacks;
             fill_moves(
@@ -500,11 +531,9 @@ impl GameState {
                 Piece::from(&PieceType::King, &color),
                 attacks,
                 &mut side_moves,
-                opposite_blockers,
+                *opposite_blockers,
             );
         }
-
-
     }
 
     fn get_castling_moves(&self, side: &BoardSide) -> Option<Vec<PieceMove>> {
@@ -608,18 +637,18 @@ impl GameState {
     }
 
     pub fn set_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
-        let mut bitboard = self.get_piece_bitboard(piece, file_rank);
+        let mut bitboard = self.get_piece_bitboard(piece);
         set_bit(&mut bitboard, &file_rank);
     }
 
     pub fn clear_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
         {
-            let mut bitboard = self.get_piece_bitboard(piece, file_rank);
+            let mut bitboard = self.get_piece_bitboard(piece);
             clear_bit(&mut bitboard, file_rank);
         }
     }
 
-    fn get_piece_bitboard(&mut self, piece: &Piece, file_rank: &FileRank) -> &mut u64 {
+    fn get_piece_bitboard(&mut self, piece: &Piece) -> &mut u64 {
         return &mut self.bitboard[piece.bitboard_index()];
     }
 
@@ -905,13 +934,13 @@ impl Default for GameState {
             en_passant: None,
             halfmove_clock: Clock::new(),
             fullmove_number: Clock::new(),
-            flat_black_moves: Vec::with_capacity(1024),
-            flat_white_moves: Vec::with_capacity(1024),
+            flat_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            flat_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
             zobrist_hashing: Arc::new(zobrist_hashing),
             hash: 0,
-            history: Vec::with_capacity(1024),
+            history: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
         }
     }
 }

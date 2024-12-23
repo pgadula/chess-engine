@@ -2,7 +2,7 @@ use std::iter::zip;
 
 use crate::{bitboard::GameState, file_rank::{
     FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_1, RANK_3, RANK_6, RANK_8
-}, types::{Color, FileRank, MoveType, Piece, PieceMove, PieceType, PROMOTION_PIECES}, utility::{get_file_ranks, pop_bit, pop_lsb, set_bit_by_index}};
+}, types::{Color, FileRank, MoveType, Piece, PieceMove, BLACK_PAWN, PROMOTION_PIECES, WHITE_PAWN}, utility::{get_file_ranks, pop_bit, pop_lsb, set_bit_by_index}};
 
 
 pub fn get_pawn_moves(
@@ -15,92 +15,88 @@ pub fn get_pawn_moves(
     flat_attacks: &mut Vec<PieceMove>
 ) {
     let mut pawns = pawns;
+    let rank_3_or_6 = if color == Color::White {RANK_3} else {RANK_6};
+    let shift_for_color = if color == Color::White {|x: u64| x >> 8} else {|x: u64| x << 8};
 
-    let rank_3_or_6 = if color == Color::White {
-        RANK_3
-    } else {
-        RANK_6
+    let piece: Piece = match color {
+        Color::White => WHITE_PAWN,
+        Color::Black => BLACK_PAWN,
     };
     
+    let en_passant_mask = if let Some(file_rank) = en_passant  {
+        let mut mask = 0u64;
+        set_bit_by_index(&mut mask, file_rank.index() as u8);
+        mask
+    }else{
+        0u64
+    };
+
     while pawns > 0 {
         let index = pawns.trailing_zeros();
-        let pawn_file_rank = FileRank::get_file_rank(index as u8).unwrap();
-        let en_passant_mask = if let Some(file_rank) = en_passant  {
-            let mut mask = 0u64;
-            set_bit_by_index(&mut mask, file_rank.index() as u8);
-            mask
-        }else{
-            0u64
-        };
-        let attack_pattern = get_pawn_pattern_attacks(color, pawn_file_rank) & (opposite_blockers | en_passant_mask);
+        let from = FileRank::get_file_rank(index as u8).unwrap();
+
+        let attack_pattern = get_pawn_pattern_attacks(color, from) & (opposite_blockers | en_passant_mask);
 
         let isolated_pawn = 1u64 << index as u64;
-        let single_push: u64 = if color == Color::White {
-            (isolated_pawn >> 8) & all_blockers
-        } else {
-            (isolated_pawn << 8) & all_blockers
-        };
+        
+        let single_push: u64 = shift_for_color(isolated_pawn) & all_blockers;
 
-        for file_rank in get_file_ranks(attack_pattern){
-            if file_rank.mask() & RANK_8 > 0 || file_rank.mask() & RANK_1 > 0{
+        for target in get_file_ranks(attack_pattern){
+            if target.mask() & RANK_8 > 0 || target.mask() & RANK_1 > 0{
                 for piece_type in PROMOTION_PIECES {
                     flat_attacks.push(PieceMove{
-                        from: pawn_file_rank,
-                        piece: Piece::from(&PieceType::Pawn, &color),
-                        target: file_rank,
+                        from,
+                        piece,
+                        target,
                         move_type: MoveType::CaptureWithPromotion(piece_type)
                     }) 
                 }
             }else{
                 flat_attacks.push(PieceMove{
-                    from: pawn_file_rank,
-                    piece: Piece::from(&PieceType::Pawn, &color),
-                    target: file_rank,
+                    from,
+                    piece,
+                    target,
                     move_type: MoveType::Capture
                 })
             }
          
         }
-        for file_rank in get_file_ranks(single_push){
-            if file_rank.mask() & RANK_8 > 0 || file_rank.mask() & RANK_1 > 0{
+        for target in get_file_ranks(single_push){
+            if target.mask() & RANK_8 > 0 || target.mask() & RANK_1 > 0{
                 for piece_type in PROMOTION_PIECES {
                     flat_attacks.push(PieceMove{
-                        from: pawn_file_rank,
-                        piece: Piece::from(&PieceType::Pawn, &color),
-                        target: file_rank,
+                        from,
+                        piece,
+                        target,
                         move_type: MoveType::Promotion(piece_type)
                     }) 
                 }
             }else{
                 flat_attacks.push(PieceMove{
-                    from: pawn_file_rank,
-                    piece: Piece::from(&PieceType::Pawn, &color),
-                    target: file_rank,
+                    from,
+                    piece,
+                    target,
                     move_type:MoveType::Quite
                 })
             }
          
         }
-        let double_push: u64 = if color == Color::White {
-            (single_push & rank_3_or_6) >> 8 & all_blockers
-        } else {
-            (single_push & rank_3_or_6) << 8 & all_blockers
-        };
+        let double_push: u64 = shift_for_color(single_push & rank_3_or_6)  & all_blockers;
         let all_moves_mask = single_push | double_push | attack_pattern;
         *attack_mask |= all_moves_mask;
 
-       for file_rank in get_file_ranks(double_push) {
+       for target in get_file_ranks(double_push) {
             let en_passant_fr = if color == Color::White{
-                FileRank::get_from_mask(file_rank.mask() <<  8).unwrap()
+                FileRank::get_from_mask(target.mask() <<  8).unwrap()
             }
             else{
-                FileRank::get_from_mask(file_rank.mask() >> 8 ).unwrap()
+                FileRank::get_from_mask(target.mask() >> 8 ).unwrap()
             };
 
             flat_attacks.push(PieceMove{
-                from: pawn_file_rank,
-                piece: Piece::from(&PieceType::Pawn, &color),
-                target: file_rank,
+                from,
+                piece,
+                target,
                 move_type: MoveType::DoublePush(Some(en_passant_fr))
             })
        }

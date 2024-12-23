@@ -1,14 +1,11 @@
 [package]
-name = "main_project"
+name = "performance_demo"
 version = "0.1.0"
 edition = "2021"
+
 
 [profile.release]
 debug = true
 
 [dependencies]
 chess_uci = { path = "../chess_uci" }
-
-rayon = "1.5"
-
-rand = "0.8.5"

@@ -28,7 +28,8 @@
     }
 
     pub const PROMOTION_PIECES:[PieceType; 4] = [PieceType::Bishop, PieceType::Queen, PieceType::Knight, PieceType::Rook];
-
+    
+    #[allow(non_camel_case_types)]
     #[derive(Copy, Clone)]
     pub enum PieceIndex {
         P,
@@ -457,6 +458,11 @@
             }
         }
     }
+    impl Default for PieceMove {
+        fn default() -> Self {
+        Self { piece: WHITE_PAWN, from: A1, target: A1, move_type: MoveType::Quite }
+    }
+    }
 
     #[derive(Debug, Clone, Copy, PartialEq)]
     #[repr(u8)]
@@ -468,6 +474,20 @@
         Promotion(PieceType),
         Capture,
         CaptureWithPromotion(PieceType),
+    }
+
+    impl MoveType {
+        pub fn score(&self)->u8{
+            match self {
+                MoveType::Quite => 0,
+                MoveType::DoublePush(_) => 1,
+                MoveType::CastleKingSide => 2,
+                MoveType::CastleQueenSide => 2,
+                MoveType::Promotion(_) => 3,
+                MoveType::Capture => 4,
+                MoveType::CaptureWithPromotion(_) => 5,
+            }
+        }
     }
     
 

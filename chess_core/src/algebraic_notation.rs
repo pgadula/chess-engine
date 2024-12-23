@@ -16,7 +16,7 @@ impl<'a> AlgebraicNotation<'a> {
     }
 
     pub fn next_token(&mut self) -> Option<AlgebraicNotationToken> {
-        let castling_symbol = self.castling_symbol;
+        let _castling_symbol = self.castling_symbol;
         while let Some(c) = self.input.next() {
             match c {
                 'K' | 'Q' | 'R' | 'B' | 'N' | 'P' => return Some(AlgebraicNotationToken::Piece(c)),

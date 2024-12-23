@@ -19,16 +19,17 @@ impl Engine {
     pub fn new() -> Self {
         let board: GameState = GameState::new_game();
         return Engine {
-            board: board,
+            board,
             is_running: true,
             is_searching: false,
             thread: None,
-            search_engine: SearchEngine::new(6)
+            search_engine: SearchEngine::new()
         };
     }
 
-    pub fn go(&mut self) {
-        let result = self.search_engine.search(&self.board);
+    pub fn go(&mut self, depth: Option<u8>) {
+        self.search_engine.max_depth = depth.unwrap_or(6);
+        let result = self.search_engine.rayon_search(&self.board);
         println!("bestmove {}", result);
     }
 

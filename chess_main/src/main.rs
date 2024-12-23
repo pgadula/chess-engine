@@ -74,7 +74,7 @@ fn main() {
                 "go" => {
                     println!("UciGo");
                     let now = Instant::now();
-                    engine.go();
+                    engine.go(Some(6));
                     let elapsed = now.elapsed();
                     println!("Thinking time: {:.2?}", elapsed);
                 }

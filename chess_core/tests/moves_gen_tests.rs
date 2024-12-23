@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use chess_core::bitboard::{FenParser, GameState};
+    use chess_core::{bitboard::{FenParser, GameState, TEMP_VALID_MOVE_SIZE}, types::PieceMove};
 
-    // Test function that will run `perft` against all positions in `TEST_CASES`
+    use crate::PERFT_TESTS;
+
     #[test]
     fn test_perft_positions() {
         for test_case in TEST_CASES {
@@ -11,13 +12,26 @@ mod tests {
             println!("current fen:{}", test_case.fen);
             let (total_nodes, _) = game.perft(test_case.depth as usize);
 
-            // Compare the calculated nodes to the expected nodes
             assert_eq!(
                 total_nodes, test_case.nodes,
                 "Failed at FEN: {} for depth: {}, expected nodes: {}, but got: {}",
                 test_case.fen, test_case.depth, test_case.nodes, total_nodes
             );
         }
+    }
+
+    #[test]
+    fn test_for_new_game() {
+        let depth: usize = 6;
+        let game = GameState::new_game();
+        let (total_nodes, _) = game.perft(depth as usize);
+        let expected_total_nodes = PERFT_TESTS[depth].total_nodes;
+        assert_eq!(
+            total_nodes,
+            expected_total_nodes,
+             "Failed for depth: {}, expected nodes: {}, but got: {}",
+             depth, expected_total_nodes, total_nodes
+        );
     }
 
     // Test function that will run `perft` against all positions in `TEST_CASES`
@@ -38,8 +52,10 @@ mod tests {
         println!("current fen:{} hash: {}", fen, expected_hash);
 
         original_game.calculate_pseudolegal_moves();
+        let mut valid_moves = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+        let count = original_game.fill_valid_moves(&mut valid_moves);
         let mut cloned_game = original_game.clone();
-        for mv in original_game.get_valid_moves() {
+        for mv in &valid_moves[..count] {
             cloned_game.make_move(&mv);
             cloned_game.unmake_move();
             cloned_game.hash = cloned_game.zobrist_hashing.get_hash(&cloned_game);
@@ -183,152 +199,76 @@ mod tests {
             fen: "8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1",
         },
     ];
-
-    pub const TEST_POSITIONS2: &[TestPosition] = &[
-        TestPosition {
-            depth: 1,
-            nodes: 45,
-            fen: "rnbq1k1r/pp1Pb1pp/2p2p2/8/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 44,
-            fen: "rnbq1k1r/p2Pbppp/1pp5/8/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 44,
-            fen: "rnbq1k1r/1p1Pbppp/p1p5/8/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 44,
-            fen: "rnbq1k1r/pp1Pbppp/8/2p5/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 44,
-            fen: "rnbq1k1r/pp1Pbpp1/2p5/7p/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 43,
-            fen: "rnbq1k1r/pp1Pbp1p/2p5/6p1/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 45,
-            fen: "rnbq1k1r/pp1Pb1pp/2p5/5p2/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 43,
-            fen: "rnbq1k1r/p2Pbppp/2p5/1p6/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 44,
-            fen: "rnbq1k1r/1p1Pbppp/2p5/p7/2B5/2P5/PP2NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 34,
-            fen: "rnbq1k1r/pp1Pbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R b KQ - 0 8",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 44,
-            fen: "rnbq1kr1/pp1Pbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 44,
-            fen: "rnbq2kr/pp1Pbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 52,
-            fen: "rnb1qk1r/pp1Pbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 40,
-            fen: "rnb2k1r/pp1qbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 48,
-            fen: "rnb2k1r/ppqPbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 47,
-            fen: "rnb2k1r/pp1Pbppp/1qp5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 9,
-            fen: "rnb2k1r/pp1Pbppp/2p5/q7/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 41,
-            fen: "rn1q1k1r/pp1bbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 41,
-            fen: "r1bq1k1r/pp1nbppp/2p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 0 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 44,
-            fen: "r1bq1k1r/pp1Pbppp/n1p5/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 44,
-            fen: "rnbq1k1r/pp1P1ppp/2p2b2/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 44,
-            fen: "rnbq1k1r/pp1P1ppp/2pb4/8/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 42,
-            fen: "rnbq1k1r/pp1P1ppp/2p5/6b1/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 43,
-            fen: "rnbq1k1r/pp1P1ppp/2p5/2b5/2B5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 42,
-            fen: "rnbq1k1r/pp1P1ppp/2p5/8/2B4b/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 8,
-            fen: "rnbq1k1r/pp1P1ppp/2p5/8/1bB5/1P6/P1P1NnPP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 42,
-            fen: "rnbq1k1r/pp1P1ppp/2p5/8/2B5/bP6/P1P1N1PP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 42,
-            fen: "rnbq1k1r/pp1Pbppp/2p5/8/2B1n3/1P6/P1P1N1PP/RNBQK2R w KQ - 1 9",
-        },
-        TestPosition {
-            depth: 1,
-            nodes: 41,
-            fen: "rnbq1k1r/pp1Pbppp/2p5/8/2B5/1P1n4/P1P1N1PP/RNBQK2R w KQ - 1 9",
-        },
-    ];
 }
+
+#[derive(Debug, Clone)]
+struct PerftNewGame {
+    depth: u8,
+    total_nodes: usize,
+}
+const PERFT_TESTS: &[PerftNewGame] = &[
+    PerftNewGame {
+        depth: 0,
+        total_nodes: 1,
+    },
+    PerftNewGame {
+        depth: 1,
+        total_nodes: 20,
+    },
+    PerftNewGame {
+        depth: 2,
+        total_nodes: 400,
+    },
+    PerftNewGame {
+        depth: 3,
+        total_nodes: 8_902,
+    },
+    PerftNewGame {
+        depth: 4,
+        total_nodes: 197_281,
+    },
+    PerftNewGame {
+        depth: 5,
+        total_nodes: 4_865_609,
+    },
+    PerftNewGame {
+        depth: 6,
+        total_nodes: 119_060_324,
+    },
+    PerftNewGame {
+        depth: 7,
+        total_nodes: 3_195_901_860,
+    },
+    PerftNewGame {
+        depth: 8,
+        total_nodes: 84_998_978_956,
+    },
+    PerftNewGame {
+        depth: 9,
+        total_nodes: 2_439_530_234_167,
+    },
+    PerftNewGame {
+        depth: 10,
+        total_nodes: 69_352_859_712_417,
+    },
+    PerftNewGame {
+        depth: 11,
+        total_nodes: 2_097_651_003_696_806,
+    },
+    PerftNewGame {
+        depth: 12,
+        total_nodes: 62_854_969_236_701_747,
+    },
+    PerftNewGame {
+        depth: 13,
+        total_nodes: 1_981_066_775_000_396_239,
+    },
+    // PerftNewGame {
+    //     depth: 14,
+    //     total_nodes: 61_885_021_521_585_529_237,
+    // },
+    // PerftNewGame {
+    //     depth: 15,
+    //     total_nodes: 2_015_099_950_053_364_471_960,
+    // },
+];
