@@ -4,7 +4,6 @@ mod tests {
 
     use crate::PERFT_TESTS;
 
-    // Test function that will run `perft` against all positions in `TEST_CASES`
     #[test]
     fn test_perft_positions() {
         for test_case in TEST_CASES {
@@ -13,7 +12,6 @@ mod tests {
             println!("current fen:{}", test_case.fen);
             let (total_nodes, _) = game.perft(test_case.depth as usize);
 
-            // Compare the calculated nodes to the expected nodes
             assert_eq!(
                 total_nodes, test_case.nodes,
                 "Failed at FEN: {} for depth: {}, expected nodes: {}, but got: {}",
@@ -22,7 +20,6 @@ mod tests {
         }
     }
 
-    // Test function that will run `perft` against all positions in `TEST_CASES`
     #[test]
     fn test_for_new_game() {
         let depth: usize = 6;
