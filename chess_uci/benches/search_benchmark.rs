@@ -3,8 +3,8 @@ use chess_uci::search_engine::SearchEngine;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
-pub fn search_engine_benchmark_depth_6(c: &mut Criterion) {
-    let max_depth = 6;
+pub fn search_engine_benchmark(c: &mut Criterion) {
+    let max_depth = 9;
     let game = GameState::new_game();
 
     let mut criterion = Criterion::default().sample_size(10);
@@ -17,12 +17,12 @@ pub fn search_engine_benchmark_depth_6(c: &mut Criterion) {
                 || {
                     let mut engine = SearchEngine::new();
                     engine.clear_lookup_table();
-                    engine.max_depth = 6;
+                    engine.max_depth = max_depth;
                     engine
                 },
                 /* measurement closure: uses the owned `engine` */
                 |mut engine| {
-                    engine.search(&game);
+                    engine.rayon_search(&game);
                 },
                 criterion::BatchSize::SmallInput,
             );
@@ -58,5 +58,5 @@ pub fn search_engine_benchmark_depth_10(c: &mut Criterion) {
 }
 
 // Define the Criterion benchmark group and main function
-criterion_group!(benches, search_engine_benchmark_depth_6, search_engine_benchmark_depth_10);
+criterion_group!(benches, search_engine_benchmark);
 criterion_main!(benches);

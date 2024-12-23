@@ -28,6 +28,7 @@ name = "chess_uci"
 version = "0.1.0"
 dependencies = [
  "chess_core",
+ "rayon",
 ]
 
 [[package]]

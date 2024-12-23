@@ -1,9 +1,18 @@
+use std::thread;
 
-use chess_core::{bitboard::{GameState, TEMP_VALID_MOVE_SIZE}, types::PieceMove};
-const LOOKUP_TABLE_SIZE: usize = 8*1024*1024;
+use chess_core::{
+    bitboard::{GameState, TEMP_VALID_MOVE_SIZE},
+    types::{Color, PieceMove},
+};
+use rayon::{
+    iter::{IntoParallelIterator, ParallelIterator},
+    slice::ParallelSlice,
+};
+const LOOKUP_TABLE_SIZE: usize = 8 * 1024 * 1024;
 pub struct SearchEngine {
     pub max_depth: u8,
     pub lookup_table: Vec<SearchResult>,
+    pub num_threads: u8,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -15,8 +24,8 @@ pub struct SearchResult {
     node_type: NodeType,
 }
 impl SearchResult {
-    pub fn empty()->SearchResult{
-        SearchResult{
+    pub fn empty() -> SearchResult {
+        SearchResult {
             depth: 0,
             hash: 0,
             score: 0,
@@ -25,7 +34,7 @@ impl SearchResult {
         }
     }
 }
-static mut COLLISION_DETECTED:u64 = 0;
+static mut COLLISION_DETECTED: u64 = 0;
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
@@ -36,7 +45,7 @@ pub enum NodeType {
 }
 
 impl SearchEngine {
-    pub fn search(&mut self, game_state:&GameState) -> String {
+    pub fn search(&mut self, game_state: &GameState) -> String {
         let mut game = game_state.clone();
         game.calculate_pseudolegal_moves();
         let mut valid_moves = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
@@ -72,7 +81,7 @@ impl SearchEngine {
         depth: u8,
         is_max: bool,
         node: &mut GameState,
-        mut buffer: &mut [PieceMove;TEMP_VALID_MOVE_SIZE]
+        mut buffer: &mut [PieceMove; TEMP_VALID_MOVE_SIZE],
     ) -> i32 {
         let original_alpha = alpha;
         let original_beta = beta;
@@ -153,6 +162,112 @@ impl SearchEngine {
         best_value
     }
 
+    pub fn multi_threads_search(&mut self, game_state: &GameState) -> String {
+        let mut game = game_state.clone();
+        game.calculate_pseudolegal_moves();
+        let mut valid_moves = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+        let count = game.fill_valid_moves(&mut valid_moves);
+        let is_max = if Color::White == game.move_turn {
+            false
+        } else {
+            true
+        };
+
+        let collection_for_thread = &valid_moves[..count].chunks(self.num_threads as usize);
+        let mut children = Vec::new();
+
+        for chunk in collection_for_thread.clone().into_iter() {
+            let mut result = Vec::new();
+            let cloned_game = game.clone();
+            let max_depth = self.max_depth;
+            let child = thread::scope(move |_| {
+                let mut new_search: SearchEngine = SearchEngine::new();
+                new_search.max_depth = max_depth;
+
+                for valid_move in chunk {
+                    let mut current_game_for_thread = cloned_game.clone();
+                    current_game_for_thread.make_move(&valid_move);
+                    let mut buffer = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+                    let score = new_search.min_max(
+                        i32::MIN,
+                        i32::MAX,
+                        0,
+                        is_max,
+                        &mut current_game_for_thread,
+                        &mut buffer,
+                    );
+                    current_game_for_thread.unmake_move();
+                    result.push((valid_move.uci(), score));
+                }
+                return result;
+            });
+            children.push(child);
+        }
+
+        let mut result: Vec<(String, i32)> = children.into_iter().flatten().collect();
+        result.sort_by(|(_, a), (_, b)| b.cmp(a));
+        println!("{:?}", result);
+        println!();
+        unsafe {
+            println!("Warning: Number of hash collision: {}", COLLISION_DETECTED);
+        }
+
+        println!("score: {}", result[0].1);
+        return result[0].0.clone();
+    }
+
+    pub fn rayon_search(&mut self, game_state: &GameState) -> String {
+        let mut game = game_state.clone();
+        game.calculate_pseudolegal_moves();
+        let mut valid_moves = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+        let count = game.fill_valid_moves(&mut valid_moves);
+        let is_max = if Color::White == game.move_turn {
+            false
+        } else {
+            true
+        };
+        let slice_of_valid_moves = &valid_moves[..count];
+        let results = &slice_of_valid_moves
+            .par_chunks(slice_of_valid_moves.len() / 4)
+            .into_par_iter()
+            .map(|valid_moves| -> Vec<(String, i32)> {
+                let mut results = Vec::with_capacity(valid_moves.len());
+                let cloned_game = game.clone();
+                let max_depth = self.max_depth;
+                let mut new_search: SearchEngine = SearchEngine::new();
+                new_search.max_depth = max_depth;
+
+                let mut current_game_for_thread = cloned_game.clone();
+                for valid_move in valid_moves {
+                    current_game_for_thread.make_move(&valid_move);
+                    let mut buffer = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+                    let score = new_search.min_max(
+                        i32::MIN,
+                        i32::MAX,
+                        0,
+                        is_max,
+                        &mut current_game_for_thread,
+                        &mut buffer,
+                    );
+                    current_game_for_thread.unmake_move();
+                    results.push((valid_move.uci(), score));
+                }
+
+                return results;
+            });
+
+        let mut result: Vec<(String, i32)> = results.clone().flatten().collect();
+        result.sort_by(|(_, a), (_, b)| b.cmp(a));
+        println!("{:?}", result);
+        println!();
+        unsafe {
+            println!("Warning: Number of hash collision: {}", COLLISION_DETECTED);
+        }
+
+        println!("score: {}", result[0].1);
+        return result[0].0.clone();
+    }
+
     fn try_get_from_cache(
         &self,
         hash: u64,
@@ -163,32 +278,31 @@ impl SearchEngine {
     ) -> Option<i32> {
         let index = self.get_index(hash);
         let result = self.lookup_table[index];
-        if result.hash == 0{
-            return None
+        if result.hash == 0 {
+            return None;
         }
         if result.hash != hash {
             unsafe {
                 COLLISION_DETECTED = COLLISION_DETECTED + 1;
             }
             return None;
-        }
-        else if result.depth >= current_depth && result.is_max == is_max {
-                match result.node_type {
-                    NodeType::Exact => {
+        } else if result.depth >= current_depth && result.is_max == is_max {
+            match result.node_type {
+                NodeType::Exact => {
+                    return Some(result.score);
+                }
+                NodeType::LowerBound => {
+                    if result.score >= beta {
                         return Some(result.score);
                     }
-                    NodeType::LowerBound => {
-                        if result.score >= beta {
-                            return Some(result.score);
-                        }
-                    }
-                    NodeType::UpperBound => {
-                        if result.score <= alpha {
-                            return Some(result.score);
-                        }
+                }
+                NodeType::UpperBound => {
+                    if result.score <= alpha {
+                        return Some(result.score);
                     }
                 }
             }
+        }
         None
     }
 
@@ -208,8 +322,8 @@ impl SearchEngine {
         white_sum - black_sum
     }
 
-    fn get_index(&self ,hash: u64)->usize{
-        return (hash as usize)*321877 % (self.lookup_table.len())
+    fn get_index(&self, hash: u64) -> usize {
+        return (hash as usize) % (self.lookup_table.len());
     }
 
     fn store_in_cache(
@@ -232,21 +346,19 @@ impl SearchEngine {
     }
 
     pub fn new() -> SearchEngine {
-        
         let empty = SearchResult::empty();
         return SearchEngine {
+            num_threads: 10,
             max_depth: 6,
-            lookup_table:  vec![empty; LOOKUP_TABLE_SIZE],
+            lookup_table: vec![empty; LOOKUP_TABLE_SIZE],
         };
     }
 
-    pub fn clear_lookup_table(&mut self){
+    pub fn clear_lookup_table(&mut self) {
         let empty = SearchResult::empty();
-        self.lookup_table =  vec![empty; LOOKUP_TABLE_SIZE];
+        self.lookup_table = vec![empty; LOOKUP_TABLE_SIZE];
         unsafe {
             COLLISION_DETECTED = 0;
         }
     }
-
-
 }

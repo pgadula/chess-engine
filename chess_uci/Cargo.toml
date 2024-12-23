@@ -14,3 +14,4 @@ harness = false
 
 [dependencies]
 chess_core = { path = "../chess_core" }
+rayon = "1.10.0"

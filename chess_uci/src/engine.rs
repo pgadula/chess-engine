@@ -29,7 +29,7 @@ impl Engine {
 
     pub fn go(&mut self, depth: Option<u8>) {
         self.search_engine.max_depth = depth.unwrap_or(6);
-        let result = self.search_engine.search(&self.board);
+        let result = self.search_engine.rayon_search(&self.board);
         println!("bestmove {}", result);
     }
 
