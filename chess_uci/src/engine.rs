@@ -1,4 +1,3 @@
-use std::thread::JoinHandle;
 
 use chess_core::{
     bitboard::{FenParser, GameState},
@@ -8,10 +7,10 @@ use chess_core::{
 use crate::search_engine::SearchEngine;
 
 pub struct Engine {
+    pub use_multithreading: bool,
     pub is_running: bool,
     is_searching: bool,
     board: GameState,
-    thread: Option<JoinHandle<()>>,
     search_engine: SearchEngine,
 }
 
@@ -22,14 +21,19 @@ impl Engine {
             board,
             is_running: true,
             is_searching: false,
-            thread: None,
-            search_engine: SearchEngine::new()
+            search_engine: SearchEngine::new(),
+            use_multithreading: true,
         };
     }
 
     pub fn go(&mut self, depth: Option<u8>) {
         self.search_engine.max_depth = depth.unwrap_or(6);
-        let result = self.search_engine.rayon_search(&self.board);
+        let result;
+        if self.use_multithreading {
+            result = self.search_engine.rayon_search(&self.board);
+        }else{
+            result = self.search_engine.search(&self.board);
+        }
         println!("bestmove {}", result);
     }
 

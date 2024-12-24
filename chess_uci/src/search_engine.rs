@@ -1,4 +1,4 @@
-use std::thread;
+use std::{result, thread};
 
 use chess_core::{
     bitboard::{GameState, TEMP_VALID_MOVE_SIZE},
@@ -165,55 +165,86 @@ impl SearchEngine {
     pub fn multi_threads_search(&mut self, game_state: &GameState) -> String {
         let mut game = game_state.clone();
         game.calculate_pseudolegal_moves();
+    
         let mut valid_moves = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
         let count = game.fill_valid_moves(&mut valid_moves);
-        let is_max = if Color::White == game.move_turn {
-            false
-        } else {
-            true
-        };
-
-        let collection_for_thread = &valid_moves[..count].chunks(self.num_threads as usize);
-        let mut children = Vec::new();
-
-        for chunk in collection_for_thread.clone().into_iter() {
-            let mut result = Vec::new();
-            let cloned_game = game.clone();
-            let max_depth = self.max_depth;
-            let child = thread::scope(move |_| {
-                let mut new_search: SearchEngine = SearchEngine::new();
-                new_search.max_depth = max_depth;
-
-                for valid_move in chunk {
-                    let mut current_game_for_thread = cloned_game.clone();
-                    current_game_for_thread.make_move(&valid_move);
-                    let mut buffer = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
-                    let score = new_search.min_max(
-                        i32::MIN,
-                        i32::MAX,
-                        0,
-                        is_max,
-                        &mut current_game_for_thread,
-                        &mut buffer,
-                    );
-                    current_game_for_thread.unmake_move();
-                    result.push((valid_move.uci(), score));
-                }
-                return result;
-            });
-            children.push(child);
-        }
-
-        let mut result: Vec<(String, i32)> = children.into_iter().flatten().collect();
-        result.sort_by(|(_, a), (_, b)| b.cmp(a));
-        println!("{:?}", result);
+    
+        // is_max means "maximizing" (commonly for the side to move)
+        // If White's turn, then is_max = false, else true
+        let is_max = game.move_turn == Color::Black;
+    
+        // We'll split the valid moves into chunks:
+        let chunks = &valid_moves[..count].chunks(count / self.num_threads as usize);
+    
+        // We'll collect final results here
+        let mut all_results: Vec<(String, i32)> = Vec::with_capacity(count);
+    
+        // Single scope so that all threads are joined by the time we exit
+        thread::scope(|scope| {
+            // We'll keep the join handles of each thread here
+            let mut handles = Vec::new();
+    
+            for chunk in chunks.clone().into_iter() {
+                let cloned_game = game.clone();
+                let max_depth = self.max_depth;
+    
+                // Spawn a child thread for each chunk
+                let handle = scope.spawn(move || {
+                    let mut thread_calculation = Vec::new();
+                    let mut new_search = SearchEngine::new();
+                    new_search.max_depth = max_depth;
+    
+                    for valid_move in chunk {
+                        let mut current_game_for_thread = cloned_game.clone();
+                        current_game_for_thread.make_move(valid_move);
+    
+                        let mut buffer = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+                        let score = new_search.min_max(
+                            i32::MIN,
+                            i32::MAX,
+                            0,
+                            is_max,
+                            &mut current_game_for_thread,
+                            &mut buffer,
+                        );
+    
+                        // Undo the move
+                        current_game_for_thread.unmake_move();
+    
+                        // Store (move_uci, score)
+                        thread_calculation.push((valid_move.uci(), score));
+                    }
+    
+                    // Return the per-chunk results from this thread
+                    thread_calculation
+                });
+                // Collect the handle so we can join later
+                handles.push(handle);
+            }
+    
+            // Now that all threads have been spawned, join them to collect results
+            for handle in handles {
+                let partial = handle.join().expect("Child thread panicked!");
+                all_results.extend(partial);
+            }
+        });
+    
+        // Now all threads are joined, and `all_results` has the moves & scores
+        // Sort in descending order of score
+        all_results.sort_by(|(_, a), (_, b)| b.cmp(a));
+    
+        // For debugging/logging
+        println!("{:?}", all_results);
         println!();
         unsafe {
             println!("Warning: Number of hash collision: {}", COLLISION_DETECTED);
         }
-
-        println!("score: {}", result[0].1);
-        return result[0].0.clone();
+    
+        // The best move is presumably the first in the sorted list
+        println!("score: {}", all_results[0].1);
+    
+        // Return the best move's UCI string
+        all_results[0].0.clone()
     }
 
     pub fn rayon_search(&mut self, game_state: &GameState) -> String {
@@ -231,6 +262,7 @@ impl SearchEngine {
             .par_chunks(slice_of_valid_moves.len() / 4)
             .into_par_iter()
             .map(|valid_moves| -> Vec<(String, i32)> {
+                println!("Hello from thread");
                 let mut results = Vec::with_capacity(valid_moves.len());
                 let cloned_game = game.clone();
                 let max_depth = self.max_depth;
@@ -348,7 +380,7 @@ impl SearchEngine {
     pub fn new() -> SearchEngine {
         let empty = SearchResult::empty();
         return SearchEngine {
-            num_threads: 10,
+            num_threads: 4,
             max_depth: 6,
             lookup_table: vec![empty; LOOKUP_TABLE_SIZE],
         };

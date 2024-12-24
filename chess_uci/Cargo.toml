@@ -9,7 +9,7 @@ debug = true
 [dev-dependencies]
 criterion = { version = "^0.4.0", features = ["html_reports"] }
 [[bench]]
-name = "search_benchmark"
+name = "search_engine_benchmark"
 harness = false
 
 [dependencies]
