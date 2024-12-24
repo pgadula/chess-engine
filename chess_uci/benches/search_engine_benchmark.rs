@@ -4,7 +4,7 @@ use chess_uci::search_engine::SearchEngine;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
 pub fn search_engine_benchmark(c: &mut Criterion) {
-    let max_depth = 9;
+    let max_depth = 7;
     let game = GameState::new_game();
 
     let mut criterion = Criterion::default().sample_size(10);
