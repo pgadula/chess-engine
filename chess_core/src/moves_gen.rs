@@ -12,7 +12,9 @@ pub fn get_pawn_moves(
     opposite_blockers: u64,
     en_passant: &Option<FileRank>,
     attack_mask:& mut u64,
-    flat_attacks: &mut Vec<PieceMove>
+    quite_attacks: &mut Vec<PieceMove>,
+    capture_attacks: &mut Vec<PieceMove>
+
 ) {
     let mut pawns = pawns;
     let rank_3_or_6 = if color == Color::White {RANK_3} else {RANK_6};
@@ -44,7 +46,7 @@ pub fn get_pawn_moves(
         for target in get_file_ranks(attack_pattern){
             if target.mask() & RANK_8 > 0 || target.mask() & RANK_1 > 0{
                 for piece_type in PROMOTION_PIECES {
-                    flat_attacks.push(PieceMove{
+                    capture_attacks.push(PieceMove{
                         from,
                         piece,
                         target,
@@ -52,7 +54,7 @@ pub fn get_pawn_moves(
                     }) 
                 }
             }else{
-                flat_attacks.push(PieceMove{
+                capture_attacks.push(PieceMove{
                     from,
                     piece,
                     target,
@@ -64,7 +66,7 @@ pub fn get_pawn_moves(
         for target in get_file_ranks(single_push){
             if target.mask() & RANK_8 > 0 || target.mask() & RANK_1 > 0{
                 for piece_type in PROMOTION_PIECES {
-                    flat_attacks.push(PieceMove{
+                    capture_attacks.push(PieceMove{
                         from,
                         piece,
                         target,
@@ -72,7 +74,7 @@ pub fn get_pawn_moves(
                     }) 
                 }
             }else{
-                flat_attacks.push(PieceMove{
+                quite_attacks.push(PieceMove{
                     from,
                     piece,
                     target,
@@ -93,7 +95,7 @@ pub fn get_pawn_moves(
                 FileRank::get_from_mask(target.mask() >> 8 ).unwrap()
             };
 
-            flat_attacks.push(PieceMove{
+            quite_attacks.push(PieceMove{
                 from,
                 piece,
                 target,
@@ -276,10 +278,11 @@ pub fn get_king_attacks(file_rank: FileRank) -> u64 {
 }
 
 pub fn fill_moves(
-    piece_file_rank: FileRank,
+    from: FileRank,
     piece: Piece,
     mut bit_moves: u64,
-    flat_attacks: &mut Vec<PieceMove>,
+    quiet_attacks: &mut Vec<PieceMove>,
+    killer_attacks: &mut Vec<PieceMove>,
     opposite_blockers: u64
 ) {
 
@@ -291,12 +294,18 @@ pub fn fill_moves(
         } else{
             MoveType::Quite
         };
-        flat_attacks.push(PieceMove{
+        let mv = PieceMove{
             piece,
-            from: piece_file_rank,
+            from,
             target: fr,
             move_type
-        });
+        };
+        
+        if move_type == MoveType::Quite   {
+            quiet_attacks.push(mv);
+        }else{
+            killer_attacks.push(mv);
+        }
 
     }
 }

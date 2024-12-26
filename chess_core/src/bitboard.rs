@@ -18,11 +18,9 @@ use crate::{
 };
 use rayon::prelude::*;
 use std::sync::Arc;
-
 pub const TEMP_VALID_MOVE_SIZE: usize = 512;
 
 pub type ValidMoveBuffer = [PieceMove; TEMP_VALID_MOVE_SIZE];
-
 
 #[derive(Debug)]
 pub struct GameState {
@@ -34,8 +32,10 @@ pub struct GameState {
 
     pub en_passant: Option<FileRank>,
     pub move_lookup_table: Arc<MoveLookupTable>,
-    pub flat_white_moves: Vec<PieceMove>,
-    pub flat_black_moves: Vec<PieceMove>,
+    quiet_white_moves: Vec<PieceMove>,
+    quiet_black_moves: Vec<PieceMove>,
+    killer_white_moves: Vec<PieceMove>,
+    killer_black_moves: Vec<PieceMove>,
     pub w_moves_mask: u64,
     pub b_moves_mask: u64,
 
@@ -54,8 +54,10 @@ impl Clone for GameState {
             fullmove_number: self.fullmove_number.clone(),
             en_passant: self.en_passant.clone(),
             move_lookup_table: self.move_lookup_table.clone(),
-            flat_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
-            flat_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            quiet_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            quiet_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            killer_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            killer_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
             w_moves_mask: self.w_moves_mask.clone(),
             b_moves_mask: self.b_moves_mask.clone(),
             zobrist_hashing: self.zobrist_hashing.clone(),
@@ -324,45 +326,44 @@ impl GameState {
     pub fn calculate_pseudolegal_moves(&mut self) {
         let white = self.get_board_side_info(&Color::White);
         let black = self.get_board_side_info(&Color::Black);
-
+        if self.move_turn == Color::White {}
         self.get_pseudolegal_moves(&white);
         self.get_pseudolegal_moves(&black);
 
-        let side = &self.get_board_side_info(&self.move_turn);
+        let side = if self.move_turn == Color::White {
+            white
+        } else {
+            black
+        };
 
-        if let Some(castlings) = self.get_castling_moves(side) {
+        if let Some(castlings) = self.get_castling_moves(&side) {
             for ele in castlings {
                 if Color::White == self.move_turn {
-                    self.flat_white_moves.push(ele);
+                    self.killer_white_moves.push(ele);
                     self.w_moves_mask |= ele.target.mask();
                 } else {
-                    self.flat_black_moves.push(ele);
+                    self.killer_black_moves.push(ele);
                     self.b_moves_mask |= ele.target.mask();
                 }
             }
         }
-        // if self.move_turn == Color::White{
-        //     self.flat_white_moves.sort_by(|a, b| a.move_type.score().cmp(&b.move_type.score()));
-        // }else{
-        //     self.flat_black_moves.sort_by(|a, b| a.move_type.score().cmp(&b.move_type.score()));
-
-        // }
     }
 
     pub fn detect_check(&self, king_mask: &u64, attacks_mask: &u64) -> bool {
         king_mask & attacks_mask > 0
     }
 
-    pub fn fill_valid_moves(&self, buffer:& mut ValidMoveBuffer )->usize {
-        let moves = if self.move_turn == Color::White {
-            &self.flat_white_moves
+    pub fn fill_valid_moves(&self, buffer: &mut ValidMoveBuffer) -> usize {
+        let (quite_moves, capture_moves) = if self.move_turn == Color::White {
+            (&self.quiet_white_moves, &self.killer_white_moves)
         } else {
-            &self.flat_black_moves
+            (&self.quiet_black_moves, &self.killer_black_moves)
         };
         let mut game: GameState = self.clone();
         let mut count = 0;
-        moves
+        capture_moves
             .iter()
+            .chain(quite_moves)
             .map(|piece_move: &PieceMove| {
                 game.make_move(piece_move);
                 let side = game.get_board_side_info(&game.move_turn);
@@ -384,16 +385,17 @@ impl GameState {
                 buffer[i] = mv;
                 count = count + 1;
             });
-            return count;
 
+        return count;
     }
 
     pub fn perft(self, depth: usize) -> (usize, Vec<(String, usize)>) {
         let mut game = self.clone();
-        let mut valid_attacks: [PieceMove; TEMP_VALID_MOVE_SIZE]  = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
+        let mut valid_attacks: [PieceMove; TEMP_VALID_MOVE_SIZE] =
+            [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
 
         game.calculate_pseudolegal_moves();
-        let count =  game.fill_valid_moves(&mut valid_attacks);
+        let count = game.fill_valid_moves(&mut valid_attacks);
 
         let results: Vec<(String, usize)> = valid_attacks[..count]
             .par_iter()
@@ -413,7 +415,11 @@ impl GameState {
         return (*total_nodes, results);
     }
 
-    fn inner_perft(&mut self, depth: usize, buffer:& mut [PieceMove; TEMP_VALID_MOVE_SIZE]) -> usize {
+    fn inner_perft(
+        &mut self,
+        depth: usize,
+        buffer: &mut [PieceMove; TEMP_VALID_MOVE_SIZE],
+    ) -> usize {
         if depth == 0 {
             return 1;
         }
@@ -422,7 +428,7 @@ impl GameState {
         self.calculate_pseudolegal_moves();
         let count = self.fill_valid_moves(buffer);
 
-        for piece_move in &buffer[..count]{
+        for piece_move in &buffer[..count] {
             self.make_move(&piece_move);
             result += self.inner_perft(depth - 1, &mut buffer.clone());
             self.unmake_move();
@@ -447,15 +453,27 @@ impl GameState {
 
         let all_pieces: u64 = self.get_all_pieces();
 
-        let (mut side_moves, mut move_mask): (&mut Vec<PieceMove>, &mut u64) =
-            if *color == Color::White {
-                (&mut self.flat_white_moves, &mut self.w_moves_mask)
-            } else {
-                (&mut self.flat_black_moves, &mut self.b_moves_mask)
-            };
+        let (mut quite_moves, mut killer_moves, mut move_mask): (
+            &mut Vec<PieceMove>,
+            &mut Vec<PieceMove>,
+            &mut u64,
+        ) = if *color == Color::White {
+            (
+                &mut self.quiet_white_moves,
+                &mut self.killer_white_moves,
+                &mut self.w_moves_mask,
+            )
+        } else {
+            (
+                &mut self.quiet_black_moves,
+                &mut self.killer_black_moves,
+                &mut self.b_moves_mask,
+            )
+        };
 
         //reset
-        side_moves.clear();
+        killer_moves.clear();
+        quite_moves.clear();
         *move_mask = 0;
 
         let lookup_table = self.move_lookup_table.clone();
@@ -469,7 +487,8 @@ impl GameState {
                 rook_position,
                 Piece::from(&PieceType::Rook, &color),
                 rook_move,
-                &mut side_moves,
+                &mut quite_moves,
+                &mut killer_moves,
                 *opposite_blockers,
             );
         }
@@ -482,7 +501,8 @@ impl GameState {
                 bishop_position,
                 Piece::from(&PieceType::Bishop, &color),
                 bishop_moves,
-                &mut side_moves,
+                &mut quite_moves,
+                &mut killer_moves,
                 *opposite_blockers,
             );
         }
@@ -496,7 +516,8 @@ impl GameState {
                 queen_position,
                 Piece::from(&PieceType::Queen, &color),
                 sliding_moves,
-                &mut side_moves,
+                &mut quite_moves,
+                &mut killer_moves,
                 *opposite_blockers,
             );
         }
@@ -508,7 +529,8 @@ impl GameState {
                 knight_position,
                 Piece::from(&PieceType::Knight, &color),
                 attacks,
-                &mut side_moves,
+                &mut quite_moves,
+                &mut killer_moves,
                 *opposite_blockers,
             );
         }
@@ -520,7 +542,8 @@ impl GameState {
             side.opposite_blockers,
             &self.en_passant,
             &mut move_mask,
-            &mut side_moves,
+            &mut quite_moves,
+            &mut killer_moves,
         );
 
         for king_position in get_file_ranks(*king) {
@@ -530,7 +553,8 @@ impl GameState {
                 king_position,
                 Piece::from(&PieceType::King, &color),
                 attacks,
-                &mut side_moves,
+                &mut quite_moves,
+                &mut killer_moves,
                 *opposite_blockers,
             );
         }
@@ -934,8 +958,10 @@ impl Default for GameState {
             en_passant: None,
             halfmove_clock: Clock::new(),
             fullmove_number: Clock::new(),
-            flat_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
-            flat_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            quiet_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            quiet_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            killer_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            killer_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
             zobrist_hashing: Arc::new(zobrist_hashing),
