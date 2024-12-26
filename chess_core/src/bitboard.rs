@@ -330,12 +330,7 @@ impl GameState {
         self.get_pseudolegal_moves(&white);
         self.get_pseudolegal_moves(&black);
 
-        let side = if self.move_turn == Color::White {
-            white
-        } else {
-            black
-        };
-
+        let side = self.get_board_side_info(&self.move_turn);
         if let Some(castlings) = self.get_castling_moves(&side) {
             for ele in castlings {
                 if Color::White == self.move_turn {
