@@ -3,7 +3,7 @@ use rand_pcg::Pcg32;
 
 use crate::{
     bitboard::GameState,
-    types::PIECES_ARRAY,
+    types::{FileRank, MoveType, PieceMove, PIECES_ARRAY},
     utility::get_file_ranks,
 };
 
@@ -28,13 +28,16 @@ impl ZobristHashing {
         };
         return zobrist_hashing;
     }
+    pub fn piece_index(index: usize, file_rank:&FileRank)->usize{
+        let piece_index = PIECES_ARRAY[index].bitboard_index();
+        piece_index * 64 + file_rank.index()
+    }
 
-    pub fn get_hash(&self, game: &GameState) -> u64 {
+    pub fn get_hash_from_scratch(&self, game: &GameState) -> u64 {
         let mut hash = 0;
         for (index, squares) in game.bitboard.iter().enumerate() {
             for file_rank in get_file_ranks(*squares) {
-                let piece_index = PIECES_ARRAY[index].bitboard_index();
-                let hash_index = piece_index * 64 + file_rank.index();
+                let hash_index = Self::piece_index(index, &file_rank);
                 hash ^= self.pieces[hash_index];
             }
         }
@@ -45,6 +48,46 @@ impl ZobristHashing {
         }
 
         hash ^= (game.move_turn as u64) * self.side;
+        return hash;
+    }
+
+    pub fn fast_recalculate_hash(&self, game: &GameState, mv: &PieceMove) -> u64 {
+        let mut hash = game.hash;
+        hash ^= (game.move_turn.flip() as u64) * self.side;
+        hash ^= (game.move_turn as u64) * self.side;
+
+        println!("{:?}", mv);
+        match mv.move_type {
+            MoveType::Quite | MoveType::DoublePush(_) => {
+                let hash_index_from = Self::piece_index(mv.piece.bitboard_index(), &mv.from);
+                let hash_index_target = Self::piece_index(mv.piece.bitboard_index(), &mv.target);
+                //revert
+                hash ^= self.pieces[hash_index_from];
+
+                //applying
+                hash ^= self.pieces[hash_index_target];
+            },
+
+            MoveType::CastleKingSide => {
+            },
+            MoveType::CastleQueenSide => {}
+            MoveType::Promotion(piece_type) => {}
+            MoveType::Capture => {
+                // let target_piece =  game.get_piece_at(&mv.target).unwrap();
+                // let hash_index_targeted = Self::piece_index(target_piece.bitboard_index(), &mv.target);
+                // let hash_index_from = Self::piece_index(mv.piece.bitboard_index(), &mv.from);
+                // let hash_index_target = Self::piece_index(mv.piece.bitboard_index(), &mv.target);
+
+                //reverting
+                // hash ^= self.pieces[hash_index_targeted];
+                // hash ^= self.pieces[hash_index_from];
+
+                // //applying
+                // hash ^= self.pieces[hash_index_target];
+            }
+            MoveType::CaptureWithPromotion(_) => {}
+        }
+
         return hash;
     }
 }

@@ -1,8 +1,47 @@
 #[cfg(test)]
 mod tests {
-    use chess_core::{bitboard::{FenParser, GameState, TEMP_VALID_MOVE_SIZE}, types::PieceMove};
+    use chess_core::{
+        bitboard::{FenParser, GameState, TEMP_VALID_MOVE_SIZE},
+        types::PieceMove,
+    };
 
     use crate::PERFT_TESTS;
+
+    #[test]
+    fn zorbrist_hash_gen_tests() {
+        let mut game = GameState::new_game();
+
+        let mv_gen = PieceMove::from_uci;
+        let mv_uci_list = [
+            "a2a4", "h7h5", // White pushes a-pawn, black does a random move
+            "a4a5", "h5h4",
+            "a5a6", "h4h3",
+            "a6b7", "h3g2",  // Now white is ready to promote
+
+        ];
+        let mut move_index = 0;
+        for mv_uci in mv_uci_list {
+            let mv = mv_gen(&mv_uci, &game);
+            game.make_move(&mv);
+            game.println();
+            let fen = GameState::serialize(&game);
+            let deep_cloned = GameState::deserialize(&fen);
+            let expected_hash = game.zobrist_hashing.get_hash_from_scratch(&game);
+            for row in 0..8 {
+                for col in 0..8 {
+                    print!("{:?}", game.board[col+row*8])
+                }
+                println!()
+            }
+
+            assert_eq!(deep_cloned.hash , expected_hash, "After deep cloned failed on hash");
+            assert_eq!(
+                game.hash, expected_hash,
+                "Zobrist hash mismatch after move {mv_uci}, move index {move_index}"
+            );
+        }
+        move_index = move_index + 1;
+    }
 
     #[test]
     fn test_perft_positions() {
@@ -27,10 +66,9 @@ mod tests {
         let (total_nodes, _) = game.perft(depth as usize);
         let expected_total_nodes = PERFT_TESTS[depth].total_nodes;
         assert_eq!(
-            total_nodes,
-            expected_total_nodes,
-             "Failed for depth: {}, expected nodes: {}, but got: {}",
-             depth, expected_total_nodes, total_nodes
+            total_nodes, expected_total_nodes,
+            "Failed for depth: {}, expected nodes: {}, but got: {}",
+            depth, expected_total_nodes, total_nodes
         );
     }
 
@@ -58,7 +96,9 @@ mod tests {
         for mv in &valid_moves[..count] {
             cloned_game.make_move(&mv);
             cloned_game.unmake_move();
-            cloned_game.hash = cloned_game.zobrist_hashing.get_hash(&cloned_game);
+            cloned_game.hash = cloned_game
+                .zobrist_hashing
+                .get_hash_from_scratch(&cloned_game);
 
             assert_eq!(
                     expected_hash, cloned_game.hash,

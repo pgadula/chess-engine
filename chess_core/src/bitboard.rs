@@ -29,6 +29,7 @@ pub struct GameState {
     pub castling: Castling,
     pub halfmove_clock: Clock,
     pub fullmove_number: Clock,
+    pub board: [char; 64],
 
     pub en_passant: Option<FileRank>,
     pub move_lookup_table: Arc<MoveLookupTable>,
@@ -63,6 +64,7 @@ impl Clone for GameState {
             zobrist_hashing: self.zobrist_hashing.clone(),
             hash: self.hash.clone(),
             history: self.history.clone(),
+            board: self.board.clone()
         }
     }
 }
@@ -146,7 +148,7 @@ impl GameState {
             self.en_passant = None;
         }
         self.move_turn = self.move_turn.flip();
-        self.hash = self.zobrist_hashing.get_hash(&self);
+        self.hash = self.zobrist_hashing.get_hash_from_scratch(&self);
 
         self.history.push(state);
     }
@@ -656,13 +658,16 @@ impl GameState {
     }
 
     pub fn set_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
+        self.board[file_rank.index()] = piece.symbol();
         let mut bitboard = self.get_piece_bitboard(piece);
         set_bit(&mut bitboard, &file_rank);
     }
 
     pub fn clear_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
         {
+            self.board[file_rank.index()] = '-'; 
             let mut bitboard = self.get_piece_bitboard(piece);
+
             clear_bit(&mut bitboard, file_rank);
         }
     }
@@ -743,12 +748,8 @@ impl GameState {
     }
 
     pub fn get_piece_at(&self, file_rank: &FileRank) -> Option<Piece> {
-        for piece in PIECES_ARRAY {
-            if GameState::has(self.bitboard[piece.bitboard_index()], file_rank) {
-                return Some(piece);
-            }
-        }
-        None
+        let c = self.board[file_rank.index()];
+        Piece::from_character(c)
     }
 
     pub fn get_board_side_info(&self, color: &Color) -> BoardSide {
@@ -823,11 +824,13 @@ impl FenParser for GameState {
         let mut row: u8 = 0;
         let mut col: u8 = 0;
 
+        game.board = core::array::from_fn(|_|{'-'});
+
         for char in piece_placement.chars() {
             if let Some(piece) = get_piece_from_char(char) {
                 let index = (row * 8) + col;
-                if let Some(rank_file) = FileRank::get_file_rank(index) {
-                    game.set_piece(piece, &rank_file);
+                if let Some(file_rank) = FileRank::get_file_rank(index) {
+                    game.set_piece(piece, &file_rank);
                 }
                 col += 1;
             } else {
@@ -868,7 +871,7 @@ impl FenParser for GameState {
         game.castling = castling;
         game.en_passant = FileRank::from_string(en_passant);
 
-        game.hash = game.zobrist_hashing.get_hash(&game);
+        game.hash = game.zobrist_hashing.get_hash_from_scratch(&game);
         game
     }
 
@@ -962,6 +965,7 @@ impl Default for GameState {
             zobrist_hashing: Arc::new(zobrist_hashing),
             hash: 0,
             history: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            board: core::array::from_fn(|_|{'-'})
         }
     }
 }
