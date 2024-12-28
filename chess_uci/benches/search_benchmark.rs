@@ -16,7 +16,7 @@ pub fn search_engine_benchmark(c: &mut Criterion) {
                 /* setup closure: returns a fresh `SearchEngine` each time */
                 || {
                     let mut engine = SearchEngine::new();
-                    engine.clear_lookup_table();
+                    engine.transposition_table.clear_lookup_table();
                     engine.max_depth = max_depth;
                     engine
                 },
@@ -43,7 +43,7 @@ pub fn search_engine_benchmark_depth_10(c: &mut Criterion) {
                 /* setup closure: returns a fresh `SearchEngine` each time */
                 || {
                     let mut engine = SearchEngine::new();
-                    engine.clear_lookup_table();
+                    engine.transposition_table.clear_lookup_table();
                     engine.max_depth = 10;
                     engine
                 },

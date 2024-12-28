@@ -12,7 +12,7 @@ use crate::{
     moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves},
     types::{
         get_piece_from_char, BoardSide, Color, FileRank, MoveType, Piece, PieceIndex, PieceMove,
-        PieceType, BLACK_ROOK, PIECES_ARRAY, WHITE_ROOK,
+        PieceType, BLACK_ROOK, WHITE_ROOK,
     },
     utility::{clear_bit, get_file_ranks, set_bit},
 };

@@ -1,8 +1,7 @@
 use crate::search_engine::{NodeType, SearchResult, EMPTY_SEARCH_RESULT};
 
-pub const LOOKUP_SIZE: usize = 1024 * 1024;
-
-pub const BUCKET_SIZE: usize = 1;
+pub const LOOKUP_SIZE: usize = 512 * 512;
+pub const BUCKET_SIZE: usize = 64;
 
 pub struct TranspositionTable {
     pub lookup_table: Vec<SearchResult>,
@@ -40,13 +39,22 @@ impl TranspositionTable {
 
         let mut i = 0;
         while i < BUCKET_SIZE {
-            let entity = self.lookup_table[index + i];
-            if entity == EMPTY_SEARCH_RESULT {
-                self.lookup_table[index + i] = search_result;
-                return Ok(index + i);
+            let idx = index + i;
+            let entity = self.lookup_table[idx];
+            if entity.hash == hash{
+                if entity.depth < search_result.depth{
+                    self.lookup_table[idx] = search_result;
+                    return Ok(idx)
+                }
+            }
+            if entity.hash == EMPTY_SEARCH_RESULT.hash {
+                self.lookup_table[idx] = search_result;
+                return Ok(idx);
             }
             i = i + 1;
         }
+        let r_idx = (search_result.hash as usize) % BUCKET_SIZE;
+        self.lookup_table[index + r_idx] = search_result;
         self.collision_detected = self.collision_detected + 1;
         return Err("Error: bucket size reached, no empty place for record");
     }
@@ -66,6 +74,7 @@ impl TranspositionTable {
             let result = self.lookup_table[index + i];
             i = i + 1;
             if result.hash == hash {
+                
                 entity = Some(result);
                 break;
             }
