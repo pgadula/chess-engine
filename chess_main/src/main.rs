@@ -74,7 +74,7 @@ fn main() {
                 "go" => {
                     println!("UciGo");
                     let now = Instant::now();
-                    engine.go(Some(6));
+                    engine.go(Some(24));
                     let elapsed = now.elapsed();
                     println!("Thinking time: {:.2?}", elapsed);
                 }
@@ -82,7 +82,7 @@ fn main() {
                     engine.new_game();
                 }
                 "stop" => {
-                    engine.stop();
+                    engine.stop_thinking();
                 }
                 "quit" => {
                     engine.quit();

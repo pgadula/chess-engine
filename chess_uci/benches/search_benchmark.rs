@@ -1,3 +1,5 @@
+use std::sync::{atomic::AtomicBool, Arc};
+
 use chess_core::bitboard::GameState;
 use chess_uci::search_engine::SearchEngine;
 
@@ -8,6 +10,7 @@ pub fn search_engine_benchmark(c: &mut Criterion) {
     let game = GameState::new_game();
 
     let mut criterion = Criterion::default().sample_size(10);
+    
     criterion.bench_with_input(
         BenchmarkId::new("search_engine bench", max_depth),
         &max_depth,
@@ -22,7 +25,7 @@ pub fn search_engine_benchmark(c: &mut Criterion) {
                 },
                 /* measurement closure: uses the owned `engine` */
                 |mut engine| {
-                    engine.rayon_search(&game);
+                    engine.rayon_search(&game, Arc::new(AtomicBool::new(false)));
                 },
                 criterion::BatchSize::SmallInput,
             );

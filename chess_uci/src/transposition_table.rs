@@ -1,11 +1,19 @@
 use crate::search_engine::{NodeType, SearchResult, EMPTY_SEARCH_RESULT};
 
-pub const LOOKUP_SIZE: usize = 512 * 512;
-pub const BUCKET_SIZE: usize = 64;
+pub const LOOKUP_SIZE: usize = 1 << 19; // 524,288
+pub const BUCKET_SIZE: usize = 16;
 
+#[derive(Debug, Clone)]
 pub struct TranspositionTable {
     pub lookup_table: Vec<SearchResult>,
     pub collision_detected: usize,
+    pub collision_strategy: CollisionStrategy
+}
+
+#[derive(Debug, Clone)]
+pub enum CollisionStrategy {
+    ReplaceWithRandHash,
+    ReplaceWithShallowDepth,
 }
 
 impl TranspositionTable {
@@ -13,6 +21,7 @@ impl TranspositionTable {
         TranspositionTable {
             lookup_table: vec![EMPTY_SEARCH_RESULT; LOOKUP_SIZE * BUCKET_SIZE],
             collision_detected: 0,
+            collision_strategy: CollisionStrategy::ReplaceWithShallowDepth
         }
     }
 
@@ -41,6 +50,7 @@ impl TranspositionTable {
         while i < BUCKET_SIZE {
             let idx = index + i;
             let entity = self.lookup_table[idx];
+
             if entity.hash == hash{
                 if entity.depth < search_result.depth{
                     self.lookup_table[idx] = search_result;
@@ -51,14 +61,39 @@ impl TranspositionTable {
                 self.lookup_table[idx] = search_result;
                 return Ok(idx);
             }
+            self.collision_detected = self.collision_detected + 1;
+
             i = i + 1;
         }
-        let r_idx = (search_result.hash as usize) % BUCKET_SIZE;
-        self.lookup_table[index + r_idx] = search_result;
-        self.collision_detected = self.collision_detected + 1;
+
+
+        match self.collision_strategy {
+            CollisionStrategy::ReplaceWithRandHash => self.replace_wth_random_index(search_result, index),
+            CollisionStrategy::ReplaceWithShallowDepth =>  self.replace_with_shallow_depth(search_result, index),
+        }
+       
         return Err("Error: bucket size reached, no empty place for record");
     }
 
+    fn replace_wth_random_index(&mut self, search_result: SearchResult, index: usize) {
+        let r_idx = (search_result.hash as usize) % BUCKET_SIZE;
+        self.lookup_table[index + r_idx] = search_result;
+    }
+
+
+    fn replace_with_shallow_depth(&mut self, search_result: SearchResult, index: usize){
+        let mut i = 0;
+        while i < BUCKET_SIZE {
+            let idx = index + i;
+            let entity = self.lookup_table[idx];
+            if entity.depth < search_result.depth{
+                self.lookup_table[idx] =  search_result;
+                break;
+            }
+            i = i + 1;
+        }
+    }
+    
     pub fn try_get_from_cache(
         &self,
         hash: u64,

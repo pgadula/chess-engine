@@ -1,16 +1,24 @@
-use std::{result, thread};
+use std::{
+    result,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
+};
 
 use chess_core::{
     bitboard::{GameState, TEMP_VALID_MOVE_SIZE},
     types::{Color, PieceMove},
 };
 use rayon::{
-    iter::{IntoParallelIterator, ParallelIterator},
+    iter::ParallelIterator,
     slice::ParallelSlice,
 };
 
 use crate::transposition_table::TranspositionTable;
 
+#[derive(Debug, Clone)]
 pub struct SearchEngine {
     pub max_depth: u8,
     pub transposition_table: TranspositionTable,
@@ -39,7 +47,6 @@ pub const EMPTY_SEARCH_RESULT: SearchResult = SearchResult {
     node_type: NodeType::Exact,
 };
 
-
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
 pub enum NodeType {
@@ -60,7 +67,15 @@ impl SearchEngine {
             let cloned_game = &mut game;
             cloned_game.make_move(&valid_move);
             let mut buffer = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
-            let score = self.min_max(i32::MIN, i32::MAX, 0, false, cloned_game, &mut buffer);
+            let score = self.min_max(
+                i32::MIN,
+                i32::MAX,
+                0,
+                false,
+                cloned_game,
+                &mut buffer,
+                Arc::new(AtomicBool::new(false)),
+            );
             cloned_game.unmake_move();
             result.push((valid_move.uci(), score));
         }
@@ -70,10 +85,10 @@ impl SearchEngine {
         result.sort_by(|(_, a), (_, b)| b.cmp(a));
         println!("{:?}", result);
         println!();
-        println!(
-            "Warning: Number of hash collision: {}",
-            self.transposition_table.collision_detected
-        );
+        // println!(
+        //     "Warning: Number of hash collision: {}",
+        //     self.transposition_table.collision_detected
+        // );
 
         println!("score: {}", result[0].1);
         return result[0].0.clone();
@@ -87,7 +102,11 @@ impl SearchEngine {
         is_max: bool,
         node: &mut GameState,
         mut buffer: &mut [PieceMove; TEMP_VALID_MOVE_SIZE],
+        stop_signal: Arc<AtomicBool>,
     ) -> i32 {
+        if stop_signal.load(Ordering::SeqCst) {
+            return 0;
+        }
         let original_alpha = alpha;
         let original_beta = beta;
 
@@ -123,7 +142,15 @@ impl SearchEngine {
             best_value = i32::MIN;
             for mv in &mut buffer[..count] {
                 node.make_move(&mv);
-                let eval = self.min_max(alpha, beta, depth + 1, false, node, new_buffer);
+                let eval = self.min_max(
+                    alpha,
+                    beta,
+                    depth + 1,
+                    false,
+                    node,
+                    new_buffer,
+                    stop_signal.clone(),
+                );
                 node.unmake_move();
 
                 if eval > best_value {
@@ -140,7 +167,15 @@ impl SearchEngine {
             best_value = i32::MAX;
             for mv in &buffer[..count] {
                 node.make_move(&mv);
-                let eval = self.min_max(alpha, beta, depth + 1, true, node, new_buffer);
+                let eval = self.min_max(
+                    alpha,
+                    beta,
+                    depth + 1,
+                    true,
+                    node,
+                    new_buffer,
+                    stop_signal.clone(),
+                );
                 node.unmake_move();
 
                 if eval < best_value {
@@ -169,42 +204,55 @@ impl SearchEngine {
         best_value
     }
 
-    pub fn multi_threads_search(&mut self, game_state: &GameState) -> String {
+    pub fn rayon_search(
+        &mut self,
+        game_state: &GameState,
+        stop_signal: Arc<AtomicBool>,
+    ) -> String {
         let mut game = game_state.clone();
         game.calculate_pseudolegal_moves();
-
         let mut valid_moves = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
         let count = game.fill_valid_moves(&mut valid_moves);
-        println!("INFO: Number of valid moves {}", count);
-        // is_max means "maximizing" (commonly for the side to move)
-        // If White's turn, then is_max = false, else true
-        let is_max = game.move_turn == Color::Black;
+        let is_max = matches!(game.move_turn, Color::Black);
+        let slice_of_valid_moves = &valid_moves[..count];
+        let max_depth = self.max_depth;
 
-        // We'll split the valid moves into chunks:
-        let chunks = &valid_moves[..count].chunks(count / self.num_threads as usize);
-        // We'll collect final results here
-        let mut all_results: Vec<(String, i32)> = Vec::with_capacity(count);
+        // Determine the number of chunks; ensure it's at least 1 to avoid division by zero
+        let num_chunks = 4.min(count.max(1));
+        let chunk_size = (count + num_chunks - 1) / num_chunks; // Ceiling division
 
-        // Single scope so that all threads are joined by the time we exit
-        thread::scope(|scope| {
-            // We'll keep the join handles of each thread here
-            let mut handles = Vec::new();
+        // Parallel processing with Rayon
+        let results = slice_of_valid_moves
+            .par_chunks(chunk_size)
+            .map(|valid_moves_chunk| -> (Vec<(String, i32, u8)>, u8) {
+                let mut thread_results: Vec<(String, i32, u8)> = Vec::new();
+                let mut last_completed_depth = 0;
+                let thread_id = thread::current().id();
 
-            for chunk in chunks.clone().into_iter() {
-                let cloned_game = game.clone();
-                let max_depth = self.max_depth;
+                for depth in 1..=max_depth {
+                    // println!(
+                    //     "INFO: Depth:{} {:?} processing chunk of size {}",
+                    //     depth,
+                    //     thread_id,
+                    //     valid_moves_chunk.len()
+                    // );
+    
 
-                // Spawn a child thread for each chunk
-                let handle = scope.spawn(move || {
-                    println!("INFO: Thread is starting with chunk size {}", chunk.len());
+                    // Check for stop signal before starting a new depth
+                    if stop_signal.load(Ordering::SeqCst) {
+                        println!("INFO: Stop signal received before starting depth {depth}");
+                        break;
+                    }
 
-                    let mut thread_calculation = Vec::new();
+                    let cloned_game = game.clone();
                     let mut new_search = SearchEngine::new();
-                    new_search.max_depth = max_depth;
+                    new_search.max_depth = depth;
 
-                    for valid_move in chunk {
-                        let mut current_game_for_thread = cloned_game.clone();
-                        current_game_for_thread.make_move(valid_move);
+                    let mut current_game = cloned_game.clone();
+                    let mut depth_results: Vec<(String, i32, u8)> = Vec::new();
+
+                    for valid_move in valid_moves_chunk {
+                        current_game.make_move(valid_move);
 
                         let mut buffer = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
                         let score = new_search.min_max(
@@ -212,112 +260,90 @@ impl SearchEngine {
                             i32::MAX,
                             0,
                             is_max,
-                            &mut current_game_for_thread,
+                            &mut current_game,
                             &mut buffer,
+                            stop_signal.clone(),
                         );
 
-                        // Undo the move
-                        current_game_for_thread.unmake_move();
+                        current_game.unmake_move();
 
-                        // Store (move_uci, score)
-                        thread_calculation.push((valid_move.uci(), score));
+                        // Check for stop signal after each move
+                        if stop_signal.load(Ordering::SeqCst) {
+                            println!("INFO: Stop signal received during processing at depth {depth}");
+                            // Discard partial results for this depth
+                            return (thread_results, last_completed_depth);
+                        }
+
+                        depth_results.push((valid_move.uci(), score, depth));
                     }
-                    println!("WARNING: hash collision {}", new_search.transposition_table.collision_detected);
 
-                    // Return the per-chunk results from this thread
-                    thread_calculation
-                });
-                // Collect the handle so we can join later
-                handles.push(handle);
-            }
-
-            // Now that all threads have been spawned, join them to collect results
-            for handle in handles {
-                let partial = handle.join().expect("Child thread panicked!");
-                all_results.extend(partial);
-            }
-        });
-
-        // Now all threads are joined, and `all_results` has the moves & scores
-        // Sort in descending order of score
-        all_results.sort_by(|(_, a), (_, b)| b.cmp(a));
-
-        // For debugging/logging
-        println!("{:?}", all_results);
-        println!();
-        // The best move is presumably the first in the sorted list
-        println!("score: {}", all_results[0].1);
-
-        // Return the best move's UCI string
-        all_results[0].0.clone()
-    }
-
-    pub fn rayon_search(&mut self, game_state: &GameState) -> String {
-        let mut game = game_state.clone();
-        game.calculate_pseudolegal_moves();
-        let mut valid_moves = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
-        let count = game.fill_valid_moves(&mut valid_moves);
-        let is_max = if Color::White == game.move_turn {
-            false
-        } else {
-            true
-        };
-        let slice_of_valid_moves = &valid_moves[..count];
-        let results = &slice_of_valid_moves
-            .par_chunks(slice_of_valid_moves.len() / 4)
-            .into_par_iter()
-            .map(|valid_moves| -> Vec<(String, i32)> {
-                println!("INFO: Thread is starting with chunk size {}", valid_moves.len());
-                let mut results = Vec::with_capacity(valid_moves.len());
-                let cloned_game = game.clone();
-                let max_depth = self.max_depth;
-                let mut new_search: SearchEngine = SearchEngine::new();
-                new_search.max_depth = max_depth;
-
-                let mut current_game_for_thread = cloned_game.clone();
-                for valid_move in valid_moves {
-                    current_game_for_thread.make_move(&valid_move);
-                    let mut buffer = [PieceMove::default(); TEMP_VALID_MOVE_SIZE];
-                    let score = new_search.min_max(
-                        i32::MIN,
-                        i32::MAX,
-                        0,
-                        is_max,
-                        &mut current_game_for_thread,
-                        &mut buffer,
-                    );
-                    current_game_for_thread.unmake_move();
-                    results.push((valid_move.uci(), score));
+                    // If all moves at this depth are processed without interruption
+                    thread_results.extend(depth_results);
+                    last_completed_depth = depth;
                 }
-                println!(
-                    "Warning: Number of hash collision: {}",
-                    new_search.transposition_table.collision_detected
-                );
-                return results;
-            });
 
-        let mut result: Vec<(String, i32)> = results.clone().flatten().collect();
-        result.sort_by(|(_, a), (_, b)| b.cmp(a));
-        println!("{:?}", result);
-        println!();
+                (thread_results, last_completed_depth)
+            })
+            .collect::<Vec<(Vec<(String, i32, u8)>, u8)>>();
 
-        println!("score: {}", result[0].1);
-        return result[0].0.clone();
+        // Determine the minimum completed depth across all threads
+        let max_completed_depth = results
+            .iter()
+            .map(|(_, depth)| *depth)
+            .min()
+            .unwrap_or(0);
+
+        println!("INFO: Maximum fully completed depth across all threads: {max_completed_depth}");
+
+        // Collect all results at the max_completed_depth
+        let mut final_results: Vec<(String, i32, u8)> = results
+            .iter()
+            .flat_map(|(moves, _)| moves.iter())
+            .filter(|(_, _, depth)| *depth == max_completed_depth)
+            .cloned()
+            .collect();
+
+        // Handle case where no results are available
+        if final_results.is_empty() {
+            println!("WARN: No results available at depth {max_completed_depth}");
+            return "no_moves".to_string();
+        }
+
+        // Sort the results based on the score
+        if is_max {
+            // For maximizing player (Black), higher scores are better
+            // Sort in descending order
+            final_results.sort_by(|a, b| b.1.cmp(&a.1));
+        } else {
+            // For minimizing player (White), lower scores are better
+            // Sort in ascending order
+            final_results.sort_by(|a, b| a.1.cmp(&b.1));
+        }
+
+        // Select the best move
+        if let Some((best_uci, best_score, _)) = final_results.first() {
+            println!("INFO: Best move at depth {max_completed_depth}: {best_uci} with score {best_score}");
+            best_uci.clone()
+        } else {
+            // Fallback if no moves are found
+            "no_moves".to_string()
+        }
     }
 
     fn score_heuristic(&self, game: &GameState) -> i32 {
-        let scoring_board: [usize; 6] = [1, 3, 3, 5, 9, 0];
+        const PIECE_VALUES: [i32; 6] = [100, 320, 330, 500, 900, 0];
         let mut white_sum = 0;
         let mut black_sum = 0;
         for (i, &board) in game.bitboard.iter().enumerate() {
             let num_bits = board.count_ones();
-            let score = num_bits * scoring_board[i % 6] as u32;
+            let score = num_bits * PIECE_VALUES[i % 6] as u32;
             if i < 6 {
                 white_sum += score as i32;
             } else {
                 black_sum += score as i32;
             }
         }
+        
         white_sum - black_sum
     }
 

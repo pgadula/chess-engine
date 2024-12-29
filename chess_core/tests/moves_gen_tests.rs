@@ -1,11 +1,10 @@
 #[cfg(test)]
 mod tests {
     use chess_core::{
-        bitboard::{FenParser, GameState, TEMP_VALID_MOVE_SIZE},
-        types::PieceMove,
+        bitboard::{ GameState, TEMP_VALID_MOVE_SIZE}, fen::FenParser, types::PieceMove
     };
 
-    use crate::PERFT_TESTS;
+    use crate::{PERFT_NEW_GAME_TESTS, PERFT_POSITION_5};
 
     #[test]
     fn zorbrist_hash_gen_tests() {
@@ -64,13 +63,27 @@ mod tests {
         let depth: usize = 6;
         let game = GameState::new_game();
         let (total_nodes, _) = game.perft(depth as usize);
-        let expected_total_nodes = PERFT_TESTS[depth].total_nodes;
+        let expected_total_nodes = PERFT_NEW_GAME_TESTS[depth].total_nodes;
         assert_eq!(
             total_nodes, expected_total_nodes,
             "Failed for depth: {}, expected nodes: {}, but got: {}",
             depth, expected_total_nodes, total_nodes
         );
     }
+
+    #[test]
+    fn test_for_position_5() {
+        let depth: usize = 5;
+        let game = GameState::deserialize("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
+        let (total_nodes, _) = game.perft(depth as usize);
+        let expected_total_nodes = PERFT_POSITION_5.last().unwrap().total_nodes;
+        assert_eq!(
+            total_nodes, expected_total_nodes,
+            "Failed for depth: {}, expected nodes: {}, but got: {}",
+            depth, expected_total_nodes, total_nodes
+        );
+    }
+
 
     // Test function that will run `perft` against all positions in `TEST_CASES`
     #[test]
@@ -242,73 +255,85 @@ mod tests {
 }
 
 #[derive(Debug, Clone)]
-struct PerftNewGame {
+struct PerftCase {
     depth: u8,
     total_nodes: usize,
 }
-const PERFT_TESTS: &[PerftNewGame] = &[
-    PerftNewGame {
+const PERFT_NEW_GAME_TESTS: &[PerftCase] = &[
+    PerftCase {
         depth: 0,
         total_nodes: 1,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 1,
         total_nodes: 20,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 2,
         total_nodes: 400,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 3,
         total_nodes: 8_902,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 4,
         total_nodes: 197_281,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 5,
         total_nodes: 4_865_609,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 6,
         total_nodes: 119_060_324,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 7,
         total_nodes: 3_195_901_860,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 8,
         total_nodes: 84_998_978_956,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 9,
         total_nodes: 2_439_530_234_167,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 10,
         total_nodes: 69_352_859_712_417,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 11,
         total_nodes: 2_097_651_003_696_806,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 12,
         total_nodes: 62_854_969_236_701_747,
     },
-    PerftNewGame {
+    PerftCase {
         depth: 13,
         total_nodes: 1_981_066_775_000_396_239,
     },
-    // PerftNewGame {
-    //     depth: 14,
-    //     total_nodes: 61_885_021_521_585_529_237,
-    // },
-    // PerftNewGame {
-    //     depth: 15,
-    //     total_nodes: 2_015_099_950_053_364_471_960,
-    // },
+];
+
+
+const PERFT_POSITION_5: &[PerftCase] = &[
+    PerftCase {
+        depth: 0,
+        total_nodes: 44,
+    },
+    PerftCase {
+        depth: 1,
+        total_nodes: 62_379,
+    },
+    PerftCase {
+        depth: 2,
+        total_nodes: 2_103_487,
+    },
+    PerftCase {
+        depth: 3,
+        total_nodes: 89_941_194,
+    },
 ];

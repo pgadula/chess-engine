@@ -1,8 +1,7 @@
-use crate::types::{
-    Castling, Clock, BLACK_CASTLING_KING_MASK, BLACK_CASTLING_QUEEN_MASK, BLACK_KING,
-    WHITE_CASTLING_KING_MASK, WHITE_CASTLING_QUEEN_MASK, WHITE_KING,
-};
-use crate::zobrist_hashing::ZobristHashing;
+use crate::fen::FenParser;
+use crate::{types::{
+    Castling, Clock, BLACK_KING, WHITE_KING,
+}, zobrist_hashing::ZobristHashing};
 use crate::{
     file_rank::{
         BLACK_KING_CASTLE_BOARD_MASK, BLACK_QUEEN_CASTLE_BOARD_MASK, RANK_3,
@@ -11,7 +10,7 @@ use crate::{
     magic_gen::MoveLookupTable,
     moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves},
     types::{
-        get_piece_from_char, BoardSide, Color, FileRank, MoveType, Piece, PieceIndex, PieceMove,
+        BoardSide, Color, FileRank, MoveType, Piece, PieceIndex, PieceMove,
         PieceType, BLACK_ROOK, WHITE_ROOK,
     },
     utility::{clear_bit, get_file_ranks, set_bit},
@@ -64,14 +63,9 @@ impl Clone for GameState {
             zobrist_hashing: self.zobrist_hashing.clone(),
             hash: self.hash.clone(),
             history: self.history.clone(),
-            board: self.board.clone()
+            board: self.board.clone(),
         }
     }
-}
-
-pub trait FenParser {
-    fn deserialize(fen: &str) -> GameState;
-    fn serialize(&self) -> String;
 }
 
 impl GameState {
@@ -161,17 +155,11 @@ impl GameState {
             self.castling = Castling::from_mask(last_move.previous_castling_rights);
 
             match last_move.piece_move.move_type {
-                MoveType::Quite => {
-                    self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
-                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
-                }
-                MoveType::DoublePush(_) => {
-                    self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
-                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
+                MoveType::Quite | MoveType::DoublePush(_) => {
+                    self.revert_move(&last_move.piece_move)
                 }
                 MoveType::Capture => {
-                    self.clear_piece(&last_move.piece_move.piece, &last_move.piece_move.target);
-                    self.set_piece(&last_move.piece_move.piece, &last_move.piece_move.from);
+                    self.revert_move(&last_move.piece_move);
                     self.set_piece(
                         &last_move.captured_piece.unwrap(),
                         &last_move
@@ -275,6 +263,11 @@ impl GameState {
         self.set_piece(&piece_move.piece, &piece_move.target);
     }
 
+    fn revert_move(&mut self, piece_move: &PieceMove) {
+        self.clear_piece(&piece_move.piece, &piece_move.target);
+        self.set_piece(&piece_move.piece, &piece_move.from);
+    }
+
     fn capture_with_promotion(
         &mut self,
         piece_move: &PieceMove,
@@ -334,13 +327,13 @@ impl GameState {
 
         let side = self.get_board_side_info(&self.move_turn);
         if let Some(castlings) = self.get_castling_moves(&side) {
-            for ele in castlings {
+            for piece_move in castlings {
                 if Color::White == self.move_turn {
-                    self.killer_white_moves.push(ele);
-                    self.w_moves_mask |= ele.target.mask();
+                    self.killer_white_moves.push(piece_move);
+                    self.w_moves_mask |= piece_move.target.mask();
                 } else {
-                    self.killer_black_moves.push(ele);
-                    self.b_moves_mask |= ele.target.mask();
+                    self.killer_black_moves.push(piece_move);
+                    self.b_moves_mask |= piece_move.target.mask();
                 }
             }
         }
@@ -468,7 +461,7 @@ impl GameState {
             )
         };
 
-        //reset
+        //reset buffers
         killer_moves.clear();
         quite_moves.clear();
         *move_mask = 0;
@@ -665,9 +658,8 @@ impl GameState {
 
     pub fn clear_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
         {
-            self.board[file_rank.index()] = '-'; 
+            self.board[file_rank.index()] = '-';
             let mut bitboard = self.get_piece_bitboard(piece);
-
             clear_bit(&mut bitboard, file_rank);
         }
     }
@@ -742,6 +734,7 @@ impl GameState {
         println!("  a b c d e f g h");
         println!("fen: {}", GameState::serialize(&self))
     }
+    
     pub fn println(&self) {
         self.print();
         println!();
@@ -810,140 +803,6 @@ impl GameState {
     }
 }
 
-impl FenParser for GameState {
-    fn deserialize(fen: &str) -> GameState {
-        let mut parts = fen.split_whitespace();
-        let piece_placement = parts.next().unwrap_or("");
-        let active_color = parts.next().unwrap_or("");
-        let castling_rights = parts.next().unwrap_or("");
-        let en_passant = parts.next().unwrap_or("");
-        let halfmove_clock = parts.next().unwrap_or("");
-        let fullmove_number = parts.next().unwrap_or("");
-
-        let mut game = GameState::empty();
-        let mut row: u8 = 0;
-        let mut col: u8 = 0;
-
-        game.board = core::array::from_fn(|_|{'-'});
-
-        for char in piece_placement.chars() {
-            if let Some(piece) = get_piece_from_char(char) {
-                let index = (row * 8) + col;
-                if let Some(file_rank) = FileRank::get_file_rank(index) {
-                    game.set_piece(piece, &file_rank);
-                }
-                col += 1;
-            } else {
-                match char {
-                    '/' => {
-                        row += 1;
-                        col = 0;
-                    }
-                    '1'..='8' => {
-                        if let Some(offset) = char.to_digit(10) {
-                            col += offset as u8;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        game.move_turn = match active_color {
-            "w" => Color::White,
-            "b" => Color::Black,
-            _ => game.move_turn, // default value
-        };
-
-        let mut castling = Castling::new();
-        for char in castling_rights.chars() {
-            match char {
-                'K' => castling.mask |= WHITE_CASTLING_KING_MASK,
-                'Q' => castling.mask |= WHITE_CASTLING_QUEEN_MASK,
-                'k' => castling.mask |= BLACK_CASTLING_KING_MASK,
-                'q' => castling.mask |= BLACK_CASTLING_QUEEN_MASK,
-                _ => {}
-            }
-        }
-
-        game.halfmove_clock = Clock::from_string(halfmove_clock);
-        game.fullmove_number = Clock::from_string(fullmove_number);
-        game.castling = castling;
-        game.en_passant = FileRank::from_string(en_passant);
-
-        game.hash = game.zobrist_hashing.get_hash_from_scratch(&game);
-        game
-    }
-
-    fn serialize(&self) -> String {
-        let mut piece_placement = String::new();
-        let active_color = if self.move_turn == Color::White {
-            "w"
-        } else {
-            "b"
-        };
-        let mut castling_rights = String::new();
-        let mut en_passant = String::from("-");
-        let halfmove_clock = self.halfmove_clock.to_string();
-        let fullmove_number = self.fullmove_number.to_string();
-
-        for rank in 0..8 {
-            let mut empty_count = 0;
-            for file in 0..8 {
-                let index = rank * 8 + file;
-                let file_rank = FileRank::get_file_rank(index).unwrap();
-                if let Some(piece) = self.get_piece_at(&file_rank) {
-                    if empty_count > 0 {
-                        piece_placement.push_str(&empty_count.to_string());
-                        empty_count = 0;
-                    }
-                    piece_placement.push(piece.symbol());
-                } else {
-                    empty_count += 1;
-                }
-            }
-            if empty_count > 0 {
-                piece_placement.push_str(&empty_count.to_string());
-            }
-            if rank < 7 {
-                piece_placement.push('/');
-            }
-        }
-
-        if self.castling.get_king_side(&Color::White) {
-            castling_rights.push('K');
-        }
-        if self.castling.get_queen_side(&Color::White) {
-            castling_rights.push('Q');
-        }
-        if self.castling.get_king_side(&Color::Black) {
-            castling_rights.push('k');
-        }
-        if self.castling.get_queen_side(&Color::Black) {
-            castling_rights.push('q');
-        }
-        if castling_rights.is_empty() {
-            castling_rights.push('-');
-        }
-
-        if let Some(en_passant_square) = self.en_passant {
-            en_passant = en_passant_square.to_string();
-        }
-
-        let fen_string = format!(
-            "{} {} {} {} {} {}",
-            piece_placement,
-            active_color,
-            castling_rights,
-            en_passant,
-            halfmove_clock,
-            fullmove_number
-        );
-
-        fen_string
-    }
-}
-
 impl Default for GameState {
     fn default() -> Self {
         let move_lookup_table = Arc::new(MoveLookupTable::init());
@@ -965,7 +824,7 @@ impl Default for GameState {
             zobrist_hashing: Arc::new(zobrist_hashing),
             hash: 0,
             history: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
-            board: core::array::from_fn(|_|{'-'})
+            board: core::array::from_fn(|_| '-'),
         }
     }
 }

@@ -7,3 +7,4 @@ pub mod types;
 pub mod utility;
 pub mod zobrist_hashing;
 mod precalculated;
+pub mod fen;
