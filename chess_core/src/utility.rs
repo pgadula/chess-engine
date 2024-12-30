@@ -15,27 +15,33 @@ pub fn print_as_board(number: u64) {
     println!("Bitboard: {}", number);
 }
 
+#[inline(always)]
 pub fn set_bit(bit_board: &mut u64, file_rank: &FileRank) {
     let file_rank_num = (*file_rank) as u8;
     let mask = 1u64 << file_rank_num;
     *bit_board |= mask;
 }
+
+#[inline(always)]
 pub fn set_bit_by_index(bit_board: &mut u64, index: u8) {
     let mask = 1u64 << index;
     *bit_board |= mask;
 }
 
+#[inline(always)]
 pub fn clear_bit(bit_board: &mut u64, file_rank: &FileRank) {
     let file_rank_num = (*file_rank) as u8;
     let mask = 1u64 << file_rank_num;
     *bit_board &= !(mask);
 }
 
+#[inline(always)]
 pub fn pop_bit(bit_board: &mut u64, index: u8) {
     let mask = 1u64 << index;
     *bit_board ^= mask;
 }
 
+#[inline(always)]
 pub fn pop_lsb(b: &mut u64) -> u32 {
     let i = b.trailing_zeros();
     *b &= (*b) - 1;
@@ -56,6 +62,8 @@ pub fn get_file_ranks(bitboard: u64) -> impl Iterator<Item = FileRank> {
     })
 }
 
+
+#[inline(always)]
 //Kernighan’s algorithm
 pub fn bit_count(bit_board: u64) -> usize {
     let mut b = bit_board;
@@ -67,6 +75,7 @@ pub fn bit_count(bit_board: u64) -> usize {
     count
 }
 
+#[inline(always)]
 pub fn get_lsb_index(bit_board: u64) -> u32 {
     bit_board.trailing_zeros()
 }

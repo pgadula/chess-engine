@@ -53,6 +53,22 @@ impl Engine {
         }));
     }
 
+    pub fn run_sync(&mut self, depth: Option<u8>){
+        self.cancellation_signal.store(false, Ordering::SeqCst);
+        self.search_engine.max_depth = depth.unwrap_or(24);
+        self.start_thinking_time = Some(Instant::now());
+
+
+        let board = self.board.clone();
+        self.search_engine.rayon_search(&board, Arc::new(AtomicBool::new(false)));
+
+        if let Some(now) = self.start_thinking_time {
+            let elapsed = now.elapsed();
+            println!("Thinking time: {:.2?}", elapsed);
+        }
+        self.start_thinking_time = None;
+    }
+
     pub fn stop_thinking(&mut self) {
         self.cancellation_signal.store(true, Ordering::Relaxed);
         if let Some(now) = self.start_thinking_time {

@@ -1,7 +1,7 @@
 use crate::search_engine::{NodeType, SearchResult, EMPTY_SEARCH_RESULT};
 
-pub const LOOKUP_SIZE: usize = 1 << 19; // 524,288
-pub const BUCKET_SIZE: usize = 16;
+pub const LOOKUP_SIZE: usize = 1026 * 1026;
+pub const BUCKET_SIZE: usize = 4;
 
 #[derive(Debug, Clone)]
 pub struct TranspositionTable {

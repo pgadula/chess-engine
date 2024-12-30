@@ -2,7 +2,7 @@ use chess_uci::{engine::Engine, transposition_table::CollisionStrategy};
 use std::time::{Duration, Instant};
 
 fn main() {
-    let depth = 10;
+    let depth = 8;
     let fen = "rnQq1k1r/pp2bppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R b KQ - 0 8";
     let num_iter = 10;
 
@@ -18,23 +18,23 @@ fn main() {
     for mut setup in engines {
         // Collect times for each iteration
         let mut iteration_times = Vec::with_capacity(num_iter);
-
+        
         for i in 0..num_iter {
             let start = Instant::now();
-            setup.engine.go(Some(depth));
-            setup.engine.from(fen);
+            let mut engine = Engine::new();
+            engine.search_engine.transposition_table.collision_strategy = setup.engine.search_engine.transposition_table.collision_strategy.clone();
+            engine.run_sync(Some(depth));
+            engine.from(fen);
             let duration = start.elapsed();
             iteration_times.push(duration);
         }
 
-        // --- Compute Stats ---
         let total_time = iteration_times.iter().sum::<Duration>();
         let avg_time = total_time / (num_iter as u32);
 
         let &min_time = iteration_times.iter().min().unwrap_or(&Duration::ZERO);
         let &max_time = iteration_times.iter().max().unwrap_or(&Duration::ZERO);
 
-        // Convert times to f64 seconds for easier standard deviation math
         let times_in_secs: Vec<f64> = iteration_times
             .iter()
             .map(|d| d.as_secs_f64())

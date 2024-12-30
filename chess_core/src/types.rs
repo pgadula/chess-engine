@@ -47,6 +47,7 @@
     }
     
     impl PieceIndex {
+        #[inline(always)]
         pub fn idx(&self)->usize{
             *self as usize
         }
@@ -58,6 +59,7 @@
         Black,
     }
     impl Color {
+        #[inline(always)]
         pub fn flip(&self)->Color{
             match self {
                 Color::White => Color::Black,
@@ -207,20 +209,23 @@
       }
 
     impl FileRank {
-         pub fn rank(self)->u8{
-            ((self as u64) / 8) as u8
-         }
-
-         pub fn file(self)->u8{
-           ((self as u64) % 8) as u8
-         }
-
-         pub fn index(self)->usize{
-            (self.rank() * 8 + self.file()) as usize
+    #[inline(always)]
+        pub fn rank(self) -> u8 {
+            (self as u8) >> 3
+        }
+    #[inline(always)]
+        pub fn file(self) -> u8 {
+            (self as u8) & 7
         }
 
+    #[inline(always)]
+        pub fn index(self) -> usize {
+            self as u8 as usize
+        }
+        
+    #[inline(always)]
         pub fn mask(self) -> u64 {
-            1u64 << self.index()
+            1 << (self as u8)
         }
         
      }
@@ -258,6 +263,7 @@
             FILE_RANK.iter()
          }
 
+         #[inline(always)]
          pub fn get_file_rank(value: u8) -> Option<FileRank> {
             if value >= FileRank::A8 as u8 && value <= FileRank::H1 as u8 {
                 Some(unsafe { std::mem::transmute(value) })
@@ -516,14 +522,17 @@
        }
     }
  
+    #[inline(always)]
      pub fn disable_white_castling_rights(&mut self) {
          self.mask &= !WHITE_CASTLING_RIGHTS_MASK;  
      }
  
+     #[inline(always)]
      pub fn disable_black_castling_rights(&mut self) {
         self.mask &= !BLACK_CASTLING_RIGHTS_MASK;  
      }
 
+     #[inline(always)]
      pub fn disable_king_side(&mut self, color: &Color) {
         match color {
             Color::White => {
@@ -535,6 +544,7 @@
         }
     }
     
+    #[inline(always)]
     pub fn disable_queen_side(&mut self, color: &Color) {
         match color {
             Color::White => {

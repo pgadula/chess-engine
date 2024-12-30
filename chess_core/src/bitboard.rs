@@ -650,12 +650,14 @@ impl GameState {
         GameState::deserialize("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
 
+    #[inline]
     pub fn set_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
         self.board[file_rank.index()] = piece.symbol();
         let mut bitboard = self.get_piece_bitboard(piece);
         set_bit(&mut bitboard, &file_rank);
     }
 
+    #[inline]
     pub fn clear_piece(&mut self, piece: &Piece, file_rank: &FileRank) {
         {
             self.board[file_rank.index()] = '-';
@@ -664,10 +666,12 @@ impl GameState {
         }
     }
 
+    #[inline]
     fn get_piece_bitboard(&mut self, piece: &Piece) -> &mut u64 {
         return &mut self.bitboard[piece.bitboard_index()];
     }
 
+    #[inline]
     pub fn get_all_pieces(&self) -> u64 {
         return (self.get_white_pieces()) | (self.get_black_pieces());
     }
@@ -690,16 +694,19 @@ impl GameState {
         result
     }
 
+    #[inline]
     pub fn empty_square(&self) -> u64 {
         return !self.get_all_pieces();
     }
 
+    #[inline]
     pub fn has(bit_board: u64, file_rank: &FileRank) -> bool {
         let file_rank_num = (*file_rank) as u8;
         let mask = 1u64 << file_rank_num;
         return (bit_board & mask) != 0;
     }
 
+    #[inline]
     pub fn get_by_index(bit_board: u64, index: u8) -> bool {
         let mask: u64 = 1u64 << index;
         return (bit_board & mask) != 0;
