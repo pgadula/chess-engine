@@ -22,7 +22,6 @@
                 PieceType::Rook => 'r',
                 PieceType::Queen => 'q',
                 PieceType::King => 'k',
-                _ => ' '
             };
         }
     }
@@ -83,6 +82,8 @@
                 color: *color 
             }
         }
+
+        #[inline(always)]
         pub fn bitboard_index(&self)->usize{
             PIECES_ARRAY.iter().position(|p| p == self).unwrap_or_else(|| panic!("Invalid piece"))
         }
@@ -271,6 +272,8 @@
                 None
             }
         }
+
+        #[inline(always)]
         pub fn get_from_mask(mask: u64) -> Option<FileRank> {
             FileRank::get_file_rank(mask.trailing_zeros() as u8)
         }
@@ -285,14 +288,6 @@
              None
          }
      }
-     pub struct PieceCollection {
-        pub rooks: u64,
-        pub bishops: u64,
-        pub queens: u64,
-        pub king: u64,
-        pub knights: u64,
-        pub pawns: u64,
-    }
 
     pub struct BoardSide {
         pub rooks: u64,

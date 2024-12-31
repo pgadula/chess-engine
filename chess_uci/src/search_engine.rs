@@ -94,6 +94,7 @@ impl SearchEngine {
         return result[0].0.clone();
     }
 
+    #[inline(always)]
     fn min_max(
         &mut self,
         alpha: i32,
@@ -330,6 +331,7 @@ impl SearchEngine {
         }
     }
 
+    #[inline(always)]
     fn score_heuristic(&self, game: &GameState) -> i32 {
         const PIECE_VALUES: [i32; 6] = [100, 320, 330, 500, 900, 0];
         let mut white_sum = 0;

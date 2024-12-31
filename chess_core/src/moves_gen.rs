@@ -37,7 +37,7 @@ pub fn get_pawn_moves(
         let index = pawns.trailing_zeros();
         let from = FileRank::get_file_rank(index as u8).unwrap();
 
-        let attack_pattern = get_pawn_pattern_attacks(color, from) & (opposite_blockers | en_passant_mask);
+        let attack_pattern = get_pawn_pattern_attacks(color, &from) & (opposite_blockers | en_passant_mask);
 
         let isolated_pawn = 1u64 << index as u64;
         
@@ -230,7 +230,7 @@ pub fn _gen_bishop_attacks_on_the_fly(file_rank: FileRank, bit_board: u64) -> u6
     attacks
 }
 
-pub fn get_pawn_pattern_attacks(side: Color, file_rank: FileRank) -> u64 {
+pub fn get_pawn_pattern_attacks(side: Color, file_rank: &FileRank) -> u64 {
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     let start = 1u64 << tr * 8 + tf;
@@ -240,7 +240,7 @@ pub fn get_pawn_pattern_attacks(side: Color, file_rank: FileRank) -> u64 {
     }
 }
 
-pub fn get_knight_attacks(file_rank: FileRank) -> u64 {
+pub fn get_knight_attacks(file_rank: &FileRank) -> u64 {
     let mut attacks = 0u64;
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
@@ -257,7 +257,7 @@ pub fn get_knight_attacks(file_rank: FileRank) -> u64 {
     attacks
 }
 
-pub fn get_king_attacks(file_rank: FileRank) -> u64 {
+pub fn get_king_attacks(file_rank: &FileRank) -> u64 {
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     let start = 1u64 << tr * 8 + tf;

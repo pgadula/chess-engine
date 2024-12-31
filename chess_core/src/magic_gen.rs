@@ -23,40 +23,33 @@ impl MoveLookupTable {
 
         for fr in FileRank::iter() {
             let fr_index = fr.index();
+            bishop[fr_index] = MoveLookupTable::calc_lookup_table(
+                BISHOP_ATTACK_MASK[fr_index],
+                BISHOP_SHIFTS[fr_index],
+                BISHOP_MAGIC_NUMBERS[fr_index],
+                fr,
+                _gen_bishop_attacks_on_the_fly,
+            );
+            rook[fr_index] = MoveLookupTable::calc_lookup_table(
+                ROOK_ATTACK_MASK[fr_index],
+                ROOK_SHIFTS[fr_index],
+                ROOK_MAGIC_NUMBERS[fr_index],
+                fr,
+                _gen_rook_move_fly,
+            );
 
-            let r_attack_mask = ROOK_ATTACK_MASK[fr_index];
-            let r_magic_number = ROOK_MAGIC_NUMBERS[fr_index];
-            let r_shift = ROOK_SHIFTS[fr_index] as usize;
-
-            let b_attack_mask = BISHOP_ATTACK_MASK[fr_index];
-            let b_magic_number = BISHOP_MAGIC_NUMBERS[fr_index];
-            let b_shift = BISHOP_SHIFTS[fr_index] as usize;
-
-            let r_num_bits: usize = 64 - r_shift;
-            let b_num_bits: usize = 64 - b_shift;
-
-            let r_lookup_size = 1u64 << r_num_bits;
-            let b_lookup_size = 1u64 << b_num_bits;
-
-            let mut r_table: Vec<u64> = vec![0; r_lookup_size as usize];
-            let mut b_table: Vec<u64> = vec![0; b_lookup_size as usize];
-
-            let r_subsets: Vec<u64> = MagicHelper::generate_attack_subsets(r_attack_mask);
-            let b_subsets: Vec<u64> = MagicHelper::generate_attack_subsets(b_attack_mask);
-
-            for subset in r_subsets {
-                let magic_index = MagicHelper::get_magic_index(subset, r_magic_number, r_shift);
-                let attack = _gen_rook_move_fly(*fr, subset);
-                r_table[magic_index] = attack;
-            }
-
-            for subset in b_subsets {
-                let magic_index = MagicHelper::get_magic_index(subset, b_magic_number, b_shift);
-                let attack = _gen_bishop_attacks_on_the_fly(*fr, subset);
-                b_table[magic_index] = attack;
-            }
-            bishop[fr_index] = b_table;
-            rook[fr_index] = r_table;
+            // pawn[fr_index] = MoveLookupTable::calc_lookup_table(
+            //     PAWN_ATTACK_MASK[fr_index],
+            //     PAWN_SHIFTS[fr_index],
+            //     PAWN_MAGIC_NUMBERS[fr_index],
+            //     fr,
+            // );
+            // pawn[fr_index] = MoveLookupTable::calc_lookup_table(
+            //     PAWN_ATTACK_MASK[fr_index * 2],
+            //     PAWN_SHIFTS[fr_index * 2],
+            //     PAWN_MAGIC_NUMBERS[fr_index * 2],
+            //     fr,
+            // );
         }
 
         MoveLookupTable {
@@ -65,7 +58,30 @@ impl MoveLookupTable {
         }
     }
 
-    pub fn get_rook_attack(&self, file_rank: FileRank, all_pieces:u64) -> u64 {
+    fn calc_lookup_table<F>(
+        attacks_mask: u64,
+        shift: usize,
+        magic_number: u64,
+        file_rank: &FileRank,
+        mut move_generator: F,
+    ) -> Vec<u64>
+    where
+        F: FnMut(FileRank, u64) -> u64,
+    {
+        let num_bits: usize = 64 - shift; 
+        let lookup_size = 1u64 << num_bits;
+        let mut table: Vec<u64> = vec![0; lookup_size as usize];
+        let subsets: Vec<u64> = MagicHelper::generate_attack_subsets(attacks_mask);
+        for subset in subsets {
+            let magic_index = MagicHelper::get_magic_index(subset, magic_number, shift);
+            let attack = move_generator(*file_rank, subset);
+            table[magic_index] = attack;
+        }
+        return table;
+    }
+
+    #[inline(always)]
+    pub fn get_rook_attack(&self, file_rank: FileRank, all_pieces: u64) -> u64 {
         let fr_index = file_rank.index();
 
         let attack_mask = ROOK_ATTACK_MASK[fr_index];
@@ -77,7 +93,8 @@ impl MoveLookupTable {
         attacks
     }
 
-    pub fn get_bishop_attack(&self, file_rank: FileRank, all_pieces:u64) -> u64 {
+    #[inline(always)]
+    pub fn get_bishop_attack(&self, file_rank: FileRank, all_pieces: u64) -> u64 {
         let fr_index = file_rank.index();
 
         let attack_mask = BISHOP_ATTACK_MASK[fr_index];
@@ -92,10 +109,10 @@ impl MoveLookupTable {
 
 pub struct MagicHelper {
     #[allow(dead_code)]
-    pub(crate) magic_numbers: [u64; 64],
+    pub magic_numbers: [u64; 64],
 
     #[allow(dead_code)]
-    pub(crate) shifts: [usize; 64],
+    pub shifts: [usize; 64],
 }
 
 impl MagicHelper {
@@ -109,7 +126,7 @@ impl MagicHelper {
         n & n1 & n2
     }
 
-    pub(crate) fn _generate_magics(mask_attacks: [u64; 64]) -> MagicHelper {
+    pub fn generate_magics(mask_attacks: [u64; 64]) -> MagicHelper {
         let mut magic_numbers: [u64; 64] = [0; 64];
         let mut shifts = [0; 64];
 
@@ -129,7 +146,6 @@ impl MagicHelper {
 
             let mut attacks: Vec<bool> = vec![false; count];
             while !found_magic {
-                //TODO its weird to fill with 1
                 attacks.fill(false);
                 magic_number = MagicHelper::get_random_number();
                 found_magic = true;
@@ -171,7 +187,7 @@ impl MagicHelper {
         subsets
     }
 
-    pub(crate) fn calculate_occupancy(index: usize, attack_mask: u64) -> u64 {
+    pub fn calculate_occupancy(index: usize, attack_mask: u64) -> u64 {
         let mut mask = attack_mask;
         let mut occupancy = 0u64;
         let bit_count = bit_count(attack_mask);
@@ -187,7 +203,8 @@ impl MagicHelper {
         occupancy
     }
 
-    pub(crate) fn get_magic_index(blockers: u64, magic_number: u64, shift: usize) -> usize {
+    #[inline(always)]
+    pub fn get_magic_index(blockers: u64, magic_number: u64, shift: usize) -> usize {
         ((blockers.wrapping_mul(magic_number)) >> (shift)) as usize
     }
 }

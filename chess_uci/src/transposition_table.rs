@@ -75,12 +75,13 @@ impl TranspositionTable {
         return Err("Error: bucket size reached, no empty place for record");
     }
 
+    #[inline(always)]
     fn replace_wth_random_index(&mut self, search_result: SearchResult, index: usize) {
         let r_idx = (search_result.hash as usize) % BUCKET_SIZE;
         self.lookup_table[index + r_idx] = search_result;
     }
 
-
+    #[inline(always)]
     fn replace_with_shallow_depth(&mut self, search_result: SearchResult, index: usize){
         let mut i = 0;
         while i < BUCKET_SIZE {
@@ -94,6 +95,7 @@ impl TranspositionTable {
         }
     }
     
+    #[inline(always)]
     pub fn try_get_from_cache(
         &self,
         hash: u64,

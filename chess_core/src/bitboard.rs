@@ -513,7 +513,7 @@ impl GameState {
         }
 
         for knight_position in get_file_ranks(*knights) {
-            let attacks = get_knight_attacks(knight_position) & rev_friendly_blockers;
+            let attacks = get_knight_attacks(&knight_position) & rev_friendly_blockers;
             *move_mask |= attacks;
             fill_moves(
                 knight_position,
@@ -537,7 +537,7 @@ impl GameState {
         );
 
         for king_position in get_file_ranks(*king) {
-            let attacks = get_king_attacks(king_position) & rev_friendly_blockers;
+            let attacks = get_king_attacks(&king_position) & rev_friendly_blockers;
             *move_mask |= attacks;
             fill_moves(
                 king_position,
