@@ -46,7 +46,7 @@
     }
     
     impl PieceIndex {
-        #[inline(always)]
+        #[inline]
         pub fn idx(&self)->usize{
             *self as usize
         }
@@ -58,7 +58,7 @@
         Black,
     }
     impl Color {
-        #[inline(always)]
+        #[inline]
         pub fn flip(&self)->Color{
             match self {
                 Color::White => Color::Black,
@@ -83,7 +83,7 @@
             }
         }
 
-        #[inline(always)]
+        #[inline]
         pub fn bitboard_index(&self)->usize{
             PIECES_ARRAY.iter().position(|p| p == self).unwrap_or_else(|| panic!("Invalid piece"))
         }
@@ -210,21 +210,21 @@
       }
 
     impl FileRank {
-    #[inline(always)]
+    #[inline]
         pub fn rank(self) -> u8 {
             (self as u8) >> 3
         }
-    #[inline(always)]
+    #[inline]
         pub fn file(self) -> u8 {
             (self as u8) & 7
         }
 
-    #[inline(always)]
+    #[inline]
         pub fn index(self) -> usize {
             self as u8 as usize
         }
         
-    #[inline(always)]
+    #[inline]
         pub fn mask(self) -> u64 {
             1 << (self as u8)
         }
@@ -264,7 +264,7 @@
             FILE_RANK.iter()
          }
 
-         #[inline(always)]
+         #[inline]
          pub fn get_file_rank(value: u8) -> Option<FileRank> {
             if value >= FileRank::A8 as u8 && value <= FileRank::H1 as u8 {
                 Some(unsafe { std::mem::transmute(value) })
@@ -273,7 +273,7 @@
             }
         }
 
-        #[inline(always)]
+        #[inline]
         pub fn get_from_mask(mask: u64) -> Option<FileRank> {
             FileRank::get_file_rank(mask.trailing_zeros() as u8)
         }
@@ -434,16 +434,16 @@
                                                if en_passant_target == target{
                                                 MoveType::Capture
                                                }else{
-                                                MoveType::Quite
+                                                MoveType::Quiet
                                                }
                                             } else {
-                                                MoveType::Quite
+                                                MoveType::Quiet
                                             }
                                         }
                                     }
                                 },
                                 // Handle other piece types (Knight, Bishop, Rook, Queen, King)
-                                _ => MoveType::Quite,
+                                _ => MoveType::Quiet,
                             }
                         }
                     };
@@ -461,31 +461,33 @@
     }
     impl Default for PieceMove {
         fn default() -> Self {
-        Self { piece: WHITE_PAWN, from: A1, target: A1, move_type: MoveType::Quite }
+        Self { piece: WHITE_PAWN, from: A1, target: A1, move_type: MoveType::Quiet }
     }
     }
 
     #[derive(Debug, Clone, Copy, PartialEq)]
     #[repr(u8)]
     pub enum MoveType{
-        Quite,
+        Quiet,
         DoublePush(Option<FileRank>),
         CastleKingSide,
         CastleQueenSide,
         Promotion(PieceType),
         Capture,
         CaptureWithPromotion(PieceType),
+        EnPassantCapture
     }
 
     impl MoveType {
         pub fn score(&self)->u8{
             match self {
-                MoveType::Quite => 0,
+                MoveType::Quiet => 0,
                 MoveType::DoublePush(_) => 1,
                 MoveType::CastleKingSide => 2,
                 MoveType::CastleQueenSide => 2,
                 MoveType::Promotion(_) => 3,
                 MoveType::Capture => 4,
+                MoveType::EnPassantCapture => 4,
                 MoveType::CaptureWithPromotion(_) => 5,
             }
         }
@@ -517,17 +519,17 @@
        }
     }
  
-    #[inline(always)]
+    #[inline]
      pub fn disable_white_castling_rights(&mut self) {
          self.mask &= !WHITE_CASTLING_RIGHTS_MASK;  
      }
  
-     #[inline(always)]
+     #[inline]
      pub fn disable_black_castling_rights(&mut self) {
         self.mask &= !BLACK_CASTLING_RIGHTS_MASK;  
      }
 
-     #[inline(always)]
+     #[inline]
      pub fn disable_king_side(&mut self, color: &Color) {
         match color {
             Color::White => {
@@ -539,7 +541,7 @@
         }
     }
     
-    #[inline(always)]
+    #[inline]
     pub fn disable_queen_side(&mut self, color: &Color) {
         match color {
             Color::White => {
@@ -562,6 +564,13 @@
         match color {
             Color::White => self.mask & WHITE_CASTLING_QUEEN_MASK != 0,
             Color::Black => self.mask & BLACK_CASTLING_QUEEN_MASK != 0,
+        }
+    }
+
+    pub fn has_any_rights(&self, color: &Color)->bool{
+        match color {
+            Color::White => self.mask & (WHITE_CASTLING_KING_MASK | WHITE_CASTLING_QUEEN_MASK) !=0,
+            Color::Black => self.mask & (BLACK_CASTLING_KING_MASK | BLACK_CASTLING_QUEEN_MASK) !=0,
         }
     }
 

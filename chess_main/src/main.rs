@@ -1,3 +1,5 @@
+mod sandbox_main;
+
 use std::io;
 
 use chess_uci::engine::Engine;

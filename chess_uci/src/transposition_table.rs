@@ -28,7 +28,8 @@ impl TranspositionTable {
     pub fn clear_lookup_table(&mut self) {
         self.lookup_table = vec![EMPTY_SEARCH_RESULT; LOOKUP_SIZE * BUCKET_SIZE]
     }
-
+    
+    #[inline(always)]
     pub fn store_in_cache(
         &mut self,
         hash: u64,
@@ -141,6 +142,7 @@ impl TranspositionTable {
         None
     }
 
+    #[inline(always)]
     pub fn get_index(&self, hash: u64) -> usize {
         return (hash as usize % LOOKUP_SIZE) * BUCKET_SIZE;
     }

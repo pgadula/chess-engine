@@ -66,13 +66,7 @@ pub fn get_file_ranks(bitboard: u64) -> impl Iterator<Item = FileRank> {
 #[inline(always)]
 //Kernighan’s algorithm
 pub fn bit_count(bit_board: u64) -> usize {
-    let mut b = bit_board;
-    let mut count = 0;
-    while b != 0 {
-        b &= b - 1; // Clears the lowest set bit
-        count += 1;
-    }
-    count
+    return bit_board.count_ones() as usize
 }
 
 #[inline(always)]

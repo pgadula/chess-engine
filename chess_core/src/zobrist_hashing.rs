@@ -15,7 +15,7 @@ pub struct ZobristHashing {
     pub side: u64,
 }
 
-const SEED:u64 = 29426028;
+const SEED: u64 = 2305843009213693951; // prime near 2^64
 impl ZobristHashing {
     pub fn init() -> ZobristHashing {
         let mut rng = Pcg32::seed_from_u64(SEED);
@@ -58,7 +58,7 @@ impl ZobristHashing {
 
         println!("{:?}", mv);
         match mv.move_type {
-            MoveType::Quite | MoveType::DoublePush(_) => {
+            MoveType::Quiet | MoveType::DoublePush(_) => {
                 let hash_index_from = Self::piece_index(mv.piece.bitboard_index(), &mv.from);
                 let hash_index_target = Self::piece_index(mv.piece.bitboard_index(), &mv.target);
                 //revert
@@ -86,6 +86,7 @@ impl ZobristHashing {
                 // hash ^= self.pieces[hash_index_target];
             }
             MoveType::CaptureWithPromotion(_) => {}
+            MoveType::EnPassantCapture => todo!(),
         }
 
         return hash;

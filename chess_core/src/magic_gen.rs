@@ -1,5 +1,7 @@
 use rand::Rng;
 
+use crate::{moves_gen::get_pawn_pattern_attacks, precalculated::{PAWN_ATTACK_MASK, PAWN_MAGIC_NUMBERS, PAWN_SHIFTS}, types::Color};
+
 use super::{
     moves_gen::{_gen_bishop_attacks_on_the_fly, _gen_rook_move_fly},
     precalculated::{
@@ -14,12 +16,15 @@ use super::{
 pub struct MoveLookupTable {
     pub rook_attacks: [Vec<u64>; 64],
     pub bishop_attacks: [Vec<u64>; 64],
+    pub pawn_attacks: [Vec<u64>; 128],
+
 }
 
 impl MoveLookupTable {
     pub fn init() -> MoveLookupTable {
         let mut rook: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
         let mut bishop: [Vec<u64>; 64] = std::array::from_fn(|_| Vec::new());
+        let mut pawn: [Vec<u64>; 128] = std::array::from_fn(|_| Vec::new());
 
         for fr in FileRank::iter() {
             let fr_index = fr.index();
@@ -38,23 +43,40 @@ impl MoveLookupTable {
                 _gen_rook_move_fly,
             );
 
-            // pawn[fr_index] = MoveLookupTable::calc_lookup_table(
-            //     PAWN_ATTACK_MASK[fr_index],
-            //     PAWN_SHIFTS[fr_index],
-            //     PAWN_MAGIC_NUMBERS[fr_index],
-            //     fr,
-            // );
-            // pawn[fr_index] = MoveLookupTable::calc_lookup_table(
-            //     PAWN_ATTACK_MASK[fr_index * 2],
-            //     PAWN_SHIFTS[fr_index * 2],
-            //     PAWN_MAGIC_NUMBERS[fr_index * 2],
-            //     fr,
-            // );
+            let white_move_fly = MoveLookupTable::factor_pawn_move(Color::White);
+
+            pawn[fr_index] = MoveLookupTable::calc_lookup_table(
+                PAWN_ATTACK_MASK[fr_index],
+                PAWN_SHIFTS[fr_index],
+                PAWN_MAGIC_NUMBERS[fr_index],
+                fr,
+                white_move_fly
+            );
+
+            let black_move_fly = MoveLookupTable::factor_pawn_move(Color::Black);
+
+
+            let b_index = fr_index + 64;
+            pawn[b_index] = MoveLookupTable::calc_lookup_table(
+                PAWN_ATTACK_MASK[b_index],
+                PAWN_SHIFTS[b_index],
+                PAWN_MAGIC_NUMBERS[b_index],
+                fr,
+                black_move_fly
+            );
         }
 
         MoveLookupTable {
             bishop_attacks: bishop,
             rook_attacks: rook,
+            pawn_attacks: pawn
+        }
+    }
+
+    fn factor_pawn_move(color: Color) -> impl Fn(FileRank, u64) -> u64 {
+        // Use `move` if the closure needs to capture `color`.
+        return move |fr: FileRank, _board: u64| {
+            get_pawn_pattern_attacks(color, &fr)
         }
     }
 
@@ -90,6 +112,24 @@ impl MoveLookupTable {
         let blockers: u64 = attack_mask & all_pieces;
         let magic_index = MagicHelper::get_magic_index(blockers, magic_number, shift);
         let attacks = self.rook_attacks[fr_index][magic_index];
+        attacks
+    }
+
+    #[inline(always)]
+    pub fn get_pawn_attack(&self, file_rank: FileRank, all_pieces: u64, color: Color) -> u64 {
+
+        let offset = match color {
+            Color::White => 0,
+            Color::Black => 64,
+        };
+        let fr_index = file_rank.index() + offset;
+
+        let attack_mask = PAWN_ATTACK_MASK[fr_index];
+        let magic_number = PAWN_MAGIC_NUMBERS[fr_index];
+        let shift = PAWN_SHIFTS[fr_index] as usize;
+        let blockers: u64 = attack_mask & all_pieces;
+        let magic_index = MagicHelper::get_magic_index(blockers, magic_number, shift);
+        let attacks = self.pawn_attacks[fr_index][magic_index];
         attacks
     }
 

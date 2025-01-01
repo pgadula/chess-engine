@@ -1,7 +1,5 @@
 use crate::fen::FenParser;
-use crate::{types::{
-    Castling, Clock, BLACK_KING, WHITE_KING,
-}, zobrist_hashing::ZobristHashing};
+use crate::moves_gen::get_pawn_moves_vectorized;
 use crate::{
     file_rank::{
         BLACK_KING_CASTLE_BOARD_MASK, BLACK_QUEEN_CASTLE_BOARD_MASK, RANK_3,
@@ -10,10 +8,14 @@ use crate::{
     magic_gen::MoveLookupTable,
     moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves},
     types::{
-        BoardSide, Color, FileRank, MoveType, Piece, PieceIndex, PieceMove,
-        PieceType, BLACK_ROOK, WHITE_ROOK,
+        BoardSide, Color, FileRank, MoveType, Piece, PieceIndex, PieceMove, PieceType, BLACK_ROOK,
+        WHITE_ROOK,
     },
     utility::{clear_bit, get_file_ranks, set_bit},
+};
+use crate::{
+    types::{Castling, Clock, BLACK_KING, WHITE_KING},
+    zobrist_hashing::ZobristHashing,
 };
 use rayon::prelude::*;
 use std::sync::Arc;
@@ -90,7 +92,7 @@ impl GameState {
         self.increment_full_move();
 
         match piece_move.move_type {
-            MoveType::Capture => {
+            MoveType::Capture | MoveType::EnPassantCapture => {
                 self.handle_capture(piece_move, &mut state);
                 self.move_piece(piece_move);
             }
@@ -136,7 +138,7 @@ impl GameState {
                 }
                 self.halfmove_clock.reset()
             }
-            MoveType::Quite => self.move_piece(piece_move),
+            MoveType::Quiet => self.move_piece(piece_move),
         }
         if !en_passant_is_updated {
             self.en_passant = None;
@@ -155,10 +157,10 @@ impl GameState {
             self.castling = Castling::from_mask(last_move.previous_castling_rights);
 
             match last_move.piece_move.move_type {
-                MoveType::Quite | MoveType::DoublePush(_) => {
+                MoveType::Quiet | MoveType::DoublePush(_) => {
                     self.revert_move(&last_move.piece_move)
                 }
-                MoveType::Capture => {
+                MoveType::Capture | MoveType::EnPassantCapture => {
                     self.revert_move(&last_move.piece_move);
                     self.set_piece(
                         &last_move.captured_piece.unwrap(),
@@ -321,22 +323,30 @@ impl GameState {
     pub fn calculate_pseudolegal_moves(&mut self) {
         let white = self.get_board_side_info(&Color::White);
         let black = self.get_board_side_info(&Color::Black);
-        if self.move_turn == Color::White {}
+        //TODO: Do not calculate for both sides, Need to be optimized
+
         self.get_pseudolegal_moves(&white);
+
         self.get_pseudolegal_moves(&black);
 
-        let side = self.get_board_side_info(&self.move_turn);
-        if let Some(castlings) = self.get_castling_moves(&side) {
-            for piece_move in castlings {
-                if Color::White == self.move_turn {
-                    self.killer_white_moves.push(piece_move);
-                    self.w_moves_mask |= piece_move.target.mask();
-                } else {
-                    self.killer_black_moves.push(piece_move);
-                    self.b_moves_mask |= piece_move.target.mask();
+        let side: BoardSide = self.get_board_side_info(&self.move_turn);
+        if self.castling.has_any_rights(&self.move_turn) {
+
+            
+            if let Some(castlings) = self.get_castling_moves(&side) {
+                for piece_move in castlings {
+                    if Color::White == self.move_turn {
+                        self.killer_white_moves.push(piece_move);
+                        self.w_moves_mask |= piece_move.target.mask();
+                    } else {
+                        self.killer_black_moves.push(piece_move);
+                        self.b_moves_mask |= piece_move.target.mask();
+                    }
                 }
             }
         }
+
+
     }
 
     pub fn detect_check(&self, king_mask: &u64, attacks_mask: &u64) -> bool {
@@ -525,7 +535,7 @@ impl GameState {
             );
         }
         let empty_squares = !all_pieces;
-        get_pawn_moves(
+        get_pawn_moves_vectorized(
             side.color,
             *pawns,
             empty_squares,
@@ -741,7 +751,7 @@ impl GameState {
         println!("  a b c d e f g h");
         println!("fen: {}", GameState::serialize(&self))
     }
-    
+
     pub fn println(&self) {
         self.print();
         println!();
@@ -752,6 +762,7 @@ impl GameState {
         Piece::from_character(c)
     }
 
+    #[inline]
     pub fn get_board_side_info(&self, color: &Color) -> BoardSide {
         if *color == Color::White {
             BoardSide {

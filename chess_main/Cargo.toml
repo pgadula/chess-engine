@@ -8,6 +8,7 @@ debug = true
 
 [dependencies]
 chess_uci = { path = "../chess_uci" }
+chess_core = { path = "../chess_core" }
 
 rayon = "1.5"
 

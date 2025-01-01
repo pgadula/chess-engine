@@ -1,8 +1,8 @@
 use std::iter::zip;
 
 use crate::{bitboard::GameState, file_rank::{
-    FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_1, RANK_3, RANK_6, RANK_8
-}, types::{Color, FileRank, MoveType, Piece, PieceMove, BLACK_PAWN, PROMOTION_PIECES, WHITE_PAWN}, utility::{get_file_ranks, pop_bit, pop_lsb, set_bit_by_index}};
+    FILE_A, FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_1, RANK_3, RANK_6, RANK_8
+}, precalculated::PAWN_ATTACK_MASK, types::{Color, FileRank, MoveType, Piece, PieceMove, BLACK_PAWN, FILE_RANK, PROMOTION_PIECES, WHITE_PAWN}, utility::{get_file_ranks, pop_bit, pop_lsb, print_as_board, set_bit_by_index}};
 
 
 pub fn get_pawn_moves(
@@ -33,78 +33,302 @@ pub fn get_pawn_moves(
         0u64
     };
 
+    let attack_index_offset:usize = match color {
+        Color::White => 0,
+        Color::Black => 64,
+    };
+
+    
     while pawns > 0 {
         let index = pawns.trailing_zeros();
         let from = FileRank::get_file_rank(index as u8).unwrap();
 
-        let attack_pattern = get_pawn_pattern_attacks(color, &from) & (opposite_blockers | en_passant_mask);
+        let attack_pattern = PAWN_ATTACK_MASK[index as usize + attack_index_offset] & (opposite_blockers | en_passant_mask);
 
         let isolated_pawn = 1u64 << index as u64;
         
         let single_push: u64 = shift_for_color(isolated_pawn) & all_blockers;
 
-        for target in get_file_ranks(attack_pattern){
-            if target.mask() & RANK_8 > 0 || target.mask() & RANK_1 > 0{
-                for piece_type in PROMOTION_PIECES {
+        let double_push: u64 = shift_for_color(single_push & rank_3_or_6)  & all_blockers;
+        let all_moves_mask = single_push | double_push | attack_pattern;
+
+        *attack_mask |= all_moves_mask;
+
+        for target in get_file_ranks(all_moves_mask){
+            let file_rank_mask = target.mask();
+           let is_capture_attack =  (attack_pattern & file_rank_mask) > 0;
+           let is_single_push =  (single_push & file_rank_mask) > 0;
+           let is_double_push =  (double_push & file_rank_mask) > 0;
+
+            if is_capture_attack {
+                if target.mask() & RANK_8 > 0 || target.mask() & RANK_1 > 0{
+                    for piece_type in PROMOTION_PIECES {
+                        capture_attacks.push(PieceMove{
+                            from,
+                            piece,
+                            target,
+                            move_type: MoveType::CaptureWithPromotion(piece_type)
+                        }) 
+                    }
+                }else{
                     capture_attacks.push(PieceMove{
                         from,
                         piece,
                         target,
-                        move_type: MoveType::CaptureWithPromotion(piece_type)
-                    }) 
+                        move_type: MoveType::Capture
+                    })
                 }
-            }else{
-                capture_attacks.push(PieceMove{
-                    from,
-                    piece,
-                    target,
-                    move_type: MoveType::Capture
-                })
             }
-         
-        }
-        for target in get_file_ranks(single_push){
-            if target.mask() & RANK_8 > 0 || target.mask() & RANK_1 > 0{
-                for piece_type in PROMOTION_PIECES {
-                    capture_attacks.push(PieceMove{
+            if is_single_push{
+                if target.mask() & RANK_8 > 0 || target.mask() & RANK_1 > 0{
+                    for piece_type in PROMOTION_PIECES {
+                        capture_attacks.push(PieceMove{
+                            from,
+                            piece,
+                            target,
+                            move_type: MoveType::Promotion(piece_type)
+                        }) 
+                    }
+                }else{
+                    quite_attacks.push(PieceMove{
                         from,
                         piece,
                         target,
-                        move_type: MoveType::Promotion(piece_type)
-                    }) 
+                        move_type:MoveType::Quiet
+                    })
                 }
-            }else{
+            }
+            if is_double_push{
+                let en_passant_fr = if color == Color::White{
+                    FileRank::get_from_mask(target.mask() <<  8).unwrap()
+                }
+                else{
+                    FileRank::get_from_mask(target.mask() >> 8 ).unwrap()
+                };
+    
                 quite_attacks.push(PieceMove{
                     from,
                     piece,
                     target,
-                    move_type:MoveType::Quite
+                    move_type: MoveType::DoublePush(Some(en_passant_fr))
                 })
             }
-         
+        
         }
-        let double_push: u64 = shift_for_color(single_push & rank_3_or_6)  & all_blockers;
-        let all_moves_mask = single_push | double_push | attack_pattern;
-        *attack_mask |= all_moves_mask;
 
-       for target in get_file_ranks(double_push) {
-            let en_passant_fr = if color == Color::White{
-                FileRank::get_from_mask(target.mask() <<  8).unwrap()
-            }
-            else{
-                FileRank::get_from_mask(target.mask() >> 8 ).unwrap()
-            };
-
-            quite_attacks.push(PieceMove{
-                from,
-                piece,
-                target,
-                move_type: MoveType::DoublePush(Some(en_passant_fr))
-            })
-       }
         pop_bit(&mut pawns, index as u8)
     }
 }
+
+pub fn get_pawn_moves_vectorized(
+    color: Color,
+    pawns: u64,            
+    empty_squares: u64,    
+    opposite_blockers: u64, 
+    en_passant: &Option<FileRank>,
+    attack_mask: &mut u64,
+    quiet_moves: &mut Vec<PieceMove>,
+    capture_moves: &mut Vec<PieceMove>,
+) {
+
+
+    let en_passant_mask = if let Some(fr) = en_passant {
+        1u64 << fr.index()
+    } else {
+        0
+    };
+
+    let (single_push_all, double_push_all) = match color {
+        Color::White => {
+            let single = (pawns >> 8) & empty_squares;
+            let dbl = ((single & RANK_3) >> 8) & empty_squares;
+            (single, dbl)
+        }
+        Color::Black => {
+            let single = (pawns << 8) & empty_squares;
+            let dbl = ((single & RANK_6) << 8) & empty_squares;
+            (single, dbl)
+        }
+    };
+
+    let capture_mask = opposite_blockers | en_passant_mask;
+    let (left_attacks_all, right_attacks_all) = match color {
+        Color::White => {
+            let left  = (pawns >> 7) & FILE_NOT_A & capture_mask;
+            let right = (pawns >> 9) & FILE_NOT_H & capture_mask;
+            (left, right)
+        }
+        Color::Black => {
+            let left  = (pawns << 7) & FILE_NOT_H & capture_mask;
+            let right = (pawns << 9) & FILE_NOT_A & capture_mask;
+            (left, right)
+        }
+    };
+
+
+    *attack_mask |= single_push_all;
+    *attack_mask |= double_push_all;
+    *attack_mask |= left_attacks_all;
+    *attack_mask |= right_attacks_all;
+
+    let piece = if color == Color::White { WHITE_PAWN } else { BLACK_PAWN };
+
+    let file_rank_of = |sq: u32| FILE_RANK[sq as usize]; 
+
+    let mut sp = single_push_all;
+    while sp != 0 {
+        let to_sq = sp.trailing_zeros();    
+        pop_bit(&mut sp, to_sq as u8);      
+
+        let from_sq = match color {
+            Color::White => to_sq + 8,
+            Color::Black => to_sq - 8,
+        };
+        let from = file_rank_of(from_sq);
+        let target   = file_rank_of(to_sq);
+
+        let is_promotion = match color {
+            Color::White => (1u64 << to_sq) & RANK_8 != 0,
+            Color::Black => (1u64 << to_sq) & RANK_1 != 0,
+        };
+
+        if is_promotion {
+            for piece_type in PROMOTION_PIECES {
+                quiet_moves.push(PieceMove {
+                    from,
+                    piece,
+                    target,
+                    move_type: MoveType::Promotion(piece_type),
+                });
+            }
+        } else {
+            // Normal quiet single push
+            quiet_moves.push(PieceMove {
+                from,
+                piece,
+                target,
+                move_type: MoveType::Quiet,
+            });
+        }
+    }
+
+    let mut dp = double_push_all;
+    while dp != 0 {
+        let to_sq = dp.trailing_zeros();
+        pop_bit(&mut dp, to_sq as u8);
+
+        let from_sq = match color {
+            Color::White => to_sq + 16,
+            Color::Black => to_sq - 16,
+        };
+        let from = file_rank_of(from_sq);
+        let to   = file_rank_of(to_sq);
+
+        let en_passant_fr = match color {
+            Color::White => file_rank_of(from_sq - 8),
+            Color::Black => file_rank_of(from_sq + 8),
+        };
+
+        quiet_moves.push(PieceMove {
+            from,
+            piece,
+            target: to,
+            move_type: MoveType::DoublePush(Some(en_passant_fr)),
+        });
+    }
+
+    let mut la = left_attacks_all;
+    while la != 0 {
+        let to_sq = la.trailing_zeros();
+        pop_bit(&mut la, to_sq as u8);
+
+        let from_sq = match color {
+            Color::White => to_sq + 7,
+            Color::Black => to_sq - 7,
+        };
+        let from = file_rank_of(from_sq);
+        let to   = file_rank_of(to_sq);
+
+        let is_promotion = match color {
+            Color::White => (1u64 << to_sq) & RANK_8 != 0,
+            Color::Black => (1u64 << to_sq) & RANK_1 != 0,
+        };
+
+        let is_en_passant = (1u64 << to_sq) & en_passant_mask != 0;
+
+        if is_promotion {
+            for piece_type in PROMOTION_PIECES {
+                capture_moves.push(PieceMove {
+                    from,
+                    piece,
+                    target: to,
+                    move_type: MoveType::CaptureWithPromotion(piece_type),
+                });
+            }
+        } else if is_en_passant {
+            capture_moves.push(PieceMove {
+                from,
+                piece,
+                target: to,
+                move_type: MoveType::Capture,
+            });
+        } else {
+            capture_moves.push(PieceMove {
+                from,
+                piece,
+                target: to,
+                move_type: MoveType::Capture,
+            });
+        }
+    }
+
+    let mut ra = right_attacks_all;
+    while ra != 0 {
+        let to_sq = ra.trailing_zeros();
+        pop_bit(&mut ra, to_sq as u8);
+
+        let from_sq = match color {
+            Color::White => to_sq + 9,
+            Color::Black => to_sq - 9,
+        };
+        let from = file_rank_of(from_sq);
+        let to   = file_rank_of(to_sq);
+
+        let is_promotion = match color {
+            Color::White => (1u64 << to_sq) & RANK_8 != 0,
+            Color::Black => (1u64 << to_sq) & RANK_1 != 0,
+        };
+
+        let is_en_passant = (1u64 << to_sq) & en_passant_mask != 0;
+
+        if is_promotion {
+            for piece_type in PROMOTION_PIECES {
+                capture_moves.push(PieceMove {
+                    from,
+                    piece,
+                    target: to,
+                    move_type: MoveType::CaptureWithPromotion(piece_type),
+                });
+            }
+        } else if is_en_passant {
+            capture_moves.push(PieceMove {
+                from,
+                piece,
+                target: to,
+                move_type: MoveType::Capture,
+            });
+        } else {
+            capture_moves.push(PieceMove {
+                from,
+                piece,
+                target: to,
+                move_type: MoveType::Capture,
+            });
+        }
+    }
+}
+
+
 
 pub fn _gen_rook_attacks_mask(file_rank: FileRank) -> u64 {
     let mut attacks = 0u64;
@@ -292,7 +516,7 @@ pub fn fill_moves(
         let move_type = if opposite_blockers & fr.mask() > 0 {
             MoveType::Capture
         } else{
-            MoveType::Quite
+            MoveType::Quiet
         };
         let mv = PieceMove{
             piece,
@@ -301,7 +525,7 @@ pub fn fill_moves(
             move_type
         };
         
-        if move_type == MoveType::Quite   {
+        if move_type == MoveType::Quiet   {
             quiet_attacks.push(mv);
         }else{
             killer_attacks.push(mv);
