@@ -553,13 +553,15 @@
         }
     }
 
+    #[inline]
     pub fn get_king_side(&self, color: &Color) -> bool {
         match color {
             Color::White => self.mask & WHITE_CASTLING_KING_MASK != 0,
             Color::Black => self.mask & BLACK_CASTLING_KING_MASK != 0,
         }
     }
-    
+
+    #[inline]
     pub fn get_queen_side(&self, color: &Color) -> bool {
         match color {
             Color::White => self.mask & WHITE_CASTLING_QUEEN_MASK != 0,
@@ -567,6 +569,7 @@
         }
     }
 
+    #[inline]
     pub fn has_any_rights(&self, color: &Color)->bool{
         match color {
             Color::White => self.mask & (WHITE_CASTLING_KING_MASK | WHITE_CASTLING_QUEEN_MASK) !=0,

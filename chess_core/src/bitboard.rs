@@ -233,6 +233,7 @@ impl GameState {
         }
     }
 
+    #[inline]
     fn increment_full_move(&mut self) {
         if self.move_turn == Color::Black {
             self.fullmove_number.tick();
@@ -260,16 +261,19 @@ impl GameState {
         self.set_and_clear(piece_move);
     }
 
+    #[inline]
     fn set_and_clear(&mut self, piece_move: &PieceMove) {
         self.clear_piece(&piece_move.piece, &piece_move.from);
         self.set_piece(&piece_move.piece, &piece_move.target);
     }
 
+    #[inline]
     fn revert_move(&mut self, piece_move: &PieceMove) {
         self.clear_piece(&piece_move.piece, &piece_move.target);
         self.set_piece(&piece_move.piece, &piece_move.from);
     }
 
+    #[inline]
     fn capture_with_promotion(
         &mut self,
         piece_move: &PieceMove,
@@ -290,6 +294,7 @@ impl GameState {
         self.set_piece(new_piece, &piece_move.target);
     }
 
+    #[inline]
     fn handle_capture(&mut self, piece_move: &PieceMove, state: &mut UnmakeInfo) {
         self.halfmove_clock.reset();
 
@@ -324,15 +329,13 @@ impl GameState {
         let white = self.get_board_side_info(&Color::White);
         let black = self.get_board_side_info(&Color::Black);
         //TODO: Do not calculate for both sides, Need to be optimized
-
+        
         self.get_pseudolegal_moves(&white);
 
         self.get_pseudolegal_moves(&black);
 
         let side: BoardSide = self.get_board_side_info(&self.move_turn);
         if self.castling.has_any_rights(&self.move_turn) {
-
-            
             if let Some(castlings) = self.get_castling_moves(&side) {
                 for piece_move in castlings {
                     if Color::White == self.move_turn {
@@ -349,6 +352,7 @@ impl GameState {
 
     }
 
+    #[inline]
     pub fn detect_check(&self, king_mask: &u64, attacks_mask: &u64) -> bool {
         king_mask & attacks_mask > 0
     }
