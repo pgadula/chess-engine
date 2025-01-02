@@ -76,7 +76,7 @@ impl MoveLookupTable {
     fn factor_pawn_move(color: Color) -> impl Fn(FileRank, u64) -> u64 {
         // Use `move` if the closure needs to capture `color`.
         return move |fr: FileRank, _board: u64| {
-            get_pawn_pattern_attacks(color, &fr)
+            get_pawn_pattern_attacks(&color, &fr)
         }
     }
 

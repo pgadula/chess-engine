@@ -14,8 +14,10 @@ const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
 
+
+
 pub fn debug_move() {
-    let mut calc = CalculationObject::new("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 5);
+    let mut calc = CalculationObject::new("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 3);
     calc.get_total_nodes(&mut GameState::new_game(), 5);
     // chess.make_move(&PieceMove{
     //     from:FileRank::A1,

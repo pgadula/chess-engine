@@ -1,555 +1,667 @@
-    use std::{fmt::Display, ops::AddAssign, slice::Iter};
+use std::{array, fmt::Display, ops::AddAssign, slice::Iter};
 
-    use crate::bitboard::GameState;
+use crate::bitboard::GameState;
 
-    use self::FileRank::*;
+use self::FileRank::*;
 
-    #[derive(Debug, PartialEq, Clone, Copy)]
-    pub enum PieceType {
-        Pawn,
-        Bishop,
-        Knight,
-        Rook,
-        Queen,
-        King,
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum PieceType {
+    None = 0,
+    Pawn = 1,
+    Bishop = 2,
+    Knight = 3,
+    Rook = 4,
+    Queen = 5,
+    King = 6,
+}
+impl PieceType {
+    pub fn get_symbol(&self) -> char {
+        return match self {
+            PieceType::Pawn => 'p',
+            PieceType::Knight => 'n',
+            PieceType::Bishop => 'b',
+            PieceType::Rook => 'r',
+            PieceType::Queen => 'q',
+            PieceType::King => 'k',
+            PieceType::None => '-',
+        };
     }
-    impl PieceType {
-        pub fn get_symbol(&self)->char{
-            return match self {
-                PieceType::Pawn => 'p',
-                PieceType::Knight => 'n',
-                PieceType::Bishop => 'b',
-                PieceType::Rook => 'r',
-                PieceType::Queen => 'q',
-                PieceType::King => 'k',
-            };
-        }
-    }
+}
 
-    pub const PROMOTION_PIECES:[PieceType; 4] = [PieceType::Bishop, PieceType::Queen, PieceType::Knight, PieceType::Rook];
-    
-    #[allow(non_camel_case_types)]
-    #[derive(Copy, Clone)]
-    pub enum PieceIndex {
-        P,
-        B,
-        N,
-        R,
-        Q,
-        K,
-        p,
-        b,
-        n,
-        r,
-        q,
-        k,
-    }
-    
-    impl PieceIndex {
-        #[inline]
-        pub fn idx(&self)->usize{
-            *self as usize
-        }
-    }
+pub const PROMOTION_PIECES: [PieceType; 4] = [
+    PieceType::Bishop,
+    PieceType::Queen,
+    PieceType::Knight,
+    PieceType::Rook,
+];
 
-    #[derive(Debug, PartialEq, Clone, Copy)]
-    pub enum Color {
-        White,
-        Black,
-    }
-    impl Color {
-        #[inline]
-        pub fn flip(&self)->Color{
-            match self {
-                Color::White => Color::Black,
-                Color::Black => Color::White,
-            }
-        }
-    }
+#[allow(non_camel_case_types)]
+#[derive(Copy, Clone)]
+pub enum PieceIndex {
+    P,
+    B,
+    N,
+    R,
+    Q,
+    K,
+    p,
+    b,
+    n,
+    r,
+    q,
+    k,
+}
 
-
-    #[derive(Debug, PartialEq, Clone, Copy)]
-
-    pub struct Piece {
-        pub piece_type: PieceType,
-        pub color: Color
-    }
-
-    impl Piece {
-        pub fn from(piece_type: &PieceType, color: &Color) -> Self {
-            Piece { 
-                piece_type: *piece_type, 
-                color: *color 
-            }
-        }
-
-        #[inline]
-        pub fn bitboard_index(&self)->usize{
-            PIECES_ARRAY.iter().position(|p| p == self).unwrap_or_else(|| panic!("Invalid piece"))
-        }
-
-        pub fn symbol(&self)->char{
-            match (self.piece_type, self.color) {
-                (PieceType::Pawn, Color::White) => 'P',
-                (PieceType::Pawn, Color::Black) => 'p',
-                (PieceType::Knight, Color::White) => 'N',
-                (PieceType::Knight, Color::Black) => 'n',
-                (PieceType::Bishop, Color::White) => 'B',
-                (PieceType::Bishop, Color::Black) => 'b',
-                (PieceType::Rook, Color::White) => 'R',
-                (PieceType::Rook, Color::Black) => 'r',
-                (PieceType::Queen, Color::White) => 'Q',
-                (PieceType::Queen, Color::Black) => 'q',
-                (PieceType::King, Color::White) => 'K',
-                (PieceType::King, Color::Black) => 'k',
-            }
-        }
-
-        pub fn from_character(character: char)-> Option<Piece>{
-            match character {
-                'P' =>   Some(Piece::from(&PieceType::Pawn, &Color::White)),
-                'p' =>   Some(Piece::from(&PieceType::Pawn, &Color::Black)),
-                'N' =>   Some(Piece::from(&PieceType::Knight, &Color::White)),
-                'n' =>   Some(Piece::from(&PieceType::Knight, &Color::Black)),
-                'B' =>   Some(Piece::from(&PieceType::Bishop, &Color::White)),
-                'b' =>   Some(Piece::from(&PieceType::Bishop, &Color::Black)),
-                'R' =>   Some(Piece::from(&PieceType::Rook, &Color::White)),
-                'r' =>   Some(Piece::from(&PieceType::Rook, &Color::Black)),
-                'Q' =>   Some(Piece::from(&PieceType::Queen, &Color::White)),
-                'q' =>   Some(Piece::from(&PieceType::Queen, &Color::Black)),
-                'K' =>   Some(Piece::from(&PieceType::King, &Color::White)),
-                'k' =>   Some(Piece::from(&PieceType::King, &Color::Black)),
-                _=> None
-            }
-        }
-
-        pub fn piece_symbol(&self) -> char {
-            match (self.piece_type, self.color) {
-                (PieceType::Pawn, Color::White) => '♙',
-                (PieceType::Pawn, Color::Black) => '♟',
-                (PieceType::Knight, Color::White) => '♘',
-                (PieceType::Knight, Color::Black) => '♞',
-                (PieceType::Bishop, Color::White) => '♗',
-                (PieceType::Bishop, Color::Black) => '♝',
-                (PieceType::Rook, Color::White) => '♖',
-                (PieceType::Rook, Color::Black) => '♜',
-                (PieceType::Queen, Color::White) => '♕',
-                (PieceType::Queen, Color::Black) => '♛',
-                (PieceType::King, Color::White) => '♔',
-                (PieceType::King, Color::Black) => '♚',
-            }
-        }
-    }
-
-    // Define constants for each piece
-    pub const WHITE_PAWN: Piece = Piece { piece_type: PieceType::Pawn, color: Color::White };
-    pub const WHITE_BISHOP: Piece = Piece { piece_type: PieceType::Bishop, color: Color::White };
-    pub const WHITE_KNIGHT: Piece = Piece { piece_type: PieceType::Knight, color: Color::White };
-    pub const WHITE_ROOK: Piece = Piece { piece_type: PieceType::Rook, color: Color::White };
-    pub const WHITE_QUEEN: Piece = Piece { piece_type: PieceType::Queen, color: Color::White };
-    pub const WHITE_KING: Piece = Piece { piece_type: PieceType::King, color: Color::White };
-    pub const BLACK_PAWN: Piece = Piece { piece_type: PieceType::Pawn, color: Color::Black };
-    pub const BLACK_BISHOP: Piece = Piece { piece_type: PieceType::Bishop, color: Color::Black };
-    pub const BLACK_KNIGHT: Piece = Piece { piece_type: PieceType::Knight, color: Color::Black };
-    pub const BLACK_ROOK: Piece = Piece { piece_type: PieceType::Rook, color: Color::Black };
-    pub const BLACK_QUEEN: Piece = Piece { piece_type: PieceType::Queen, color: Color::Black };
-    pub const BLACK_KING: Piece = Piece { piece_type: PieceType::King, color: Color::Black };
-
-    pub(crate) const PIECES_ARRAY: [Piece; 12] = [
-        WHITE_PAWN,    // 'P'
-        WHITE_BISHOP,  // 'B'
-        WHITE_KNIGHT,  // 'N'
-        WHITE_ROOK,    // 'R'
-        WHITE_QUEEN,   // 'Q'
-        WHITE_KING,    // 'K'
-        BLACK_PAWN,    // 'p'
-        BLACK_BISHOP,  // 'b'
-        BLACK_KNIGHT,  // 'n'
-        BLACK_ROOK,    // 'r'
-        BLACK_QUEEN,   // 'q'
-        BLACK_KING,    // 'k'
-    ];
-
-    pub fn get_piece_from_char<'a>(piece: char) -> Option<&'a Piece> {    
-        let index = get_char_value(piece);
-        if index < 0{
-            return None;
-        }
-        Some(&PIECES_ARRAY[index as usize])
-    }
-
-    pub(crate) fn get_char_value(c: char) -> i32 {
-        match c {
-            'P' => 0,  // Pawn (White)
-            'B' => 1,  // Bishop (White)
-            'N' => 2,  // Knight (White)
-            'R' => 3,  // Rook (White)
-            'Q' => 4,  // Queen (White)
-            'K' => 5,  // King (White)
-            'p' => 6,  // Pawn (Black)
-            'b' => 7,  // Bishop (Black)
-            'n' => 8,  // Knight (Black)
-            'r' => 9,  // Rook (Black)
-            'q' => 10, // Queen (Black)
-            'k' => 11, // King (Black)
-            _ => -1,   // Character not found
-        }
-    }
-
-    #[repr(u8)]
-     #[derive(Clone, Copy, Debug, PartialEq)]
-     pub enum FileRank {
-         A8, B8, C8, D8, E8, F8, G8, H8,
-         A7, B7, C7, D7, E7, F7, G7, H7,
-         A6, B6, C6, D6, E6, F6, G6, H6,
-         A5, B5, C5, D5, E5, F5, G5, H5,
-         A4, B4, C4, D4, E4, F4, G4, H4,
-         A3, B3, C3, D3, E3, F3, G3, H3,
-         A2, B2, C2, D2, E2, F2, G2, H2,
-         A1, B1, C1, D1, E1, F1, G1, H1
-      }
-
-    impl FileRank {
+impl PieceIndex {
     #[inline]
-        pub fn rank(self) -> u8 {
-            (self as u8) >> 3
-        }
+    pub fn idx(&self) -> usize {
+        *self as usize
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Color {
+    White,
+    Black,
+}
+impl Color {
     #[inline]
-        pub fn file(self) -> u8 {
-            (self as u8) & 7
+    pub fn flip(&self) -> Color {
+        match self {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+
+pub struct Piece {
+    pub piece_type: PieceType,
+    pub color: Color,
+}
+
+impl Piece {
+    pub fn from(piece_type: &PieceType, color: &Color) -> Self {
+        Piece {
+            piece_type: *piece_type,
+            color: *color,
+        }
+    }
 
     #[inline]
-        pub fn index(self) -> usize {
-            self as u8 as usize
+    pub fn bitboard_index(&self) -> usize {
+        PIECES_ARRAY
+            .iter()
+            .position(|p| p == self)
+            .unwrap_or_else(|| panic!("Invalid piece"))
+    }
+
+    pub fn symbol(&self) -> char {
+        match (self.piece_type, self.color) {
+            (PieceType::Pawn, Color::White) => 'P',
+            (PieceType::Pawn, Color::Black) => 'p',
+            (PieceType::Knight, Color::White) => 'N',
+            (PieceType::Knight, Color::Black) => 'n',
+            (PieceType::Bishop, Color::White) => 'B',
+            (PieceType::Bishop, Color::Black) => 'b',
+            (PieceType::Rook, Color::White) => 'R',
+            (PieceType::Rook, Color::Black) => 'r',
+            (PieceType::Queen, Color::White) => 'Q',
+            (PieceType::Queen, Color::Black) => 'q',
+            (PieceType::King, Color::White) => 'K',
+            (PieceType::King, Color::Black) => 'k',
+            (PieceType::None, Color::White) | (PieceType::None, Color::Black) => '-',
         }
-        
+    }
+
+    pub fn from_character(character: char) -> Option<Piece> {
+        match character {
+            'P' => Some(Piece::from(&PieceType::Pawn, &Color::White)),
+            'p' => Some(Piece::from(&PieceType::Pawn, &Color::Black)),
+            'N' => Some(Piece::from(&PieceType::Knight, &Color::White)),
+            'n' => Some(Piece::from(&PieceType::Knight, &Color::Black)),
+            'B' => Some(Piece::from(&PieceType::Bishop, &Color::White)),
+            'b' => Some(Piece::from(&PieceType::Bishop, &Color::Black)),
+            'R' => Some(Piece::from(&PieceType::Rook, &Color::White)),
+            'r' => Some(Piece::from(&PieceType::Rook, &Color::Black)),
+            'Q' => Some(Piece::from(&PieceType::Queen, &Color::White)),
+            'q' => Some(Piece::from(&PieceType::Queen, &Color::Black)),
+            'K' => Some(Piece::from(&PieceType::King, &Color::White)),
+            'k' => Some(Piece::from(&PieceType::King, &Color::Black)),
+            _ => None,
+        }
+    }
+
+    pub fn piece_symbol(&self) -> char {
+        match (self.piece_type, self.color) {
+            (PieceType::Pawn, Color::White) => '♙',
+            (PieceType::Pawn, Color::Black) => '♟',
+            (PieceType::Knight, Color::White) => '♘',
+            (PieceType::Knight, Color::Black) => '♞',
+            (PieceType::Bishop, Color::White) => '♗',
+            (PieceType::Bishop, Color::Black) => '♝',
+            (PieceType::Rook, Color::White) => '♖',
+            (PieceType::Rook, Color::Black) => '♜',
+            (PieceType::Queen, Color::White) => '♕',
+            (PieceType::Queen, Color::Black) => '♛',
+            (PieceType::King, Color::White) => '♔',
+            (PieceType::King, Color::Black) => '♚',
+            (PieceType::None, Color::White) | (PieceType::None, Color::Black) => '-',
+        }
+    }
+}
+
+// Define constants for each piece
+pub const WHITE_PAWN: Piece = Piece {
+    piece_type: PieceType::Pawn,
+    color: Color::White,
+};
+pub const WHITE_BISHOP: Piece = Piece {
+    piece_type: PieceType::Bishop,
+    color: Color::White,
+};
+pub const WHITE_KNIGHT: Piece = Piece {
+    piece_type: PieceType::Knight,
+    color: Color::White,
+};
+pub const WHITE_ROOK: Piece = Piece {
+    piece_type: PieceType::Rook,
+    color: Color::White,
+};
+pub const WHITE_QUEEN: Piece = Piece {
+    piece_type: PieceType::Queen,
+    color: Color::White,
+};
+pub const WHITE_KING: Piece = Piece {
+    piece_type: PieceType::King,
+    color: Color::White,
+};
+pub const BLACK_PAWN: Piece = Piece {
+    piece_type: PieceType::Pawn,
+    color: Color::Black,
+};
+pub const BLACK_BISHOP: Piece = Piece {
+    piece_type: PieceType::Bishop,
+    color: Color::Black,
+};
+pub const BLACK_KNIGHT: Piece = Piece {
+    piece_type: PieceType::Knight,
+    color: Color::Black,
+};
+pub const BLACK_ROOK: Piece = Piece {
+    piece_type: PieceType::Rook,
+    color: Color::Black,
+};
+pub const BLACK_QUEEN: Piece = Piece {
+    piece_type: PieceType::Queen,
+    color: Color::Black,
+};
+pub const BLACK_KING: Piece = Piece {
+    piece_type: PieceType::King,
+    color: Color::Black,
+};
+
+pub(crate) const PIECES_ARRAY: [Piece; 12] = [
+    WHITE_PAWN,   // 'P'
+    WHITE_BISHOP, // 'B'
+    WHITE_KNIGHT, // 'N'
+    WHITE_ROOK,   // 'R'
+    WHITE_QUEEN,  // 'Q'
+    WHITE_KING,   // 'K'
+    BLACK_PAWN,   // 'p'
+    BLACK_BISHOP, // 'b'
+    BLACK_KNIGHT, // 'n'
+    BLACK_ROOK,   // 'r'
+    BLACK_QUEEN,  // 'q'
+    BLACK_KING,   // 'k'
+];
+
+pub fn get_piece_from_char<'a>(piece: char) -> Option<&'a Piece> {
+    let index = get_char_value(piece);
+    if index < 0 {
+        return None;
+    }
+    Some(&PIECES_ARRAY[index as usize])
+}
+
+pub(crate) fn get_char_value(c: char) -> i32 {
+    match c {
+        'P' => 0,  // Pawn (White)
+        'B' => 1,  // Bishop (White)
+        'N' => 2,  // Knight (White)
+        'R' => 3,  // Rook (White)
+        'Q' => 4,  // Queen (White)
+        'K' => 5,  // King (White)
+        'p' => 6,  // Pawn (Black)
+        'b' => 7,  // Bishop (Black)
+        'n' => 8,  // Knight (Black)
+        'r' => 9,  // Rook (Black)
+        'q' => 10, // Queen (Black)
+        'k' => 11, // King (Black)
+        _ => -1,   // Character not found
+    }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum FileRank {
+    A8,
+    B8,
+    C8,
+    D8,
+    E8,
+    F8,
+    G8,
+    H8,
+    A7,
+    B7,
+    C7,
+    D7,
+    E7,
+    F7,
+    G7,
+    H7,
+    A6,
+    B6,
+    C6,
+    D6,
+    E6,
+    F6,
+    G6,
+    H6,
+    A5,
+    B5,
+    C5,
+    D5,
+    E5,
+    F5,
+    G5,
+    H5,
+    A4,
+    B4,
+    C4,
+    D4,
+    E4,
+    F4,
+    G4,
+    H4,
+    A3,
+    B3,
+    C3,
+    D3,
+    E3,
+    F3,
+    G3,
+    H3,
+    A2,
+    B2,
+    C2,
+    D2,
+    E2,
+    F2,
+    G2,
+    H2,
+    A1,
+    B1,
+    C1,
+    D1,
+    E1,
+    F1,
+    G1,
+    H1,
+}
+
+impl FileRank {
     #[inline]
-        pub fn mask(self) -> u64 {
-            1 << (self as u8)
+    pub fn rank(self) -> u8 {
+        (self as u8) >> 3
+    }
+    #[inline]
+    pub fn file(self) -> u8 {
+        (self as u8) & 7
+    }
+
+    #[inline]
+    pub fn index(self) -> usize {
+        self as u8 as usize
+    }
+
+    #[inline]
+    pub fn mask(self) -> u64 {
+        1 << (self as u8)
+    }
+}
+impl Display for FileRank {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let file = FILE_RANK_CHAR[self.index()];
+        write!(f, "{file}")
+    }
+}
+
+pub(crate) const FILE_RANK_CHAR: [&'static str; 64] = [
+    "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8", "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
+    "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6", "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
+    "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4", "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
+    "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2", "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
+];
+
+pub const FILE_RANK: [FileRank; 64] = [
+    A8, B8, C8, D8, E8, F8, G8, H8, A7, B7, C7, D7, E7, F7, G7, H7, A6, B6, C6, D6, E6, F6, G6, H6,
+    A5, B5, C5, D5, E5, F5, G5, H5, A4, B4, C4, D4, E4, F4, G4, H4, A3, B3, C3, D3, E3, F3, G3, H3,
+    A2, B2, C2, D2, E2, F2, G2, H2, A1, B1, C1, D1, E1, F1, G1, H1,
+];
+
+impl FileRank {
+    pub fn iter() -> Iter<'static, FileRank> {
+        FILE_RANK.iter()
+    }
+
+    #[inline]
+    pub fn get_file_rank(value: u8) -> Option<FileRank> {
+        if value >= FileRank::A8 as u8 && value <= FileRank::H1 as u8 {
+            Some(unsafe { std::mem::transmute(value) })
+        } else {
+            None
         }
-        
-     }
-     impl Display for FileRank {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            let file = FILE_RANK_CHAR[self.index()];
-            write!(f, "{file}")
+    }
+
+    #[inline]
+    pub fn get_from_mask(mask: u64) -> Option<FileRank> {
+        FileRank::get_file_rank(mask.trailing_zeros() as u8)
+    }
+
+    pub fn from_string(value: &str) -> Option<Self> {
+        let index = FILE_RANK_CHAR.iter().position(|&r| r == value);
+        if let Some(i) = index {
+            return Some(FILE_RANK[i]);
         }
-     }
+        None
+    }
+}
 
-    pub(crate) const FILE_RANK_CHAR: [&'static str; 64] = [
-        "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
-        "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
-        "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
-        "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
-        "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
-        "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
-        "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
-        "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1"
-    ];
+pub struct BoardSide {
+    pub rooks: u64,
+    pub bishops: u64,
+    pub queens: u64,
+    pub king: u64,
+    pub knights: u64,
+    pub pawns: u64,
 
-    pub const FILE_RANK: [FileRank; 64] = [   
-        A8, B8, C8, D8, E8, F8, G8, H8,
-        A7, B7, C7, D7, E7, F7, G7, H7,
-        A6, B6, C6, D6, E6, F6, G6, H6,
-        A5, B5, C5, D5, E5, F5, G5, H5,
-        A4, B4, C4, D4, E4, F4, G4, H4,
-        A3, B3, C3, D3, E3, F3, G3, H3,
-        A2, B2, C2, D2, E2, F2, G2, H2,
-        A1, B1, C1, D1, E1, F1, G1, H1
-    ];
+    pub opposite_rooks: u64,
+    pub opposite_bishops: u64,
+    pub opposite_queens: u64,
+    pub opposite_king: u64,
+    pub opposite_knights: u64,
+    pub opposite_pawns: u64,
 
-    impl FileRank {
-         pub fn iter() -> Iter<'static, FileRank> {
-            FILE_RANK.iter()
-         }
+    pub opposite_attacks: u64,
 
-         #[inline]
-         pub fn get_file_rank(value: u8) -> Option<FileRank> {
-            if value >= FileRank::A8 as u8 && value <= FileRank::H1 as u8 {
-                Some(unsafe { std::mem::transmute(value) })
-            } else {
-                None
+    pub friendly_blockers: u64,
+    pub opposite_blockers: u64,
+    pub color: Color,
+
+    pub king_mask_castling: u64,
+    pub queen_mask_castling: u64,
+
+    pub castling_queen_side: bool,
+    pub castling_king_side: bool,
+}
+
+#[derive(Debug)]
+pub enum AlgebraicNotationToken {
+    Piece(char),
+    File(char),
+    Rank(char),
+    Capture,
+    Check,
+    Checkmate,
+    CastleKingSide,
+    CastleQueenSide,
+    Promotion(char),
+    MoveIndicator,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PieceMove {
+    pub piece: Piece,
+    pub from: FileRank,
+    pub target: FileRank,
+    pub move_type: MoveType,
+}
+impl PieceMove {
+    pub fn uci(&self) -> String {
+        match self.move_type {
+            MoveType::Promotion(promotion_piece)
+            | MoveType::CaptureWithPromotion(promotion_piece) => {
+                return format!(
+                    "{}{}{}",
+                    self.from,
+                    self.target,
+                    promotion_piece.get_symbol()
+                );
+            }
+            _ => {
+                return format!("{0}{1}", self.from, self.target);
             }
         }
+    }
 
-        #[inline]
-        pub fn get_from_mask(mask: u64) -> Option<FileRank> {
-            FileRank::get_file_rank(mask.trailing_zeros() as u8)
+    pub fn empty() -> PieceMove {
+        PieceMove {
+            piece: Piece {
+                piece_type: PieceType::Pawn,
+                color: Color::White,
+            },
+            from: FileRank::A1,
+            target: FileRank::A1,
+            move_type: MoveType::Quiet,
         }
-
-        pub fn from_string(value: &str) -> Option<Self> {
-            let index = FILE_RANK_CHAR
-             .iter()
-             .position(|&r| r == value);
-             if let Some(i) = index{
-                 return Some(FILE_RANK[i])
-             }
-             None
-         }
-     }
-
-    pub struct BoardSide {
-        pub rooks: u64,
-        pub bishops: u64,
-        pub queens: u64,
-        pub king: u64,
-        pub knights: u64,
-        pub pawns: u64,
-
-        pub opposite_rooks: u64,
-        pub opposite_bishops: u64,
-        pub opposite_queens: u64,
-        pub opposite_king: u64,
-        pub opposite_knights: u64,
-        pub opposite_pawns: u64,
-
-        pub opposite_attacks: u64,
-
-        pub friendly_blockers: u64,
-        pub opposite_blockers: u64,
-        pub color:Color,
-
-        pub king_mask_castling: u64,
-        pub queen_mask_castling: u64,
-
-
-        pub castling_queen_side:bool,
-        pub castling_king_side: bool
     }
-
-    #[derive(Debug)]
-    pub enum AlgebraicNotationToken {
-        Piece(char),
-        File(char),
-        Rank(char),
-        Capture,
-        Check,
-        Checkmate,
-        CastleKingSide,
-        CastleQueenSide,
-        Promotion(char),
-        MoveIndicator,
-    }
-
-    #[derive(Debug, Clone, Copy)]
-    pub struct PieceMove{
-        pub piece:Piece,
-        pub from: FileRank,
-        pub target: FileRank,
-        pub move_type: MoveType
-    }
-    impl PieceMove {
-        pub fn uci(&self)->String{
-            match self.move_type {
-                MoveType::Promotion(promotion_piece) | MoveType::CaptureWithPromotion(promotion_piece) => {
-                    return format!("{}{}{}", self.from, self.target, promotion_piece.get_symbol());
+    pub fn from_uci(uci: &str, game: &GameState) -> PieceMove {
+        match uci {
+            // White castling queenside
+            "O-O-O" => {
+                PieceMove {
+                    piece: WHITE_KING,                    // The piece being moved (white king)
+                    from: E1,   // From e1 (standard position for white king)
+                    target: C1, // To c1 (after castling queenside)
+                    move_type: MoveType::CastleQueenSide, // Type of move (castling)
                 }
-                _ => {
-                    return format!("{0}{1}", self.from, self.target);
+            }
+            // White castling kingside
+            "O-O" => {
+                PieceMove {
+                    piece: WHITE_KING,                   // The piece being moved (white king)
+                    from: E1,   // From e1 (standard position for white king)
+                    target: G1, // To g1 (after castling kingside)
+                    move_type: MoveType::CastleKingSide, // Type of move (castling)
                 }
-            }   
-        }
-        
-        pub fn from_uci(uci: &str, game: &GameState) -> PieceMove {        
-            match uci {
-                // White castling queenside
-                "O-O-O" => {
-                    PieceMove {
-                        piece: WHITE_KING,               // The piece being moved (white king)
-                        from: E1,                        // From e1 (standard position for white king)
-                        target: C1,                      // To c1 (after castling queenside)
-                        move_type: MoveType::CastleQueenSide,  // Type of move (castling)
-                    }
-                },
-                // White castling kingside
-                "O-O" => {
-                    PieceMove {
-                        piece: WHITE_KING,               // The piece being moved (white king)
-                        from: E1,                        // From e1 (standard position for white king)
-                        target: G1,                      // To g1 (after castling kingside)
-                        move_type: MoveType::CastleKingSide,   // Type of move (castling)
-                    }
-                },
-                // Black castling queenside
-                "o-o-o" => {
-                    PieceMove {
-                        piece: BLACK_KING,               // The piece being moved (black king)
-                        from: E8,                        // From e8 (standard position for black king)
-                        target: C8,                      // To c8 (after castling queenside)
-                        move_type: MoveType::CastleQueenSide,  // Type of move (castling)
-                    }
-                },
-                // Black castling kingside
-                "o-o" => {
-                    PieceMove {
-                        piece: BLACK_KING,               // The piece being moved (black king)
-                        from: E8,                        // From e8 (standard position for black king)
-                        target: G8,                      // To g8 (after castling kingside)
-                        move_type: MoveType::CastleKingSide,   // Type of move (castling)
-                    }
-                },
-                _ => {
-                    let chars = &mut uci.chars().collect::<Vec<char>>();
-                    let from = FileRank::from_string(&chars[0..2].iter().collect::<String>()).unwrap();
-                    let target = FileRank::from_string(&chars[2..4].iter().collect::<String>()).unwrap();
-                    let mut promotion = None;
-        
-                    // Check for promotion (if there's a 5th character)
-                    if chars.len() == 5 {
-                        promotion = Piece::from_character(chars[4]);
-                    }
-        
-                    // Get the piece at the starting position
-                    let piece = game.get_piece_at(&from).unwrap();
-                    let target_piece = game.get_piece_at(&target);
-        
-                    // Determine move type (Capture, Quiet, or Promotion)
-                    let move_type = match target_piece {
-                        Some(_) => {
-                            // If there's a piece at the target square, it's a capture
-                            if let Some(promotion_piece) = promotion {
-                                // Capture and promotion
-                                MoveType::CaptureWithPromotion(promotion_piece.piece_type)
-                            } else {
-                                // Normal capture
-                                MoveType::Capture
-                            }
+            }
+            // Black castling queenside
+            "o-o-o" => {
+                PieceMove {
+                    piece: BLACK_KING,                    // The piece being moved (black king)
+                    from: E8,   // From e8 (standard position for black king)
+                    target: C8, // To c8 (after castling queenside)
+                    move_type: MoveType::CastleQueenSide, // Type of move (castling)
+                }
+            }
+            // Black castling kingside
+            "o-o" => {
+                PieceMove {
+                    piece: BLACK_KING,                   // The piece being moved (black king)
+                    from: E8,   // From e8 (standard position for black king)
+                    target: G8, // To g8 (after castling kingside)
+                    move_type: MoveType::CastleKingSide, // Type of move (castling)
+                }
+            }
+            _ => {
+                let chars = &mut uci.chars().collect::<Vec<char>>();
+                let from = FileRank::from_string(&chars[0..2].iter().collect::<String>()).unwrap();
+                let target =
+                    FileRank::from_string(&chars[2..4].iter().collect::<String>()).unwrap();
+                let mut promotion = None;
+
+                // Check for promotion (if there's a 5th character)
+                if chars.len() == 5 {
+                    promotion = Piece::from_character(chars[4]);
+                }
+
+                // Get the piece at the starting position
+                let piece = game.get_piece_at(&from).unwrap();
+                let target_piece = game.get_piece_at(&target);
+
+                // Determine move type (Capture, Quiet, or Promotion)
+                let move_type = match target_piece {
+                    Some(_) => {
+                        // If there's a piece at the target square, it's a capture
+                        if let Some(promotion_piece) = promotion {
+                            // Capture and promotion
+                            MoveType::CaptureWithPromotion(promotion_piece.piece_type)
+                        } else {
+                            // Normal capture
+                            MoveType::Capture
                         }
-                        None => {
-                            // No piece at the target square
-                            match piece.piece_type {
-                                PieceType::Pawn => {
-                                    // Handle pawn promotion if applicable
-                                    if let Some(promotion_piece) = promotion {
-                                        MoveType::Promotion(promotion_piece.piece_type)
+                    }
+                    None => {
+                        // No piece at the target square
+                        match piece.piece_type {
+                            PieceType::Pawn => {
+                                // Handle pawn promotion if applicable
+                                if let Some(promotion_piece) = promotion {
+                                    MoveType::Promotion(promotion_piece.piece_type)
+                                } else {
+                                    // Handle double pawn push (special move)
+                                    if (from.rank() == 2 && target.rank() == 4)
+                                        || (from.rank() == 7 && target.rank() == 5)
+                                    {
+                                        // Double push condition (White pawns from 2 to 4, Black pawns from 7 to 5)
+                                        MoveType::DoublePush(Some(target))
                                     } else {
-                                        // Handle double pawn push (special move)
-                                        if (from.rank() == 2 && target.rank() == 4) || (from.rank() == 7 && target.rank() == 5) {
-                                            // Double push condition (White pawns from 2 to 4, Black pawns from 7 to 5)
-                                            MoveType::DoublePush(Some(target))
-                                        } else {
-                                            // Normal quiet pawn move or en passant if necessary
-                                            if let Some(en_passant_target) = game.en_passant {
-                                               if en_passant_target == target{
+                                        // Normal quiet pawn move or en passant if necessary
+                                        if let Some(en_passant_target) = game.en_passant {
+                                            if en_passant_target == target {
                                                 MoveType::Capture
-                                               }else{
-                                                MoveType::Quiet
-                                               }
                                             } else {
                                                 MoveType::Quiet
                                             }
+                                        } else {
+                                            MoveType::Quiet
                                         }
                                     }
-                                },
-                                // Handle other piece types (Knight, Bishop, Rook, Queen, King)
-                                _ => MoveType::Quiet,
+                                }
                             }
+                            // Handle other piece types (Knight, Bishop, Rook, Queen, King)
+                            _ => MoveType::Quiet,
                         }
-                    };
-        
-                    // Return the resulting PieceMove
-                    PieceMove {
-                        piece,
-                        from,
-                        target,
-                        move_type,
                     }
+                };
+
+                // Return the resulting PieceMove
+                PieceMove {
+                    piece,
+                    from,
+                    target,
+                    move_type,
                 }
             }
         }
     }
-    impl Default for PieceMove {
-        fn default() -> Self {
-        Self { piece: WHITE_PAWN, from: A1, target: A1, move_type: MoveType::Quiet }
-    }
-    }
-
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    #[repr(u8)]
-    pub enum MoveType{
-        Quiet,
-        DoublePush(Option<FileRank>),
-        CastleKingSide,
-        CastleQueenSide,
-        Promotion(PieceType),
-        Capture,
-        CaptureWithPromotion(PieceType),
-        EnPassantCapture
-    }
-
-    impl MoveType {
-        pub fn score(&self)->u8{
-            match self {
-                MoveType::Quiet => 0,
-                MoveType::DoublePush(_) => 1,
-                MoveType::CastleKingSide => 2,
-                MoveType::CastleQueenSide => 2,
-                MoveType::Promotion(_) => 3,
-                MoveType::Capture => 4,
-                MoveType::EnPassantCapture => 4,
-                MoveType::CaptureWithPromotion(_) => 5,
-            }
+}
+impl Default for PieceMove {
+    fn default() -> Self {
+        Self {
+            piece: WHITE_PAWN,
+            from: A1,
+            target: A1,
+            move_type: MoveType::Quiet,
         }
     }
-    
+}
 
-    pub const WHITE_CASTLING_RIGHTS_MASK: u64 = 0b1100;
-    pub const BLACK_CASTLING_RIGHTS_MASK: u64 = 0b0011;
-    
-    pub const WHITE_CASTLING_KING_MASK: u64 = 0b1000;
-    pub const WHITE_CASTLING_QUEEN_MASK: u64 = 0b0100;
-    
-    pub const BLACK_CASTLING_KING_MASK: u64 = 0b0010;
-    pub const BLACK_CASTLING_QUEEN_MASK: u64 = 0b0001;
-        #[derive(Debug, Clone, Copy)]
-    pub struct Castling {
-        pub mask: u64
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum MoveType {
+    Quiet = 1,
+    DoublePush(Option<FileRank>) = 2,
+    CastleKingSide = 3,
+    CastleQueenSide = 4,
+    Promotion(PieceType) = 5,
+    Capture = 6,
+    CaptureWithPromotion(PieceType) = 7,
+    EnPassantCapture = 8,
+}
+
+impl MoveType {
+    pub fn value(&self) -> u8 {
+        match self {
+            MoveType::Quiet => 0,
+            MoveType::DoublePush(_) => 1,
+            MoveType::CastleKingSide => 2,
+            MoveType::CastleQueenSide => 2,
+            MoveType::Promotion(_) => 3,
+            MoveType::Capture => 4,
+            MoveType::EnPassantCapture => 4,
+            MoveType::CaptureWithPromotion(_) => 5,
+        }
     }
+}
 
- impl Castling {
-     pub fn new() -> Castling {
-         Castling {
+pub const WHITE_CASTLING_RIGHTS_MASK: u64 = 0b1100;
+pub const BLACK_CASTLING_RIGHTS_MASK: u64 = 0b0011;
+
+pub const WHITE_CASTLING_KING_MASK: u64 = 0b1000;
+pub const WHITE_CASTLING_QUEEN_MASK: u64 = 0b0100;
+
+pub const BLACK_CASTLING_KING_MASK: u64 = 0b0010;
+pub const BLACK_CASTLING_QUEEN_MASK: u64 = 0b0001;
+#[derive(Debug, Clone, Copy)]
+pub struct Castling {
+    pub mask: u64,
+}
+
+impl Castling {
+    pub fn new() -> Castling {
+        Castling {
             mask: WHITE_CASTLING_RIGHTS_MASK | BLACK_CASTLING_RIGHTS_MASK, // Full rights by default
         }
-     }
-     pub fn from_mask(mask: u64) -> Castling {
-        Castling {
-           mask
-       }
     }
- 
-    #[inline]
-     pub fn disable_white_castling_rights(&mut self) {
-         self.mask &= !WHITE_CASTLING_RIGHTS_MASK;  
-     }
- 
-     #[inline]
-     pub fn disable_black_castling_rights(&mut self) {
-        self.mask &= !BLACK_CASTLING_RIGHTS_MASK;  
-     }
+    pub fn from_mask(mask: u64) -> Castling {
+        Castling { mask }
+    }
 
-     #[inline]
-     pub fn disable_king_side(&mut self, color: &Color) {
+    #[inline]
+    pub fn disable_white_castling_rights(&mut self) {
+        self.mask &= !WHITE_CASTLING_RIGHTS_MASK;
+    }
+
+    #[inline]
+    pub fn disable_black_castling_rights(&mut self) {
+        self.mask &= !BLACK_CASTLING_RIGHTS_MASK;
+    }
+
+    #[inline]
+    pub fn disable_king_side(&mut self, color: &Color) {
         match color {
             Color::White => {
                 self.mask &= !WHITE_CASTLING_KING_MASK;
-            },
+            }
             Color::Black => {
                 self.mask &= !BLACK_CASTLING_KING_MASK;
-            },
+            }
         }
     }
-    
+
     #[inline]
     pub fn disable_queen_side(&mut self, color: &Color) {
         match color {
             Color::White => {
                 self.mask &= !WHITE_CASTLING_QUEEN_MASK;
-            },
+            }
             Color::Black => {
                 self.mask &= !BLACK_CASTLING_QUEEN_MASK;
-            },
+            }
         }
     }
 
@@ -570,48 +682,80 @@
     }
 
     #[inline]
-    pub fn has_any_rights(&self, color: &Color)->bool{
+    pub fn has_any_rights(&self, color: &Color) -> bool {
         match color {
-            Color::White => self.mask & (WHITE_CASTLING_KING_MASK | WHITE_CASTLING_QUEEN_MASK) !=0,
-            Color::Black => self.mask & (BLACK_CASTLING_KING_MASK | BLACK_CASTLING_QUEEN_MASK) !=0,
+            Color::White => self.mask & (WHITE_CASTLING_KING_MASK | WHITE_CASTLING_QUEEN_MASK) != 0,
+            Color::Black => self.mask & (BLACK_CASTLING_KING_MASK | BLACK_CASTLING_QUEEN_MASK) != 0,
         }
     }
+}
 
- }
-
- #[derive(Clone, Debug)]
- pub struct Clock(u8);
- impl Clock {
-        pub fn counter(&self)-> u8{
-            return self.0
-        }
-        pub fn new() -> Self {
-            Clock(0)
-        }
-        pub fn tick(&mut self){
-            self.0 +=  1;
-        }
-
-        pub fn from_string(value:&str)->Clock{
-            return Clock(value.parse().unwrap_or(0));
-        } 
-        pub fn from(value: u8)->Clock{
-            return Clock(value);
-        } 
-        
-        pub fn reset(&mut self){
-            self.0 = 0;
-        }
+#[derive(Clone, Debug)]
+pub struct Clock(u8);
+impl Clock {
+    pub fn counter(&self) -> u8 {
+        return self.0;
     }
+    pub fn new() -> Self {
+        Clock(0)
+    }
+    pub fn tick(&mut self) {
+        self.0 += 1;
+    }
+
+    pub fn from_string(value: &str) -> Clock {
+        return Clock(value.parse().unwrap_or(0));
+    }
+    pub fn from(value: u8) -> Clock {
+        return Clock(value);
+    }
+
+    pub fn reset(&mut self) {
+        self.0 = 0;
+    }
+}
 
 impl Display for Clock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = self.0;
-        write!(f, "{value}")    }
+        write!(f, "{value}")
+    }
 }
 
-impl AddAssign<u8> for Clock{
+impl AddAssign<u8> for Clock {
     fn add_assign(&mut self, rhs: u8) {
-        self.0+= rhs;
+        self.0 += rhs;
+    }
+}
+
+#[derive(Debug)]
+pub struct MoveBuffer {
+    arr: [PieceMove; 64],
+    count: usize,
+}
+
+impl MoveBuffer {
+    #[inline]
+    pub fn push(&mut self, piece_move: PieceMove) {
+        self.arr[self.count] = piece_move;
+        self.count += 1;
+    }
+
+    #[inline]
+    pub fn init() -> MoveBuffer {
+        MoveBuffer {
+            arr: array::from_fn(|_| PieceMove::empty()),
+            count: 0,
+        }
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        self.count = 0;
+    }
+
+    #[inline]
+    pub fn get(&self) -> &[PieceMove] {
+        &self.arr[..self.count]
     }
 }

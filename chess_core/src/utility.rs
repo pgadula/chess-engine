@@ -48,6 +48,7 @@ pub fn pop_lsb(b: &mut u64) -> u32 {
     return i;
 }
 
+#[inline(always)]
 pub fn get_file_ranks(bitboard: u64) -> impl Iterator<Item = FileRank> {
     let mut copy = bitboard;
 

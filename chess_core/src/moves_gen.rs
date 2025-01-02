@@ -2,7 +2,7 @@ use std::iter::zip;
 
 use crate::{bitboard::GameState, file_rank::{
     FILE_A, FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_1, RANK_3, RANK_6, RANK_8
-}, precalculated::PAWN_ATTACK_MASK, types::{Color, FileRank, MoveType, Piece, PieceMove, BLACK_PAWN, FILE_RANK, PROMOTION_PIECES, WHITE_PAWN}, utility::{get_file_ranks, pop_bit, pop_lsb, print_as_board, set_bit_by_index}};
+}, precalculated::PAWN_ATTACK_MASK, types::{Color, FileRank, MoveBuffer, MoveType, Piece, PieceMove, BLACK_PAWN, FILE_RANK, PROMOTION_PIECES, WHITE_PAWN}, utility::{get_file_ranks, pop_bit, pop_lsb, print_as_board, set_bit_by_index}};
 
 
 pub fn get_pawn_moves(
@@ -127,8 +127,8 @@ pub fn get_pawn_moves_vectorized(
     opposite_blockers: u64, 
     en_passant: &Option<FileRank>,
     attack_mask: &mut u64,
-    quiet_moves: &mut Vec<PieceMove>,
-    capture_moves: &mut Vec<PieceMove>,
+    quiet_moves: &mut MoveBuffer,
+    capture_moves: &mut MoveBuffer,
 ) {
 
 
@@ -454,7 +454,7 @@ pub fn _gen_bishop_attacks_on_the_fly(file_rank: FileRank, bit_board: u64) -> u6
     attacks
 }
 
-pub fn get_pawn_pattern_attacks(side: Color, file_rank: &FileRank) -> u64 {
+pub fn get_pawn_pattern_attacks(side: &Color, file_rank: &FileRank) -> u64 {
     let tr: u8 = file_rank.rank();
     let tf: u8 = file_rank.file();
     let start = 1u64 << tr * 8 + tf;
@@ -505,8 +505,8 @@ pub fn fill_moves(
     from: FileRank,
     piece: Piece,
     mut bit_moves: u64,
-    quiet_attacks: &mut Vec<PieceMove>,
-    killer_attacks: &mut Vec<PieceMove>,
+    quiet_attacks: &mut MoveBuffer,
+    killer_attacks: &mut MoveBuffer,
     opposite_blockers: u64
 ) {
 

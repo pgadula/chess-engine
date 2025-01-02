@@ -1,12 +1,13 @@
 use crate::fen::FenParser;
-use crate::moves_gen::get_pawn_moves_vectorized;
+use crate::moves_gen::{get_pawn_moves_vectorized, get_pawn_pattern_attacks};
+use crate::types::MoveBuffer;
 use crate::{
     file_rank::{
         BLACK_KING_CASTLE_BOARD_MASK, BLACK_QUEEN_CASTLE_BOARD_MASK, RANK_3,
         WHITE_KING_CASTLE_BOARD_MASK, WHITE_QUEEN_CASTLE_BOARD_MASK,
     },
     magic_gen::MoveLookupTable,
-    moves_gen::{fill_moves, get_king_attacks, get_knight_attacks, get_pawn_moves},
+    moves_gen::{fill_moves, get_king_attacks, get_knight_attacks},
     types::{
         BoardSide, Color, FileRank, MoveType, Piece, PieceIndex, PieceMove, PieceType, BLACK_ROOK,
         WHITE_ROOK,
@@ -34,10 +35,10 @@ pub struct GameState {
 
     pub en_passant: Option<FileRank>,
     pub move_lookup_table: Arc<MoveLookupTable>,
-    quiet_white_moves: Vec<PieceMove>,
-    quiet_black_moves: Vec<PieceMove>,
-    killer_white_moves: Vec<PieceMove>,
-    killer_black_moves: Vec<PieceMove>,
+    quiet_white_moves: MoveBuffer,
+    quiet_black_moves: MoveBuffer,
+    killer_white_moves: MoveBuffer,
+    killer_black_moves: MoveBuffer,
     pub w_moves_mask: u64,
     pub b_moves_mask: u64,
 
@@ -56,10 +57,10 @@ impl Clone for GameState {
             fullmove_number: self.fullmove_number.clone(),
             en_passant: self.en_passant.clone(),
             move_lookup_table: self.move_lookup_table.clone(),
-            quiet_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
-            quiet_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
-            killer_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
-            killer_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            quiet_white_moves: MoveBuffer::init(),
+            quiet_black_moves: MoveBuffer::init(),
+            killer_white_moves: MoveBuffer::init(),
+            killer_black_moves: MoveBuffer::init(),
             w_moves_mask: self.w_moves_mask.clone(),
             b_moves_mask: self.b_moves_mask.clone(),
             zobrist_hashing: self.zobrist_hashing.clone(),
@@ -329,7 +330,7 @@ impl GameState {
         let white = self.get_board_side_info(&Color::White);
         let black = self.get_board_side_info(&Color::Black);
         //TODO: Do not calculate for both sides, Need to be optimized
-        
+
         self.get_pseudolegal_moves(&white);
 
         self.get_pseudolegal_moves(&black);
@@ -348,8 +349,6 @@ impl GameState {
                 }
             }
         }
-
-
     }
 
     #[inline]
@@ -358,26 +357,27 @@ impl GameState {
     }
 
     pub fn fill_valid_moves(&self, buffer: &mut ValidMoveBuffer) -> usize {
-        let (quite_moves, capture_moves) = if self.move_turn == Color::White {
-            (&self.quiet_white_moves, &self.killer_white_moves)
+        let (quiet_moves, capture_moves) = if self.move_turn == Color::White {
+            (self.quiet_white_moves.get(), self.killer_white_moves.get())
         } else {
-            (&self.quiet_black_moves, &self.killer_black_moves)
+            (self.quiet_black_moves.get(), self.killer_black_moves.get())
         };
         let mut game: GameState = self.clone();
         let mut count = 0;
         capture_moves
             .iter()
-            .chain(quite_moves)
+            .chain(quiet_moves)
             .map(|piece_move: &PieceMove| {
                 game.make_move(piece_move);
                 let side = game.get_board_side_info(&game.move_turn);
+                // let attack_mask =game.get_ray_attacks(&side);
                 game.get_pseudolegal_moves(&side);
+
                 let BoardSide {
                     king,
                     opposite_attacks,
                     ..
                 } = game.get_board_side_info(&game.move_turn.flip());
-
                 let check = game.detect_check(&king, &opposite_attacks);
                 game.unmake_move();
                 (check, *piece_move)
@@ -440,6 +440,54 @@ impl GameState {
 
         result
     }
+    pub fn get_ray_attacks(&self, side: &BoardSide) -> u64 {
+        let mut attack_mask = 0;
+        let BoardSide {
+            bishops,
+            friendly_blockers,
+            queens,
+            rooks,
+            knights,
+            pawns,
+            color,
+            ..
+        } = side;
+
+        let all_pieces: u64 = self.get_all_pieces();
+
+        let lookup_table = self.move_lookup_table.clone();
+        let rev_friendly_blockers = !friendly_blockers;
+
+        for rook_position in get_file_ranks(*rooks) {
+            let rook_move: u64 =
+                lookup_table.get_rook_attack(rook_position, all_pieces) & rev_friendly_blockers;
+            attack_mask |= rook_move;
+        }
+        for bishop_position in get_file_ranks(*bishops) {
+            let bishop_moves: u64 =
+                lookup_table.get_bishop_attack(bishop_position, all_pieces) & rev_friendly_blockers;
+            attack_mask |= bishop_moves;
+        }
+
+        for queen_position in get_file_ranks(*queens) {
+            let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, all_pieces);
+            let rook_moves: u64 = lookup_table.get_rook_attack(queen_position, all_pieces);
+            let sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
+            attack_mask |= sliding_moves;
+        }
+
+        for knight_position in get_file_ranks(*knights) {
+            let attacks = get_knight_attacks(&knight_position) & rev_friendly_blockers;
+            attack_mask |= attacks;
+        }
+
+        for pawn_position in get_file_ranks(*pawns) {
+            let attacks = get_pawn_pattern_attacks(color, &pawn_position) & rev_friendly_blockers;
+            attack_mask |= attacks;
+        }
+
+        return attack_mask;
+    }
 
     pub fn get_pseudolegal_moves(&mut self, side: &BoardSide) {
         let BoardSide {
@@ -458,8 +506,8 @@ impl GameState {
         let all_pieces: u64 = self.get_all_pieces();
 
         let (mut quite_moves, mut killer_moves, mut move_mask): (
-            &mut Vec<PieceMove>,
-            &mut Vec<PieceMove>,
+            &mut MoveBuffer,
+            &mut MoveBuffer,
             &mut u64,
         ) = if *color == Color::White {
             (
@@ -837,10 +885,10 @@ impl Default for GameState {
             en_passant: None,
             halfmove_clock: Clock::new(),
             fullmove_number: Clock::new(),
-            quiet_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
-            quiet_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
-            killer_black_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
-            killer_white_moves: Vec::with_capacity(TEMP_VALID_MOVE_SIZE),
+            quiet_black_moves: MoveBuffer::init(),
+            quiet_white_moves: MoveBuffer::init(),
+            killer_black_moves: MoveBuffer::init(),
+            killer_white_moves: MoveBuffer::init(),
             w_moves_mask: 0u64,
             b_moves_mask: 0u64,
             zobrist_hashing: Arc::new(zobrist_hashing),
