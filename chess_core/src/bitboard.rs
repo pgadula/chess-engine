@@ -356,41 +356,42 @@ impl GameState {
         king_mask & attacks_mask > 0
     }
 
-    pub fn fill_valid_moves(&self, buffer: &mut ValidMoveBuffer) -> usize {
-        let (quiet_moves, capture_moves) = if self.move_turn == Color::White {
-            (self.quiet_white_moves.get(), self.killer_white_moves.get())
-        } else {
-            (self.quiet_black_moves.get(), self.killer_black_moves.get())
-        };
-        let mut game: GameState = self.clone();
-        let mut count = 0;
-        capture_moves
-            .iter()
-            .chain(quiet_moves)
-            .map(|piece_move: &PieceMove| {
-                game.make_move(piece_move);
-                let side = game.get_board_side_info(&game.move_turn);
-                // let attack_mask =game.get_ray_attacks(&side);
-                game.get_pseudolegal_moves(&side);
+    pub fn fill_valid_moves(&mut self, buffer: &mut ValidMoveBuffer) -> usize {
+        // Pull out the slices/iterators
+    let (quiet_moves, capture_moves) = if self.move_turn == Color::White {
+        (self.quiet_white_moves.get(), self.killer_white_moves.get())
+    } else {
+        (self.quiet_black_moves.get(), self.killer_black_moves.get())
+    };
 
-                let BoardSide {
-                    king,
-                    opposite_attacks,
-                    ..
-                } = game.get_board_side_info(&game.move_turn.flip());
-                let check = game.detect_check(&king, &opposite_attacks);
-                game.unmake_move();
-                (check, *piece_move)
-            })
-            .filter(|attack| attack.0 == false)
-            .map(|tuple| tuple.1)
-            .enumerate()
-            .for_each(|(i, mv)| {
-                buffer[i] = mv;
-                count = count + 1;
-            });
 
-        return count;
+    let all_moves: Vec<PieceMove> = capture_moves
+        .iter()
+        .chain(quiet_moves)
+        .copied()
+        .collect();
+
+    let mut count = 0;
+    for  piece_move in all_moves.iter() {
+        self.make_move(piece_move);
+        
+        let side = self.get_board_side_info(&self.move_turn);
+        // self.get_pseudolegal_moves(&side);
+        let rays = self.get_ray_attacks(&side);
+        let king: u64 = if self.move_turn == Color::White {self.bitboard[BLACK_KING.bitboard_index()]} else{
+            self.bitboard[WHITE_KING.bitboard_index()]
+        } ;
+        let check = self.detect_check(&king, &rays );
+
+        self.unmake_move();
+
+        if !check {
+            buffer[count] = *piece_move;
+            count += 1;
+        }
+    }
+
+    count
     }
 
     pub fn perft(self, depth: usize) -> (usize, Vec<(String, usize)>) {
@@ -440,6 +441,7 @@ impl GameState {
 
         result
     }
+    
     pub fn get_ray_attacks(&self, side: &BoardSide) -> u64 {
         let mut attack_mask = 0;
         let BoardSide {
