@@ -4,7 +4,7 @@ use rand_pcg::Pcg32;
 use crate::{
     bitboard::GameState,
     types::{FileRank, MoveType, PieceMove, PIECES_ARRAY},
-    utility::get_file_ranks,
+    utility::get_file_ranks_from_mask,
 };
 
 #[derive(Debug)]
@@ -36,7 +36,7 @@ impl ZobristHashing {
     pub fn get_hash_from_scratch(&self, game: &GameState) -> u64 {
         let mut hash = 0;
         for (index, squares) in game.bitboard.iter().enumerate() {
-            for file_rank in get_file_ranks(*squares) {
+            for file_rank in get_file_ranks_from_mask(*squares) {
                 let hash_index = Self::piece_index(index, &file_rank);
                 hash ^= self.pieces[hash_index];
             }

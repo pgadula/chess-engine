@@ -49,7 +49,7 @@ pub fn pop_lsb(b: &mut u64) -> u32 {
 }
 
 #[inline(always)]
-pub fn get_file_ranks(bitboard: u64) -> impl Iterator<Item = FileRank> {
+pub fn get_file_ranks_from_mask(bitboard: u64) -> impl Iterator<Item = FileRank> {
     let mut copy = bitboard;
 
     std::iter::from_fn(move ||{

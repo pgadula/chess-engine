@@ -1,8 +1,8 @@
 use std::iter::zip;
 
 use crate::{bitboard::GameState, file_rank::{
-    FILE_A, FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_1, RANK_3, RANK_6, RANK_8
-}, precalculated::PAWN_ATTACK_MASK, types::{Color, FileRank, MoveBuffer, MoveType, Piece, PieceMove, BLACK_PAWN, FILE_RANK, PROMOTION_PIECES, WHITE_PAWN}, utility::{get_file_ranks, pop_bit, pop_lsb, print_as_board, set_bit_by_index}};
+    FILE_NOT_A, FILE_NOT_AB, FILE_NOT_GH, FILE_NOT_H, NOT_RANK_1, NOT_RANK_1_2, NOT_RANK_7_8, NOT_RANK_8, RANK_1, RANK_3, RANK_6, RANK_8
+}, precalculated::PAWN_ATTACK_MASK, types::{Color, FileRank, MoveBuffer, MoveType, Piece, PieceMove, BLACK_PAWN, FILE_RANK, PROMOTION_PIECES, WHITE_PAWN}, utility::{get_file_ranks_from_mask, pop_bit, pop_lsb, set_bit_by_index}};
 
 
 pub fn get_pawn_moves(
@@ -54,7 +54,7 @@ pub fn get_pawn_moves(
 
         *attack_mask |= all_moves_mask;
 
-        for target in get_file_ranks(all_moves_mask){
+        for target in get_file_ranks_from_mask(all_moves_mask){
             let file_rank_mask = target.mask();
            let is_capture_attack =  (attack_pattern & file_rank_mask) > 0;
            let is_single_push =  (single_push & file_rank_mask) > 0;
@@ -270,7 +270,7 @@ pub fn get_pawn_moves_vectorized(
                 from,
                 piece,
                 target: to,
-                move_type: MoveType::Capture,
+                move_type: MoveType::EnPassantCapture,
             });
         } else {
             capture_moves.push(PieceMove {

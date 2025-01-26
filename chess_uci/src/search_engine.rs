@@ -321,6 +321,7 @@ impl SearchEngine {
             final_results.sort_by(|a, b| a.1.cmp(&b.1));
         }
 
+        println!("{:?}", final_results);
         // Select the best move
         if let Some((best_uci, best_score, _)) = final_results.first() {
             println!("INFO: Best move at depth {max_completed_depth}: {best_uci} with score {best_score}");

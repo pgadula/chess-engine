@@ -728,7 +728,7 @@ impl AddAssign<u8> for Clock {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MoveBuffer {
     arr: [PieceMove; 64],
     count: usize,

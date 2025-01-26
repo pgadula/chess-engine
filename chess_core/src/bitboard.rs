@@ -1,6 +1,7 @@
 use crate::fen::FenParser;
 use crate::moves_gen::{get_pawn_moves_vectorized, get_pawn_pattern_attacks};
 use crate::types::MoveBuffer;
+use crate::utility::print_as_board;
 use crate::{
     file_rank::{
         BLACK_KING_CASTLE_BOARD_MASK, BLACK_QUEEN_CASTLE_BOARD_MASK, RANK_3,
@@ -12,7 +13,7 @@ use crate::{
         BoardSide, Color, FileRank, MoveType, Piece, PieceIndex, PieceMove, PieceType, BLACK_ROOK,
         WHITE_ROOK,
     },
-    utility::{clear_bit, get_file_ranks, set_bit},
+    utility::{clear_bit, get_file_ranks_from_mask, set_bit},
 };
 use crate::{
     types::{Castling, Clock, BLACK_KING, WHITE_KING},
@@ -24,7 +25,7 @@ pub const TEMP_VALID_MOVE_SIZE: usize = 512;
 
 pub type ValidMoveBuffer = [PieceMove; TEMP_VALID_MOVE_SIZE];
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GameState {
     pub bitboard: [u64; 12],
     pub move_turn: Color,
@@ -46,29 +47,6 @@ pub struct GameState {
     pub hash: u64,
 
     pub history: Vec<UnmakeInfo>,
-}
-impl Clone for GameState {
-    fn clone(&self) -> Self {
-        Self {
-            bitboard: self.bitboard.clone(),
-            move_turn: self.move_turn.clone(),
-            castling: self.castling.clone(),
-            halfmove_clock: self.halfmove_clock.clone(),
-            fullmove_number: self.fullmove_number.clone(),
-            en_passant: self.en_passant.clone(),
-            move_lookup_table: self.move_lookup_table.clone(),
-            quiet_white_moves: MoveBuffer::init(),
-            quiet_black_moves: MoveBuffer::init(),
-            killer_white_moves: MoveBuffer::init(),
-            killer_black_moves: MoveBuffer::init(),
-            w_moves_mask: self.w_moves_mask.clone(),
-            b_moves_mask: self.b_moves_mask.clone(),
-            zobrist_hashing: self.zobrist_hashing.clone(),
-            hash: self.hash.clone(),
-            history: self.history.clone(),
-            board: self.board.clone(),
-        }
-    }
 }
 
 impl GameState {
@@ -327,13 +305,17 @@ impl GameState {
     }
 
     pub fn calculate_pseudolegal_moves(&mut self) {
-        let white = self.get_board_side_info(&Color::White);
-        let black = self.get_board_side_info(&Color::Black);
         //TODO: Do not calculate for both sides, Need to be optimized
+            if self.move_turn == Color::White {
+                let white = self.get_board_side_info(&Color::White);
+                self.get_pseudolegal_moves(&white);
 
-        self.get_pseudolegal_moves(&white);
+            }else{
+                let black = self.get_board_side_info(&Color::Black);
+                self.get_pseudolegal_moves(&black);
+            }
 
-        self.get_pseudolegal_moves(&black);
+
 
         let side: BoardSide = self.get_board_side_info(&self.move_turn);
         if self.castling.has_any_rights(&self.move_turn) {
@@ -364,7 +346,7 @@ impl GameState {
         (self.quiet_black_moves.get(), self.killer_black_moves.get())
     };
 
-
+    // Copy all moves into a local Vec (so we're not borrowing from self)
     let all_moves: Vec<PieceMove> = capture_moves
         .iter()
         .chain(quiet_moves)
@@ -373,15 +355,14 @@ impl GameState {
 
     let mut count = 0;
     for  piece_move in all_moves.iter() {
-        self.make_move(piece_move);
+        self.make_move(piece_move); // now we can mutate `self`
         
         let side = self.get_board_side_info(&self.move_turn);
-        // self.get_pseudolegal_moves(&side);
+
         let rays = self.get_ray_attacks(&side);
-        let king: u64 = if self.move_turn == Color::White {self.bitboard[BLACK_KING.bitboard_index()]} else{
-            self.bitboard[WHITE_KING.bitboard_index()]
-        } ;
-        let check = self.detect_check(&king, &rays );
+        let BoardSide { king, .. } = 
+            self.get_board_side_info(&self.move_turn.flip());
+        let check = self.detect_check(&king, &rays  );
 
         self.unmake_move();
 
@@ -441,7 +422,6 @@ impl GameState {
 
         result
     }
-    
     pub fn get_ray_attacks(&self, side: &BoardSide) -> u64 {
         let mut attack_mask = 0;
         let BoardSide {
@@ -451,6 +431,7 @@ impl GameState {
             rooks,
             knights,
             pawns,
+            king,
             color,
             ..
         } = side;
@@ -460,31 +441,37 @@ impl GameState {
         let lookup_table = self.move_lookup_table.clone();
         let rev_friendly_blockers = !friendly_blockers;
 
-        for rook_position in get_file_ranks(*rooks) {
+        for rook_position in get_file_ranks_from_mask(*rooks) {
             let rook_move: u64 =
                 lookup_table.get_rook_attack(rook_position, all_pieces) & rev_friendly_blockers;
             attack_mask |= rook_move;
         }
-        for bishop_position in get_file_ranks(*bishops) {
+        for bishop_position in get_file_ranks_from_mask(*bishops) {
             let bishop_moves: u64 =
                 lookup_table.get_bishop_attack(bishop_position, all_pieces) & rev_friendly_blockers;
             attack_mask |= bishop_moves;
         }
 
-        for queen_position in get_file_ranks(*queens) {
+        for queen_position in get_file_ranks_from_mask(*queens) {
             let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, all_pieces);
             let rook_moves: u64 = lookup_table.get_rook_attack(queen_position, all_pieces);
             let sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
             attack_mask |= sliding_moves;
         }
 
-        for knight_position in get_file_ranks(*knights) {
+        for knight_position in get_file_ranks_from_mask(*knights) {
             let attacks = get_knight_attacks(&knight_position) & rev_friendly_blockers;
             attack_mask |= attacks;
         }
 
-        for pawn_position in get_file_ranks(*pawns) {
+        for pawn_position in get_file_ranks_from_mask(*pawns) {
             let attacks = get_pawn_pattern_attacks(color, &pawn_position) & rev_friendly_blockers;
+            attack_mask |= attacks;
+        }
+
+
+        for king_position in get_file_ranks_from_mask(*king) {
+            let attacks = get_king_attacks(&king_position) & rev_friendly_blockers;
             attack_mask |= attacks;
         }
 
@@ -533,7 +520,7 @@ impl GameState {
         let lookup_table = self.move_lookup_table.clone();
         let rev_friendly_blockers = !friendly_blockers;
 
-        for rook_position in get_file_ranks(*rooks) {
+        for rook_position in get_file_ranks_from_mask(*rooks) {
             let rook_move: u64 =
                 lookup_table.get_rook_attack(rook_position, all_pieces) & rev_friendly_blockers;
             *move_mask |= rook_move;
@@ -546,7 +533,7 @@ impl GameState {
                 *opposite_blockers,
             );
         }
-        for bishop_position in get_file_ranks(*bishops) {
+        for bishop_position in get_file_ranks_from_mask(*bishops) {
             let bishop_moves: u64 =
                 lookup_table.get_bishop_attack(bishop_position, all_pieces) & rev_friendly_blockers;
             *move_mask |= bishop_moves;
@@ -561,7 +548,7 @@ impl GameState {
             );
         }
 
-        for queen_position in get_file_ranks(*queens) {
+        for queen_position in get_file_ranks_from_mask(*queens) {
             let bishop_moves: u64 = lookup_table.get_bishop_attack(queen_position, all_pieces);
             let rook_moves: u64 = lookup_table.get_rook_attack(queen_position, all_pieces);
             let sliding_moves = (bishop_moves | rook_moves) & rev_friendly_blockers;
@@ -576,7 +563,7 @@ impl GameState {
             );
         }
 
-        for knight_position in get_file_ranks(*knights) {
+        for knight_position in get_file_ranks_from_mask(*knights) {
             let attacks = get_knight_attacks(&knight_position) & rev_friendly_blockers;
             *move_mask |= attacks;
             fill_moves(
@@ -600,7 +587,7 @@ impl GameState {
             &mut killer_moves,
         );
 
-        for king_position in get_file_ranks(*king) {
+        for king_position in get_file_ranks_from_mask(*king) {
             let attacks = get_king_attacks(&king_position) & rev_friendly_blockers;
             *move_mask |= attacks;
             fill_moves(
@@ -628,15 +615,15 @@ impl GameState {
             opposite_blockers,
             ..
         } = side;
-
+        let attacks_ray = self.get_ray_attacks(side);
         let blockers = opposite_blockers | friendly_blockers;
 
-        let has_check = self.detect_check(&king, &opposite_attacks);
+        let has_check = self.detect_check(&king, &attacks_ray);
         if has_check || !(castling_king_side | castling_queen_side) {
             return None;
         }
 
-        let mut castlings: Vec<PieceMove> = Vec::with_capacity(2);
+        let mut castling_moves: Vec<PieceMove> = Vec::with_capacity(2);
         let king_piece = Piece {
             piece_type: PieceType::King,
             color: *color,
@@ -671,7 +658,7 @@ impl GameState {
             && has_space_king_side
             && rooks_starting_field[1].mask() & rooks > 0
         {
-            castlings.push({
+            castling_moves.push({
                 PieceMove {
                     piece: king_piece,
                     from: starting_king_file_rank,
@@ -693,7 +680,7 @@ impl GameState {
             && has_space_queen_side
             && (rooks_starting_field[0].mask() & rooks) > 0
         {
-            castlings.push({
+            castling_moves.push({
                 PieceMove {
                     piece: king_piece,
                     from: starting_king_file_rank,
@@ -703,8 +690,8 @@ impl GameState {
             })
         }
 
-        if castlings.len() > 0 {
-            return Some(castlings);
+        if castling_moves.len() > 0 {
+            return Some(castling_moves);
         }
 
         return None;
